@@ -1,0 +1,602 @@
+/* ==========================================================================
+   Stake Platform - Split Screen Auth Page Styles
+   - Animated Rising Stock Bubbles in Left Visual Area Only (Consistent smooth linear velocity)
+   - Clean Unboxed Modern Form Layout on the Right Side
+   ========================================================================== */
+
+.stake-auth-layout {
+  min-height: 100vh;
+  display: flex;
+  width: 100%;
+  font-family: var(--font-body);
+  background: #f8fafc;
+}
+
+/* Left Hero Column (Dark Green / Atmospheric) */
+.stake-auth-left {
+  flex: 1.1;
+  background: radial-gradient(circle at 50% 50%, #0e2a1e 0%, #06110c 60%, #040906 100%);
+  color: #ffffff;
+  padding: 48px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden; /* Restricts all bubbles to this image/hero column only */
+  box-sizing: border-box;
+}
+
+@media (max-width: 960px) {
+  .stake-auth-left {
+    display: none;
+  }
+}
+
+/* Background Subtle Glow Grid */
+.stake-auth-left::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: radial-gradient(rgba(0, 229, 153, 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  opacity: 0.5;
+  z-index: 0;
+}
+
+/* ==========================================================================
+   RISING STOCK BUBBLES FIELD (Fast, randomized natural movement)
+   ========================================================================== */
+.stake-auth-bubble-field {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.stake-rising-stock-bubble {
+  position: absolute;
+  bottom: -60px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(14, 38, 28, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 229, 153, 0.35);
+  border-radius: 9999px;
+  padding: 7px 15px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 229, 153, 0.18);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.stake-rising-stock-bubble.down {
+  background: rgba(45, 18, 20, 0.78);
+  border: 1px solid rgba(248, 113, 113, 0.38);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), 0 0 16px rgba(239, 68, 68, 0.18);
+}
+
+.stake-rising-stock-bubble.path-1 {
+  animation-name: bubbleFloat1;
+}
+.stake-rising-stock-bubble.path-2 {
+  animation-name: bubbleFloat2;
+}
+.stake-rising-stock-bubble.path-3 {
+  animation-name: bubbleFloat3;
+}
+.stake-rising-stock-bubble.path-4 {
+  animation-name: bubbleFloat4;
+}
+
+@keyframes bubbleFloat1 {
+  0% {
+    transform: translate(0, 0) scale(0.92);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.95;
+  }
+  35% {
+    transform: translate(24px, -35vh) scale(1.02);
+  }
+  65% {
+    transform: translate(-18px, -70vh) scale(0.98);
+    opacity: 0.95;
+  }
+  90% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(12px, -115vh) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes bubbleFloat2 {
+  0% {
+    transform: translate(0, 0) scale(0.95);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  40% {
+    transform: translate(-28px, -40vh) scale(0.98);
+  }
+  70% {
+    transform: translate(20px, -75vh) scale(1.04);
+    opacity: 0.95;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-10px, -115vh) scale(0.96);
+    opacity: 0;
+  }
+}
+
+@keyframes bubbleFloat3 {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(32px, -55vh) scale(1.05);
+    opacity: 0.95;
+  }
+  85% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(-24px, -115vh) scale(0.94);
+    opacity: 0;
+  }
+}
+
+@keyframes bubbleFloat4 {
+  0% {
+    transform: translate(0, 0) scale(0.9);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.95;
+  }
+  45% {
+    transform: translate(-22px, -48vh) scale(1.02);
+  }
+  75% {
+    transform: translate(18px, -82vh) scale(0.97);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(0px, -115vh) scale(1);
+    opacity: 0;
+  }
+}
+
+.bubble-ticker-tag {
+  font-size: 11.5px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+}
+
+.bubble-price-tag {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #e2e8f0;
+}
+
+.bubble-chg-tag {
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.bubble-chg-tag.up {
+  color: #00e599;
+  background: rgba(0, 229, 153, 0.15);
+}
+
+.bubble-chg-tag.down {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.15);
+}
+
+/* Foreground Typography on Left Column - Centered & Prominent */
+.stake-auth-left-content {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  max-width: 560px;
+}
+
+.stake-auth-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  color: #00e599;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.stake-auth-headline {
+  font-family: var(--font-display);
+  font-size: clamp(44px, 4.8vw, 68px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+  margin: 0 0 22px;
+  text-align: center;
+}
+
+.stake-auth-lead {
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: #94a3b8;
+  line-height: 1.65;
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* ==========================================================================
+   RIGHT AUTH FORM COLUMN (Clean Unboxed Layout)
+   ========================================================================== */
+.stake-auth-right {
+  flex: 1;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 36px;
+  box-sizing: border-box;
+}
+
+/* Clean Unboxed Form Wrapper */
+.stake-auth-form-wrapper {
+  width: 100%;
+  max-width: 420px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  text-align: left;
+}
+
+.stake-auth-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.stake-back-landing-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.stake-back-landing-btn:hover {
+  color: #0f172a;
+}
+
+.stake-auth-title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+}
+
+.stake-auth-desc {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: #64748b;
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+/* Segmented Mode Switcher - Fixed No Wrap */
+.stake-mode-pill-box {
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  border: 1px solid #e2e8f0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.stake-mode-pill-btn {
+  flex: 1 1 50%;
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #64748b;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap !important;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stake-mode-pill-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Form Groups & Inputs */
+.stake-form-group {
+  margin-bottom: 18px;
+}
+
+.stake-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.stake-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.stake-input-icon {
+  position: absolute;
+  left: 14px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.stake-input {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px 14px 12px 42px;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.stake-input:focus {
+  background: #ffffff;
+  border-color: #006c49;
+  box-shadow: 0 0 0 3px rgba(0, 108, 73, 0.12);
+}
+
+.stake-input.error {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.stake-eye-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stake-eye-btn:hover {
+  color: #475569;
+}
+
+.stake-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.45;
+  margin: 18px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.stake-checkbox-label input {
+  margin-top: 3px;
+  accent-color: #006c49;
+  cursor: pointer;
+}
+
+.stake-submit-btn {
+  width: 100%;
+  background: #00e599;
+  color: #06110c;
+  border: none;
+  padding: 13px 20px;
+  border-radius: 12px;
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.18s ease;
+  box-shadow: 0 4px 14px rgba(0, 229, 153, 0.3);
+  margin-top: 6px;
+  font-family: var(--font-body);
+}
+
+.stake-submit-btn:hover {
+  background: #25fab0;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 229, 153, 0.45);
+}
+
+.stake-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Error and Success Banners */
+.stake-error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.stake-success-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 12px;
+  color: #059669;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+/* Divider & Social Buttons */
+.stake-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 22px 0 16px;
+}
+
+.stake-divider::before,
+.stake-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.stake-divider:not(:empty)::before {
+  margin-right: 12px;
+}
+
+.stake-divider:not(:empty)::after {
+  margin-left: 12px;
+}
+
+.stake-social-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stake-social-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-body);
+}
+
+.stake-social-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.stake-demo-btn-container {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.stake-demo-subtle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #006c49;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  font-family: var(--font-body);
+}
+
+.stake-demo-subtle-btn:hover {
+  background: rgba(0, 108, 73, 0.08);
+  color: #004d34;
+}
