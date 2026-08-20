@@ -185,12 +185,9 @@ export function AgentTab({
 
   // Countdown timer for next autonomous cron scan - actually triggers a scan at zero
   const scanRef = useRef(handleTriggerScan);
+  scanRef.current = handleTriggerScan;
   const isScanningRef = useRef(isScanning);
-
-  useEffect(() => {
-    scanRef.current = handleTriggerScan;
-    isScanningRef.current = isScanning;
-  }, [handleTriggerScan, isScanning]);
+  isScanningRef.current = isScanning;
 
   useEffect(() => {
     if (!agentEnabled) return;
