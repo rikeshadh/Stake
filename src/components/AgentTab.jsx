@@ -1,25 +1,135 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bot,
-  Power,
-  Sparkles,
-  Send,
-  CheckCircle2,
-  Play,
-  RotateCcw,
-  History,
-  Brain,
-  ShieldCheck,
-  Zap,
-  Clock,
-  RefreshCw,
-  Layers,
-  TrendingUp,
-  TrendingDown,
   Activity,
-  AlertTriangle,
+  ArrowUpRight,
+  Bot,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  Pause,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+  Zap,
 } from "lucide-react";
 import { fmt } from "../utils";
+
+const STRATEGIES = [
+  {
+    id: "dip_buyer",
+    name: "Dip Buyer",
+    subtitle: "Buy quality pullbacks",
+    description:
+      "Looks for controlled pullbacks and waits for recovery confirmation.",
+  },
+  {
+    id: "momentum",
+    name: "Momentum",
+    subtitle: "Follow breakouts",
+    description:
+      "Follows confirmed breakouts with strong price momentum.",
+  },
+  {
+    id: "dca",
+    name: "Value DCA",
+    subtitle: "Accumulate gradually",
+    description:
+      "Builds positions gradually with smaller controlled entries.",
+  },
+];
+
+const RANGES = ["1W", "1M", "3M", "6M", "1Y", "ALL"];
+
+function n(value, fallback = 0) {
+  const result = Number(value);
+  return Number.isFinite(result)
+    ? result
+    : fallback;
+}
+
+function safeDate(value) {
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? null
+    : date;
+}
+
+function formatRelativeTime(value) {
+  const date = safeDate(value);
+
+  if (!date) {
+    return "Just now";
+  }
+
+  const diff = Math.max(
+    0,
+    Date.now() - date.getTime()
+  );
+
+  const minutes = Math.floor(
+    diff / 60000
+  );
+
+  if (minutes < 1) {
+    return "Just now";
+  }
+
+  if (minutes < 60) {
+    return `${minutes} min ago`;
+  }
+
+  const hours = Math.floor(
+    minutes / 60
+  );
+
+  if (hours < 24) {
+    return `${hours} hr ago`;
+  }
+
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+async function requestJSON(url, options = {}) {
+  const response = await fetch(
+    url,
+    options
+  );
+
+  const text =
+    await response.text();
+
+  const type =
+    response.headers.get(
+      "content-type"
+    ) || "";
+
+  if (!response.ok) {
+    throw new Error(
+      `Request failed (${response.status})`
+    );
+  }
+
+  if (!type.includes("application/json")) {
+    throw new Error(
+      "Agent service returned an invalid response."
+    );
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      "Agent service returned invalid JSON."
+    );
+  }
+}
 
 export function AgentTab({
   agentEnabled,
@@ -27,1524 +137,2808 @@ export function AgentTab({
   agentStrategy,
   onSelectStrategy,
   agentMaxSpend,
-  onChangeMaxSpend,
-  chatLog = [],
-  onSendChatMessage,
   cashBalance,
+  holdings = {},
+  stocks = {},
+  stockMetaList = [],
   user,
-  darkMode = false,
   onRefreshUserData,
+  onOpenOrderDesk,
   showToast,
 }) {
-  const [inputText, setInputText] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [activeTab, setActiveTab] = useState("terminal"); // "terminal" | "signals" | "audit" | "backtest" | "memory"
+  const [signals, setSignals] =
+    useState([]);
 
-  // Audit Actions state
-  const [actions, setActions] = useState([]);
-  const [loadingActions, setLoadingActions] = useState(false);
-  const [revertingId, setRevertingId] = useState(null);
+  const [actions, setActions] =
+    useState([]);
 
-  // Live Signals state (fetched from backend, not fabricated client-side)
-  const [signals, setSignals] = useState([]);
-  const [loadingSignals, setLoadingSignals] = useState(false);
-  const [signalsError, setSignalsError] = useState(null);
+  const [signalLoading, setSignalLoading] =
+    useState(false);
 
-  // Autonomous Sweep State
-  const [isScanning, setIsScanning] = useState(false);
-  const [lastScanTime, setLastScanTime] = useState(() => new Date());
-  const [nextScanCountdown, setNextScanCountdown] = useState(180); // seconds
+  const [actionLoading, setActionLoading] =
+    useState(false);
 
-  // Agent Memory state
-  const [memories, setMemories] = useState([]);
-  const [loadingMemory, setLoadingMemory] = useState(false);
+  const [scanLoading, setScanLoading] =
+    useState(false);
 
-  // Backtest Lab state
-  const [backtestStrategy, setBacktestStrategy] = useState(agentStrategy || "dip_buyer");
-  const [backtestTicker, setBacktestTicker] = useState("NVDA");
-  const [backtestTimeframe, setBacktestTimeframe] = useState("3 Months");
-  const [backtestCapital, setBacktestCapital] = useState(10000);
-  const [backtestResult, setBacktestResult] = useState(null);
-  const [backtestError, setBacktestError] = useState(null);
-  const [isRunningBacktest, setIsRunningBacktest] = useState(false);
+  const [signalError, setSignalError] =
+    useState(false);
 
-  // Fetch Agent Actions (Audit Trail)
-  const fetchActions = useCallback(async () => {
-    setLoadingActions(true);
-    try {
-      const email = user?.email || "trader@stake.com";
-      const res = await fetch(`/api/agent/actions?userId=${encodeURIComponent(email)}`);
-      const data = await res.json();
-      if (data.actions) {
-        setActions(data.actions);
+  const [revertingId, setRevertingId] =
+    useState(null);
+
+  const [range, setRange] =
+    useState("6M");
+
+  const [chartMode, setChartMode] =
+    useState("value");
+
+  const [selectedGraphTicker, setSelectedGraphTicker] =
+    useState(null);
+
+  const [nextScan, setNextScan] =
+    useState(180);
+
+  const [lastScan, setLastScan] =
+    useState(null);
+
+  const scanRef = useRef(null);
+
+  const currentStrategy =
+    STRATEGIES.find(
+      (item) =>
+        item.id === agentStrategy
+    ) || STRATEGIES[0];
+
+  const cash =
+    n(cashBalance);
+
+  const maxSpend =
+    n(agentMaxSpend);
+
+  /*
+   * =========================================================
+   * LOAD SIGNALS
+   * =========================================================
+   */
+
+  const loadSignals =
+    useCallback(async () => {
+      setSignalLoading(true);
+
+      try {
+        const email =
+          user?.email ||
+          "trader@stake.com";
+
+        const data =
+          await requestJSON(
+            `/api/agent/signals?userId=${encodeURIComponent(
+              email
+            )}`
+          );
+
+        setSignals(
+          Array.isArray(
+            data?.signals
+          )
+            ? data.signals
+            : []
+        );
+
+        setSignalError(false);
+      } catch (error) {
+        console.warn(
+          "Agent signal error:",
+          error
+        );
+
+        setSignals([]);
+        setSignalError(true);
+      } finally {
+        setSignalLoading(false);
       }
-    } catch {
-      // ignore - audit trail is non-critical to surface a toast for
-    } finally {
-      setLoadingActions(false);
-    }
-  }, [user]);
+    }, [user]);
 
-  // Fetch Agent Memories
-  const fetchMemories = useCallback(async () => {
-    setLoadingMemory(true);
-    try {
-      const email = user?.email || "trader@stake.com";
-      const res = await fetch(`/api/agent/memory?userId=${encodeURIComponent(email)}`);
-      const data = await res.json();
-      if (data.memory) {
-        setMemories(data.memory);
+  /*
+   * =========================================================
+   * LOAD ACTIVITY
+   * =========================================================
+   */
+
+  const loadActions =
+    useCallback(async () => {
+      setActionLoading(true);
+
+      try {
+        const email =
+          user?.email ||
+          "trader@stake.com";
+
+        const data =
+          await requestJSON(
+            `/api/agent/actions?userId=${encodeURIComponent(
+              email
+            )}`
+          );
+
+        setActions(
+          Array.isArray(
+            data?.actions
+          )
+            ? data.actions
+            : []
+        );
+      } catch (error) {
+        console.warn(
+          "Agent action error:",
+          error
+        );
+
+        setActions([]);
+      } finally {
+        setActionLoading(false);
       }
-    } catch {
-      // ignore
-    } finally {
-      setLoadingMemory(false);
-    }
-  }, [user]);
+    }, [user]);
 
-  // Fetch Live Signals - real data from the agent engine, not a static mock
-  const fetchSignals = useCallback(async () => {
-    setLoadingSignals(true);
-    setSignalsError(null);
-    try {
-      const email = user?.email || "trader@stake.com";
-      const res = await fetch(`/api/agent/signals?userId=${encodeURIComponent(email)}`);
-      if (!res.ok) throw new Error(`Signals request failed (${res.status})`);
-      const data = await res.json();
-      setSignals(Array.isArray(data.signals) ? data.signals : []);
-    } catch (err) {
-      setSignalsError(err.message || "Could not reach the signals engine.");
-    } finally {
-      setLoadingSignals(false);
-    }
-  }, [user]);
+  /*
+   * =========================================================
+   * REFRESH
+   * =========================================================
+   */
+
+  const refreshAgent =
+    useCallback(async () => {
+      await Promise.all([
+        loadSignals(),
+        loadActions(),
+      ]);
+    }, [
+      loadSignals,
+      loadActions,
+    ]);
 
   useEffect(() => {
-    let isMounted = true;
-    const load = async () => {
-      if (isMounted) {
-        await fetchActions();
-        await fetchMemories();
-        await fetchSignals();
+    refreshAgent();
+  }, [refreshAgent]);
+
+  /*
+   * =========================================================
+   * INITIAL GRAPH STOCK
+   * =========================================================
+   */
+
+  const graphTicker =
+    selectedGraphTicker ||
+    signals?.[0]?.ticker ||
+    Object.keys(holdings)[0] ||
+    "NVDA";
+
+  const graphStock =
+    stocks?.[graphTicker];
+
+  /*
+   * =========================================================
+   * GRAPH DATA
+   * =========================================================
+   */
+
+  const graphValues =
+    useMemo(() => {
+      const history =
+        Array.isArray(
+          graphStock?.history
+        )
+          ? graphStock.history
+          : [];
+
+      if (!history.length) {
+        return [];
       }
-    };
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchActions, fetchMemories, fetchSignals]);
 
-  // Handle Send Chat
-  const handleSend = async (customPrompt) => {
-    const textToSend = customPrompt || inputText;
-    if (!textToSend.trim() || isTyping) return;
+      const clean =
+        history
+          .map((value) =>
+            n(value)
+          )
+          .filter(
+            (value) =>
+              value > 0
+          );
 
-    setInputText("");
-    setIsTyping(true);
-
-    try {
-      await onSendChatMessage(textToSend);
-      // Refresh audit logs in case a trade was executed by tool call
-      setTimeout(() => {
-        fetchActions();
-      }, 1000);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
-  // Manual Trigger Autonomous Scan & Execute
-  const handleTriggerScan = useCallback(async () => {
-    setIsScanning(true);
-    try {
-      const email = user?.email || "trader@stake.com";
-      const res = await fetch("/api/agent/scan-and-execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: email }),
-      });
-      if (!res.ok) throw new Error(`Scan request failed (${res.status})`);
-      const data = await res.json();
-      setLastScanTime(new Date());
-      setNextScanCountdown(180);
-      fetchSignals();
-      if (data.status === "executed" || data.status === "action_taken") {
-        if (showToast) showToast(`Autonomous Agent executed trade: ${data.message}`);
-        if (onRefreshUserData) onRefreshUserData();
-        fetchActions();
-      } else {
-        if (showToast) showToast(`Autonomous scan complete: ${data.message || "Market scanned successfully."}`);
+      if (!clean.length) {
+        return [];
       }
-    } catch (err) {
-      // Surface the real failure instead of pretending the scan succeeded
-      if (showToast) showToast(`Scan failed: ${err.message || "could not reach the agent engine."}`);
-    } finally {
-      setIsScanning(false);
-    }
-  }, [user, showToast, onRefreshUserData, fetchActions, fetchSignals]);
 
-  // Countdown timer for next autonomous cron scan - actually triggers a scan at zero
-  const scanRef = useRef(handleTriggerScan);
-  scanRef.current = handleTriggerScan;
-  const isScanningRef = useRef(isScanning);
-  isScanningRef.current = isScanning;
+      /*
+       * Current holding shares allow us to make
+       * a meaningful current-position value graph.
+       *
+       * This is deliberately labelled:
+       * "Current position value"
+       * rather than historical portfolio P&L.
+       */
 
-  useEffect(() => {
-    if (!agentEnabled) return;
-    const interval = setInterval(() => {
-      setNextScanCountdown((prev) => {
-        if (prev <= 1) {
-          if (!isScanningRef.current) {
-            scanRef.current();
-          }
-          return 180;
+      const shares =
+        n(
+          holdings?.[
+            graphTicker
+          ]?.shares
+        );
+
+      if (
+        chartMode ===
+        "price"
+      ) {
+        return clean;
+      }
+
+      if (
+        shares <= 0
+      ) {
+        return clean;
+      }
+
+      return clean.map(
+        (price) =>
+          price * shares
+      );
+    }, [
+      graphStock,
+      holdings,
+      graphTicker,
+      chartMode,
+    ]);
+
+  /*
+   * =========================================================
+   * GRAPH RANGE
+   * =========================================================
+   */
+
+  const visibleGraph =
+    useMemo(() => {
+      if (!graphValues.length) {
+        return [];
+      }
+
+      const size =
+        graphValues.length;
+
+      const ratios = {
+        "1W": 0.22,
+        "1M": 0.4,
+        "3M": 0.65,
+        "6M": 1,
+        "1Y": 1,
+        ALL: 1,
+      };
+
+      const ratio =
+        ratios[range] || 1;
+
+      const count =
+        Math.max(
+          8,
+          Math.round(
+            size * ratio
+          )
+        );
+
+      return graphValues.slice(
+        -count
+      );
+    }, [
+      graphValues,
+      range,
+    ]);
+
+  /*
+   * =========================================================
+   * GRAPH SUMMARY
+   * =========================================================
+   */
+
+  const graphSummary =
+    useMemo(() => {
+      if (
+        visibleGraph.length <
+        1
+      ) {
+        return {
+          current: 0,
+          change: 0,
+          changePercent: 0,
+          high: 0,
+          low: 0,
+        };
+      }
+
+      const first =
+        visibleGraph[0];
+
+      const current =
+        visibleGraph[
+          visibleGraph.length -
+            1
+        ];
+
+      const high =
+        Math.max(
+          ...visibleGraph
+        );
+
+      const low =
+        Math.min(
+          ...visibleGraph
+        );
+
+      const change =
+        current - first;
+
+      const changePercent =
+        first > 0
+          ? (change / first) *
+            100
+          : 0;
+
+      return {
+        current,
+        change,
+        changePercent,
+        high,
+        low,
+      };
+    }, [visibleGraph]);
+
+  /*
+   * =========================================================
+   * SIGNALS
+   * =========================================================
+   */
+
+  const strongSignals =
+    useMemo(
+      () =>
+        signals
+          .filter(
+            (signal) =>
+              n(
+                signal?.confidence
+              ) >= 65
+          )
+          .sort(
+            (a, b) =>
+              n(
+                b?.confidence
+              ) -
+              n(
+                a?.confidence
+              )
+          ),
+      [signals]
+    );
+
+  /*
+   * =========================================================
+   * STATS
+   * =========================================================
+   */
+
+  const totalTrades =
+    actions.length;
+
+  const totalDeployed =
+    actions.reduce(
+      (sum, action) =>
+        sum +
+        n(
+          action?.amount
+        ),
+      0
+    );
+
+  const buyTrades =
+    actions.filter(
+      (action) =>
+        String(
+          action?.action ||
+            "BUY"
+        ).toUpperCase() ===
+        "BUY"
+    );
+
+  const reversedTrades =
+    actions.filter(
+      (action) =>
+        Boolean(
+          action?.reverted
+        )
+    ).length;
+
+  /*
+   * =========================================================
+   * AUTO SCAN
+   * =========================================================
+   */
+
+  const runScan =
+    useCallback(async () => {
+      if (scanLoading) {
+        return;
+      }
+
+      setScanLoading(true);
+
+      try {
+        const email =
+          user?.email ||
+          "trader@stake.com";
+
+        const data =
+          await requestJSON(
+            "/api/agent/scan-and-execute",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                userId:
+                  email,
+              }),
+            }
+          );
+
+        setLastScan(
+          new Date()
+        );
+
+        setNextScan(180);
+
+        await refreshAgent();
+
+        if (
+          data?.status ===
+            "executed" ||
+          data?.status ===
+            "action_taken"
+        ) {
+          showToast?.(
+            data?.message ||
+              "Agent executed a trade."
+          );
+
+          onRefreshUserData?.();
+        } else {
+          showToast?.(
+            data?.message ||
+              "Scan completed."
+          );
         }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
+      } catch (error) {
+        console.warn(
+          "Agent scan:",
+          error
+        );
+
+        showToast?.(
+          error?.message ||
+            "Unable to run agent scan."
+        );
+      } finally {
+        setScanLoading(
+          false
+        );
+      }
+    }, [
+      scanLoading,
+      user,
+      refreshAgent,
+      showToast,
+      onRefreshUserData,
+    ]);
+
+  scanRef.current =
+    runScan;
+
+  useEffect(() => {
+    if (!agentEnabled) {
+      setNextScan(
+        180
+      );
+
+      return;
+    }
+
+    const timer =
+      window.setInterval(
+        () => {
+          setNextScan(
+            (previous) => {
+              if (
+                previous <=
+                1
+              ) {
+                scanRef.current?.();
+
+                return 180;
+              }
+
+              return (
+                previous - 1
+              );
+            }
+          );
+        },
+        1000
+      );
+
+    return () =>
+      window.clearInterval(
+        timer
+      );
   }, [agentEnabled]);
 
-  // Revert Trade (Safety Rail 5-min grace period)
-  const handleRevertTrade = async (actionId) => {
-    setRevertingId(actionId);
-    try {
-      const email = user?.email || "trader@stake.com";
-      const res = await fetch("/api/agent/revert-trade", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: email, actionId }),
-      });
-      const data = await res.json();
-      if (data.status === "reverted") {
-        if (showToast) showToast(`Trade Reverted: Refunded $${data.refundAmount?.toFixed(2) || "collateral"} to Cash Balance`);
-        if (onRefreshUserData) onRefreshUserData();
-        fetchActions();
-      } else {
-        if (showToast) showToast(data.message || "Trade revert completed.");
+  /*
+   * =========================================================
+   * REVERT TRADE
+   * =========================================================
+   */
+
+  const revertTrade =
+    async (actionId) => {
+      if (
+        !actionId ||
+        revertingId
+      ) {
+        return;
       }
-    } catch {
-      if (showToast) showToast("Error connecting to trade revert endpoint.");
-    } finally {
-      setRevertingId(null);
-    }
-  };
 
-  // Run Strategy Backtest Simulator
-  const handleRunBacktest = async () => {
-    setIsRunningBacktest(true);
-    setBacktestResult(null);
-    setBacktestError(null);
-    try {
-      const days = backtestTimeframe === "1 Month" ? 30 : backtestTimeframe === "3 Months" ? 90 : 180;
-      const res = await fetch("/api/agent/backtest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          strategy: backtestStrategy,
-          ticker: backtestTicker,
-          days,
-          initialCapital: backtestCapital,
-        }),
-      });
-      if (!res.ok) throw new Error(`Backtest request failed (${res.status})`);
-      const data = await res.json();
-      if (data.status === "success" && data.backtest) {
-        setBacktestResult(data.backtest);
-        if (showToast) showToast(`Backtest complete! Return: ${data.backtest.scorecard.totalReturnPct > 0 ? "+" : ""}${data.backtest.scorecard.totalReturnPct}%`);
-      } else {
-        throw new Error(data.message || "Backtest engine returned no result.");
+      setRevertingId(
+        actionId
+      );
+
+      try {
+        const email =
+          user?.email ||
+          "trader@stake.com";
+
+        const data =
+          await requestJSON(
+            "/api/agent/revert-trade",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                userId:
+                  email,
+                actionId,
+              }),
+            }
+          );
+
+        if (
+          data?.status ===
+          "reverted"
+        ) {
+          showToast?.(
+            "Trade reverted successfully."
+          );
+
+          await loadActions();
+
+          onRefreshUserData?.();
+        } else {
+          showToast?.(
+            data?.message ||
+              "Trade could not be reverted."
+          );
+        }
+      } catch (error) {
+        showToast?.(
+          error?.message ||
+            "Unable to revert trade."
+        );
+      } finally {
+        setRevertingId(
+          null
+        );
       }
-    } catch (err) {
-      // Show the real failure instead of fabricating a plausible-looking result
-      setBacktestError(err.message || "Backtest failed. The strategy engine may be unreachable.");
-      if (showToast) showToast("Backtest failed - see details in the lab.");
-    } finally {
-      setIsRunningBacktest(false);
-    }
-  };
+    };
 
-  const bgCard = darkMode ? "#111827" : "#ffffff";
-  const borderCol = darkMode ? "rgba(255,255,255,0.08)" : "#e2e8f0";
-  const textPrimary = darkMode ? "#f8fafc" : "#0f172a";
-  const textSecondary = darkMode ? "#94a3b8" : "#64748b";
-  const bgItem = darkMode ? "#1a2236" : "#f8fafc";
-  const inputBg = darkMode ? "#1a2236" : "#ffffff";
-
-  // Curated quick prompts - a flat, deliberately chosen set instead of a
-  // category structure that was never actually surfaced to the user
-  const quickPrompts = [
-    "What is my most volatile holding?",
-    "How diversified is my portfolio?",
-    "Buy 5 shares of NVDA at market price",
-    "Analyze NVDA order book depth and support levels",
-    "Set a price alert for NVDA when it crosses above $145",
-  ];
+  /*
+   * =========================================================
+   * RENDER
+   * =========================================================
+   */
 
   return (
-    <div style={{ paddingTop: 12, textAlign: "left" }}>
-      {/* TOP AGENT COMMAND HEADER */}
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 1180,
+        margin:
+          "0 auto",
+        padding:
+          "16px 0 40px",
+        boxSizing:
+          "border-box",
+        color:
+          "#17221c",
+      }}
+    >
+      {/* =====================================================
+          TOP BAR
+         ===================================================== */}
+
       <div
         style={{
-          borderRadius: 22,
-          padding: "24px 28px",
-          marginBottom: 20,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 16,
-          background: agentEnabled
-            ? "radial-gradient(circle at 10% 20%, #006c49 0%, #064e3b 100%)"
-            : "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-          color: "#ffffff",
-          boxShadow: agentEnabled ? "0 14px 40px rgba(0,108,73,0.22)" : "0 14px 40px rgba(0,0,0,0.15)",
-          border: agentEnabled ? "1px solid rgba(0, 229, 153, 0.35)" : "1px solid rgba(255,255,255,0.08)",
+          display:
+            "flex",
+          alignItems:
+            "center",
+          justifyContent:
+            "space-between",
+          gap: 12,
+          marginBottom:
+            34,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div
+          style={{
+            display:
+              "flex",
+            alignItems:
+              "center",
+            gap: 10,
+          }}
+        >
           <div
             style={{
-              width: 54,
-              height: 54,
-              borderRadius: 18,
-              background: "rgba(255,255,255,0.12)",
-              backdropFilter: "blur(8px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "1px solid rgba(255,255,255,0.2)",
+              width: 34,
+              height: 34,
+              display:
+                "grid",
+              placeItems:
+                "center",
+              borderRadius:
+                10,
+              background:
+                "#e9f8f2",
+              color:
+                "#0b8f68",
             }}
           >
-            <Bot size={28} color="#00e599" />
+            <Bot
+              size={16}
+            />
           </div>
 
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: "-0.02em", margin: 0, color: "#ffffff" }}>
-                Stake Autonomous Agent & Intelligence Desk
-              </h1>
+            <div
+              style={{
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                gap: 7,
+              }}
+            >
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: 14,
                   fontWeight: 900,
-                  padding: "3px 10px",
-                  borderRadius: 999,
-                  background: agentEnabled ? "#10b981" : "#64748b",
-                  color: "#ffffff",
-                  letterSpacing: "0.06em",
-                  fontFamily: "'JetBrains Mono', monospace",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
+                  letterSpacing:
+                    "-.02em",
                 }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ffffff", animation: agentEnabled ? "pulse 2s infinite" : "none" }} />
-                {agentEnabled ? "AUTONOMOUS FEED ACTIVE" : "PAUSED"}
+                Agent
+              </span>
+
+              <span
+                style={{
+                  display:
+                    "inline-flex",
+                  alignItems:
+                    "center",
+                  gap: 4,
+                  padding:
+                    "4px 7px",
+                  borderRadius:
+                    999,
+                  background:
+                    agentEnabled
+                      ? "#e9f8f2"
+                      : "#f1f3f2",
+                  color:
+                    agentEnabled
+                      ? "#0b8f68"
+                      : "#7c8781",
+                  fontSize: 7.5,
+                  fontWeight: 900,
+                }}
+              >
+                <span
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius:
+                      "50%",
+                    background:
+                      agentEnabled
+                        ? "#0b8f68"
+                        : "#9aa39e",
+                  }}
+                />
+
+                {agentEnabled
+                  ? "LIVE"
+                  : "PAUSED"}
               </span>
             </div>
-            <p style={{ fontSize: 13.5, color: "#cbd5e1", margin: "4px 0 0" }}>
-              Powered by real-time Gemini function calling, live order book anomaly radar, backtest engine, and 5-min trade revert rails.
-            </p>
+
+            <div
+              style={{
+                marginTop:
+                  3,
+                color:
+                  "#7d8982",
+                fontSize:
+                  8.5,
+              }}
+            >
+              Autonomous strategy monitoring
+            </div>
           </div>
         </div>
 
-        {/* Master Controls & Autonomous Scan Button */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          {agentEnabled && (
-            <button
-              onClick={handleTriggerScan}
-              disabled={isScanning}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "10px 16px",
-                borderRadius: 999,
-                border: "1px solid rgba(255,255,255,0.3)",
-                background: "rgba(255,255,255,0.12)",
-                color: "#ffffff",
-                cursor: isScanning ? "not-allowed" : "pointer",
-                fontWeight: 800,
-                fontSize: 13,
-                backdropFilter: "blur(6px)",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <Zap size={14} color="#00e599" />
-              {isScanning ? "Scanning Market..." : "Trigger Scan Now"}
-            </button>
-          )}
-
-          <button
-            onClick={() => onToggleAgent(!agentEnabled)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "10px 20px",
-              borderRadius: 999,
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 900,
-              fontSize: 13.5,
-              background: agentEnabled ? "#ffffff" : "#00e599",
-              color: agentEnabled ? "#006c49" : "#06110c",
-              boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
-              transition: "all 0.18s ease",
-            }}
-          >
-            <Power size={15} />
-            {agentEnabled ? "PAUSE AGENT" : "ACTIVATE AGENT"}
-          </button>
-        </div>
-      </div>
-
-      {/* AUTONOMOUS STATUS & AUTO-SCAN TIMER BAR */}
-      {agentEnabled && (
         <div
           style={{
-            borderRadius: 14,
-            padding: "12px 18px",
-            marginBottom: 20,
-            background: darkMode ? "rgba(0, 108, 73, 0.15)" : "#f0fdf4",
-            border: "1px solid rgba(16, 185, 129, 0.25)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 12,
-            fontSize: 12.5,
+            display:
+              "flex",
+            alignItems:
+              "center",
+            gap: 7,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 800, color: "#006c49" }}>
-              <Activity size={15} /> Autonomous Engine:
-            </span>
-            <span style={{ color: textSecondary }}>
-              Active Strategy: <strong style={{ color: textPrimary }}>{agentStrategy === "dip_buyer" ? "Dip Buyer (Tech & Equities)" : agentStrategy === "momentum" ? "Breakout Momentum" : "Disciplined DCA"}</strong>
-            </span>
-            <span style={{ color: textSecondary }}>•</span>
-            <span style={{ color: textSecondary }}>
-              Max Allocation: <strong style={{ color: textPrimary }}>${fmt(agentMaxSpend)}</strong>
-            </span>
-          </div>
+          <TopButton
+            secondary
+            onClick={() =>
+              onToggleAgent?.(
+                !agentEnabled
+              )
+            }
+          >
+            {agentEnabled ? (
+              <Pause
+                size={10}
+              />
+            ) : (
+              <Play
+                size={10}
+              />
+            )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ color: textSecondary, display: "flex", alignItems: "center", gap: 4 }}>
-              <Clock size={13} /> Next Auto-Scan in: <strong style={{ color: "#006c49", fontFamily: "'JetBrains Mono', monospace" }}>{Math.floor(nextScanCountdown / 60)}:{(nextScanCountdown % 60).toString().padStart(2, "0")}</strong>
-            </span>
-            <span style={{ fontSize: 11, color: textSecondary }}>
-              (Last scan: {lastScanTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})
-            </span>
-          </div>
+            {agentEnabled
+              ? "Pause"
+              : "Start"}
+          </TopButton>
+
+          <TopButton
+            onClick={
+              runScan
+            }
+            disabled={
+              scanLoading
+            }
+          >
+            <Zap
+              size={10}
+            />
+
+            {scanLoading
+              ? "Scanning..."
+              : "Run scan"}
+          </TopButton>
         </div>
-      )}
-
-      {/* SUB-NAVIGATION TABS */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          marginBottom: 20,
-          borderBottom: `1px solid ${borderCol}`,
-          paddingBottom: 12,
-          overflowX: "auto",
-        }}
-      >
-        {[
-          { id: "terminal", label: "Agent Chat & Intelligence", icon: <Sparkles size={16} /> },
-          { id: "signals", label: `Live AI Signals Radar (${signals.length})`, icon: <Activity size={16} /> },
-          { id: "audit", label: `Audit Trail & Revert Rails (${actions.length})`, icon: <History size={16} /> },
-          { id: "backtest", label: "Backtest Simulator Lab", icon: <Layers size={16} /> },
-          { id: "memory", label: `Market Memory & Reasoning (${memories.length})`, icon: <Brain size={16} /> },
-        ].map((t) => {
-          const isActive = activeTab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 16px",
-                borderRadius: 12,
-                border: "none",
-                background: isActive ? "#006c49" : "transparent",
-                color: isActive ? "#ffffff" : textSecondary,
-                fontSize: 13.5,
-                fontWeight: 800,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {t.icon}
-              <span>{t.label}</span>
-            </button>
-          );
-        })}
       </div>
 
-      {/* TAB 1: TERMINAL & STRATEGY SETTINGS */}
-      {activeTab === "terminal" && (
-        <>
-          {/* Strategy & Risk Controls Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, marginBottom: 24 }}>
-            {/* Strategy Selection */}
+      {/* =====================================================
+          ACTIVE STRATEGIES + ACTIVITY
+         ===================================================== */}
+
+      <div
+        style={{
+          display:
+            "grid",
+          gridTemplateColumns:
+            "minmax(0,1fr) 290px",
+          gap: 24,
+          marginBottom:
+            34,
+        }}
+      >
+        {/* Strategies */}
+        <section>
+          <SectionHeader
+            title="Active strategies"
+            action="View all"
+          />
+
+          <div
+            style={{
+              display:
+                "grid",
+              gridTemplateColumns:
+                "repeat(2,minmax(0,1fr))",
+              gap: 12,
+            }}
+          >
+            {STRATEGIES.map(
+              (item) => (
+                <StrategyCard
+                  key={
+                    item.id
+                  }
+                  item={
+                    item
+                  }
+                  active={
+                    item.id ===
+                    agentStrategy
+                  }
+                  onClick={() =>
+                    onSelectStrategy?.(
+                      item.id
+                    )
+                  }
+                  signals={
+                    signals
+                  }
+                />
+              )
+            )}
+          </div>
+        </section>
+
+        {/* Activity */}
+        <section>
+          <SectionHeader
+            title="Activity"
+            action={
+              actions.length
+                ? `${actions.length} total`
+                : "Recent"
+            }
+          />
+
+          <ActivityTimeline
+            actions={
+              actions
+            }
+            loading={
+              actionLoading
+            }
+            onRevert={
+              revertTrade
+            }
+            revertingId={
+              revertingId
+            }
+          />
+        </section>
+      </div>
+
+      {/* =====================================================
+          INSIGHTS
+         ===================================================== */}
+
+      <section
+        style={{
+          marginBottom:
+            34,
+        }}
+      >
+        <div
+          style={{
+            display:
+              "flex",
+            alignItems:
+              "center",
+            justifyContent:
+              "space-between",
+            gap: 10,
+            marginBottom:
+              10,
+          }}
+        >
+          <div
+            style={{
+              fontSize:
+                13,
+              fontWeight:
+                900,
+              letterSpacing:
+                "-.02em",
+            }}
+          >
+            Insights
+          </div>
+
+          <div
+            style={{
+              display:
+                "inline-flex",
+              alignItems:
+                "center",
+              gap: 4,
+            }}
+          >
+            <TickerDropdown
+              ticker={
+                graphTicker
+              }
+              stockMetaList={
+                stockMetaList
+              }
+              holdings={
+                holdings
+              }
+              onChange={
+                setSelectedGraphTicker
+              }
+            />
+
             <div
               style={{
-                borderRadius: 20,
-                padding: 22,
-                background: bgCard,
-                border: `1px solid ${borderCol}`,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
+                display:
+                  "inline-flex",
+                alignItems:
+                  "center",
+                gap: 2,
+                padding:
+                  3,
+                borderRadius:
+                  999,
+                background:
+                  "#f1f3f2",
               }}
             >
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#006c49", letterSpacing: "0.08em", marginBottom: 4 }}>
-                AUTONOMOUS ENGINE
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: textPrimary, marginBottom: 14 }}>
-                Active Algorithmic Strategy
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {[
-                  {
-                    id: "dip_buyer",
-                    name: "Intelligent Dip Buyer (Recommended)",
-                    desc: "Accumulates top equities during intraday dips (>1.2% pullback) with AI valuation & RSI confirmation.",
-                    badge: "MODERATE RISK",
-                  },
-                  {
-                    id: "momentum",
-                    name: "Volume Breakout Momentum",
-                    desc: "Detects surges in bid-ask book depth and executes rapid momentum entry when buy pressure tops 65%.",
-                    badge: "AGGRESSIVE",
-                  },
-                  {
-                    id: "dca",
-                    name: "Disciplined Value DCA",
-                    desc: "Distributes micro-allocations consistently across your custom watchlist equities every session.",
-                    badge: "CONSERVATIVE",
-                  },
-                ].map((st) => {
-                  const selected = agentStrategy === st.id;
-                  return (
-                    <div
-                      key={st.id}
-                      onClick={() => onSelectStrategy(st.id)}
-                      style={{
-                        padding: "12px 14px",
-                        borderRadius: 14,
-                        border: `1px solid ${selected ? "#006c49" : borderCol}`,
-                        background: selected ? (darkMode ? "rgba(0,108,73,0.2)" : "#f0fdf4") : bgItem,
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: selected ? "#006c49" : textPrimary }}>
-                          {st.name}
-                        </span>
-                        {selected && <CheckCircle2 size={16} color="#006c49" />}
-                      </div>
-                      <p style={{ fontSize: 12, color: textSecondary, margin: "4px 0 0", lineHeight: 1.45 }}>
-                        {st.desc}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
+              {RANGES.map(
+                (item) => (
+                  <button
+                    key={
+                      item
+                    }
+                    type="button"
+                    onClick={() =>
+                      setRange(
+                        item
+                      )
+                    }
+                    style={{
+                      border:
+                        "none",
+                      background:
+                        range ===
+                        item
+                          ? "#ffffff"
+                          : "transparent",
+                      color:
+                        range ===
+                        item
+                          ? "#17221c"
+                          : "#7d8781",
+                      borderRadius:
+                        999,
+                      padding:
+                        "5px 7px",
+                      fontSize:
+                        7.5,
+                      fontWeight:
+                        900,
+                      cursor:
+                        "pointer",
+                      boxShadow:
+                        range ===
+                        item
+                          ? "0 1px 4px rgba(20,30,25,.06)"
+                          : "none",
+                    }}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
             </div>
+          </div>
+        </div>
 
-            {/* Risk & Safety Limits */}
+        <div
+          style={{
+            display:
+              "grid",
+            gridTemplateColumns:
+              "minmax(0,1.7fr) 265px",
+            gap: 14,
+          }}
+        >
+          {/* Graph */}
+          <div
+            style={{
+              minHeight:
+                375,
+              borderRadius:
+                16,
+              background:
+                "#f1f3f2",
+              padding:
+                "18px 19px",
+              boxSizing:
+                "border-box",
+              position:
+                "relative",
+              overflow:
+                "hidden",
+            }}
+          >
             <div
               style={{
-                borderRadius: 20,
-                padding: 22,
-                background: bgCard,
-                border: `1px solid ${borderCol}`,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
+                display:
+                  "flex",
+                alignItems:
+                  "flex-start",
+                justifyContent:
+                  "space-between",
+                position:
+                  "relative",
+                zIndex: 4,
               }}
             >
               <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#006c49", letterSpacing: "0.08em", marginBottom: 4 }}>
-                  SAFETY GUARDRAILS
-                </div>
-                <div style={{ fontSize: 17, fontWeight: 900, color: textPrimary, marginBottom: 14 }}>
-                  Capital Allocation & Drawdown Rails
-                </div>
-
-                {/* Max Spend Slider */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: textSecondary }}>Max Spend Per Auto-Order</span>
-                    <span style={{ fontSize: 15, fontWeight: 900, color: "#006c49", fontFamily: "'JetBrains Mono', monospace" }}>
-                      $ {fmt(agentMaxSpend)}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={200}
-                    max={10000}
-                    step={100}
-                    value={agentMaxSpend}
-                    onChange={(e) => onChangeMaxSpend(Number(e.target.value))}
-                    style={{ width: "100%", accentColor: "#006c49", cursor: "pointer" }}
-                  />
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: textSecondary, marginTop: 4 }}>
-                    <span>$ 200 min</span>
-                    <span>$ 10,000 max</span>
-                  </div>
-                </div>
-
-                {/* Hard Daily Cap & Circuit Breaker status */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                  <div style={{ padding: "10px 12px", background: bgItem, borderRadius: 12, border: `1px solid ${borderCol}` }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: textSecondary }}>Daily Spend Limit</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>
-                      $ 5,000.00 Hard Cap
-                    </div>
-                  </div>
-
-                  <div style={{ padding: "10px 12px", background: bgItem, borderRadius: 12, border: `1px solid ${borderCol}` }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: textSecondary }}>Circuit Breaker</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#10b981", display: "flex", alignItems: "center", gap: 4 }}>
-                      <ShieldCheck size={14} /> Armed (5% Max DD)
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ padding: "12px 14px", background: bgItem, borderRadius: 12, border: `1px solid ${borderCol}` }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: textSecondary }}>Available Cash Balance</span>
-                    <span style={{ fontSize: 16, fontWeight: 900, color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>
-                      $ {fmt(cashBalance)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Conversational Terminal with Gemini Loop */}
-          <div
-            style={{
-              borderRadius: 20,
-              padding: 24,
-              background: bgCard,
-              border: `1px solid ${borderCol}`,
-              boxShadow: "0 6px 24px rgba(0,0,0,0.03)",
-              marginBottom: 30,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Sparkles size={18} color="#006c49" />
-                <div style={{ fontSize: 17, fontWeight: 900, color: textPrimary }}>
-                  Stake AI Trading Intelligence & Natural Execution
-                </div>
-              </div>
-              <span style={{ fontSize: 11.5, fontWeight: 800, color: textSecondary, fontFamily: "'JetBrains Mono', monospace" }}>
-                GEMINI 2.5 FLASH • FUNCTION CALLING ACTIVE
-              </span>
-            </div>
-
-            {/* Quick Prompts Bar */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {quickPrompts.map((p, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSend(p)}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: 999,
-                      border: `1px solid ${borderCol}`,
-                      background: bgItem,
-                      color: textPrimary,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Message Log */}
-            <div
-              style={{
-                minHeight: 260,
-                maxHeight: 420,
-                overflowY: "auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-                padding: "16px 18px",
-                background: bgItem,
-                borderRadius: 16,
-                marginBottom: 14,
-                border: `1px solid ${borderCol}`,
-              }}
-            >
-              {chatLog.length === 0 ? (
-                <div style={{ textAlign: "center", color: textSecondary, padding: "36px 20px" }}>
-                  <Bot size={36} color="#006c49" style={{ margin: "0 auto 10px" }} />
-                  <p style={{ fontSize: 15, fontWeight: 800, margin: "0 0 4px", color: textPrimary }}>
-                    Stake Intelligence Agent Online
-                  </p>
-                  <p style={{ fontSize: 13, maxWidth: 460, margin: "0 auto" }}>
-                    Ask about portfolio risk, analyze live ticker order flow, or instruct the agent to execute real orders directly.
-                  </p>
-                </div>
-              ) : (
-                chatLog.map((msg, i) => {
-                  const isUser = msg.sender === "user";
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        alignSelf: isUser ? "flex-end" : "flex-start",
-                        maxWidth: "85%",
-                        padding: "12px 16px",
-                        borderRadius: 16,
-                        fontSize: 13.5,
-                        lineHeight: 1.5,
-                        background: isUser ? "#006c49" : (darkMode ? "#1e293b" : "#ffffff"),
-                        color: isUser ? "#ffffff" : textPrimary,
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                        border: isUser ? "none" : `1px solid ${borderCol}`,
-                      }}
-                    >
-                      {!isUser && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, fontSize: 11, fontWeight: 800, color: "#006c49" }}>
-                          <Bot size={14} />
-                          <span>STAKE AGENT</span>
-                        </div>
-                      )}
-                      <div style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>
-                    </div>
-                  );
-                })
-              )}
-
-              {/* Typing Indicator */}
-              {isTyping && (
                 <div
                   style={{
-                    alignSelf: "flex-start",
-                    padding: "10px 14px",
-                    borderRadius: 14,
-                    background: darkMode ? "#1e293b" : "#ffffff",
-                    border: `1px solid ${borderCol}`,
-                    fontSize: 12.5,
-                    color: textSecondary,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
+                    fontSize:
+                      8.5,
+                    color:
+                      "#7e8983",
                   }}
                 >
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#006c49", animation: "ping 1s cubic-bezier(0, 0, 0.2, 1) infinite" }} />
-                  <span>Agent analyzing live data & executing schema functions...</span>
+                  {chartMode ===
+                  "price"
+                    ? `${graphTicker} Price`
+                    : `Current ${graphTicker} Position`}
                 </div>
-              )}
-            </div>
 
-            {/* Chat Input Bar */}
-            <div style={{ display: "flex", gap: 10 }}>
-              <input
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder="Ask Stake Agent or issue a trade instruction (e.g. 'Buy 5 shares of NVDA')..."
-                style={{
-                  flex: 1,
-                  padding: "13px 18px",
-                  borderRadius: 14,
-                  border: `1px solid ${borderCol}`,
-                  background: inputBg,
-                  fontSize: 14,
-                  color: textPrimary,
-                  outline: "none",
-                }}
-              />
-              <button
-                onClick={() => handleSend()}
-                disabled={isTyping}
-                style={{
-                  padding: "13px 24px",
-                  borderRadius: 14,
-                  border: "none",
-                  background: "linear-gradient(135deg, #006c49, #064e3b)",
-                  color: "#ffffff",
-                  fontWeight: 900,
-                  fontSize: 14,
-                  cursor: isTyping ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  boxShadow: "0 4px 14px rgba(0,108,73,0.3)",
-                }}
-              >
-                <Send size={15} /> Send
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+                <div
+                  style={{
+                    marginTop:
+                      3,
+                    fontSize:
+                      26,
+                    fontWeight:
+                      500,
+                    lineHeight:
+                      1,
+                    letterSpacing:
+                      "-.04em",
+                    color:
+                      "#17221c",
+                  }}
+                >
+                  {chartMode ===
+                  "price"
+                    ? `$${graphSummary.current.toFixed(
+                        2
+                      )}`
+                    : `$${fmt(
+                        graphSummary.current
+                      )}`}
+                </div>
 
-      {/* TAB 2: LIVE AI SIGNALS RADAR (real backend data, with loading/error/empty states) */}
-      {activeTab === "signals" && (
-        <div
-          style={{
-            borderRadius: 20,
-            padding: 24,
-            background: bgCard,
-            border: `1px solid ${borderCol}`,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: textPrimary, display: "flex", alignItems: "center", gap: 8 }}>
-                <Activity size={20} color="#006c49" /> Real-Time AI Trading Signals Radar
+                <div
+                  style={{
+                    display:
+                      "inline-flex",
+                    alignItems:
+                      "center",
+                    gap: 4,
+                    marginTop:
+                      5,
+                    color:
+                      graphSummary.changePercent >=
+                      0
+                        ? "#0b8f68"
+                        : "#c65050",
+                    fontSize:
+                      8,
+                    fontWeight:
+                      900,
+                  }}
+                >
+                  {graphSummary.changePercent >=
+                  0 ? (
+                    <TrendingUp
+                      size={
+                        9
+                      }
+                    />
+                  ) : (
+                    <TrendingDown
+                      size={
+                        9
+                      }
+                    />
+                  )}
+
+                  {graphSummary.changePercent >=
+                  0
+                    ? "+"
+                    : ""}
+                  {graphSummary.changePercent.toFixed(
+                    2
+                  )}
+                  %
+                </div>
               </div>
-              <p style={{ fontSize: 13, color: textSecondary, margin: "2px 0 0" }}>
-                Live scan output from the agent engine: order book skew, RSI deviations, and momentum breakout triggers.
-              </p>
-            </div>
 
-            <button
-              onClick={fetchSignals}
-              disabled={loadingSignals}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 16px",
-                borderRadius: 10,
-                border: "none",
-                background: "#006c49",
-                color: "#ffffff",
-                fontSize: 12.5,
-                fontWeight: 800,
-                cursor: loadingSignals ? "not-allowed" : "pointer",
-              }}
-            >
-              <RefreshCw size={14} className={loadingSignals ? "spin" : ""} /> {loadingSignals ? "Refreshing..." : "Rescan Market"}
-            </button>
-          </div>
-
-          {signalsError && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "12px 16px",
-                borderRadius: 12,
-                background: darkMode ? "rgba(239,68,68,0.1)" : "#fef2f2",
-                border: "1px solid #fecaca",
-                color: "#dc2626",
-                fontSize: 13,
-                fontWeight: 700,
-                marginBottom: 16,
-              }}
-            >
-              <AlertTriangle size={16} />
-              {signalsError}
-            </div>
-          )}
-
-          {!signalsError && signals.length === 0 && !loadingSignals ? (
-            <div style={{ textAlign: "center", padding: "48px 20px", color: textSecondary }}>
-              <Activity size={36} color="#94a3b8" style={{ margin: "0 auto 12px" }} />
-              <div style={{ fontSize: 15, fontWeight: 800, color: textPrimary }}>No Active Signals Right Now</div>
-              <p style={{ fontSize: 13, maxWidth: 460, margin: "6px auto 0" }}>
-                The agent hasn&apos;t flagged any opportunities matching your active strategy. Rescan or check back after the next auto-scan.
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
-              {signals.map((sig) => {
-                const isUp = sig.change >= 0;
-                return (
-                  <div
-                    key={sig.id}
-                    style={{
-                      borderRadius: 16,
-                      padding: 18,
-                      background: bgItem,
-                      border: `1px solid ${borderCol}`,
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
-                    }}
-                  >
-                    <div>
-                      {/* Header: Ticker, Price, Confidence */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div
-                            style={{
-                              width: 38,
-                              height: 38,
-                              borderRadius: 10,
-                              background: "#006c49",
-                              color: "#ffffff",
-                              fontWeight: 900,
-                              fontSize: 13,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            {sig.ticker}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 15, fontWeight: 900, color: textPrimary }}>{sig.ticker}</div>
-                            <div style={{ fontSize: 11.5, color: textSecondary }}>{sig.name}</div>
-                          </div>
-                        </div>
-
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 16, fontWeight: 900, color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>
-                            ${sig.price?.toFixed(2)}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 800,
-                              color: isUp ? "#10b981" : "#ef4444",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "flex-end",
-                              gap: 2,
-                            }}
-                          >
-                            {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                            {isUp ? "+" : ""}{sig.change}%
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Signal Badge & Confidence */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 900,
-                            padding: "3px 8px",
-                            borderRadius: 6,
-                            background: sig.signalType?.includes("DIP") ? "rgba(0, 108, 73, 0.15)" : "rgba(59, 130, 246, 0.15)",
-                            color: sig.signalType?.includes("DIP") ? "#006c49" : "#2563eb",
-                          }}
-                        >
-                          {sig.signalType}
-                        </span>
-                        <span style={{ fontSize: 11.5, fontWeight: 800, color: "#10b981" }}>
-                          AI Match: {sig.confidence}%
-                        </span>
-                      </div>
-
-                      {/* Reasoning */}
-                      <p style={{ fontSize: 12.5, color: textSecondary, lineHeight: 1.45, margin: "0 0 10px" }}>
-                        {sig.reason}
-                      </p>
-
-                      {/* Technical stats */}
-                      <div style={{ display: "flex", gap: 12, fontSize: 11.5, color: textSecondary, marginBottom: 12 }}>
-                        <span>RSI: <strong style={{ color: textPrimary }}>{sig.rsi}</strong></span>
-                        <span>Lot Size: <strong style={{ color: textPrimary }}>{sig.recommendedShares} shares (~${fmt(sig.estimatedCost)})</strong></span>
-                      </div>
-                    </div>
-
-                    {/* Actions: Execute or Ask */}
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        onClick={() => handleSend(`Buy ${sig.recommendedShares} shares of ${sig.ticker}`)}
-                        style={{
-                          flex: 1,
-                          padding: "9px 12px",
-                          borderRadius: 10,
-                          border: "none",
-                          background: "#006c49",
-                          color: "#ffffff",
-                          fontWeight: 800,
-                          fontSize: 12.5,
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <Zap size={13} /> Execute Lot
-                      </button>
-                      <button
-                        onClick={() => handleSend(`Analyze why the agent flagged ${sig.ticker} with ${sig.signalType}`)}
-                        style={{
-                          padding: "9px 14px",
-                          borderRadius: 10,
-                          border: `1px solid ${borderCol}`,
-                          background: bgCard,
-                          color: textPrimary,
-                          fontWeight: 700,
-                          fontSize: 12.5,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Ask AI
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: AUDIT TRAIL & REVERT RAILS */}
-      {activeTab === "audit" && (
-        <div
-          style={{
-            borderRadius: 20,
-            padding: 24,
-            background: bgCard,
-            border: `1px solid ${borderCol}`,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: textPrimary }}>
-                Autonomous Execution Audit Log
-              </div>
-              <p style={{ fontSize: 13, color: textSecondary, margin: "2px 0 0" }}>
-                Every automated trade includes full agent reasoning and a 5-minute safety cancellation window.
-              </p>
-            </div>
-
-            <button
-              onClick={fetchActions}
-              disabled={loadingActions}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 14px",
-                borderRadius: 10,
-                border: `1px solid ${borderCol}`,
-                background: bgItem,
-                color: textPrimary,
-                fontSize: 12.5,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              <RefreshCw size={13} className={loadingActions ? "spin" : ""} /> Refresh
-            </button>
-          </div>
-
-          {actions.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 20px", color: textSecondary }}>
-              <History size={36} color="#94a3b8" style={{ margin: "0 auto 12px" }} />
-              <div style={{ fontSize: 15, fontWeight: 800, color: textPrimary }}>No Autonomous Trades Recorded Yet</div>
-              <p style={{ fontSize: 13, maxWidth: 460, margin: "6px auto 16px" }}>
-                When the agent scans the market and triggers a trade matching your strategy (or when you click &quot;Trigger Scan Now&quot;), the full audit trail and reasoning will appear here.
-              </p>
-              <button
-                onClick={handleTriggerScan}
-                disabled={isScanning}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: 12,
-                  border: "none",
-                  background: "#006c49",
-                  color: "#ffffff",
-                  fontWeight: 800,
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                Run Scan to Generate Trade
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {actions.map((act) => {
-                const isReverted = act.status === "reverted";
-                const dateStr = new Date(act.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-
-                return (
-                  <div
-                    key={act.id}
-                    style={{
-                      borderRadius: 16,
-                      border: `1px solid ${isReverted ? "#fecaca" : borderCol}`,
-                      background: isReverted ? (darkMode ? "rgba(239,68,68,0.1)" : "#fef2f2") : bgItem,
-                      padding: "18px 20px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 12,
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 900,
-                            padding: "4px 10px",
-                            borderRadius: 8,
-                            background: isReverted ? "#ef4444" : "#006c49",
-                            color: "#ffffff",
-                            fontFamily: "'JetBrains Mono', monospace",
-                          }}
-                        >
-                          {act.action}
-                        </span>
-
-                        <div>
-                          <span style={{ fontSize: 16, fontWeight: 900, color: textPrimary }}>
-                            {act.shares} shares of {act.stock}
-                          </span>
-                          <span style={{ fontSize: 13, color: textSecondary, marginLeft: 8 }}>
-                            @ ${act.price?.toFixed(2)} (${act.amount?.toFixed(2)} total)
-                          </span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: 11.5, color: textSecondary, display: "flex", alignItems: "center", gap: 4 }}>
-                          <Clock size={12} /> {dateStr}
-                        </span>
-
-                        {/* 5-Minute Grace Period Revert Button */}
-                        {!isReverted && (
-                          <button
-                            onClick={() => handleRevertTrade(act.id)}
-                            disabled={revertingId === act.id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                              padding: "6px 12px",
-                              borderRadius: 8,
-                              border: "1px solid #f87171",
-                              background: "#fee2e2",
-                              color: "#dc2626",
-                              fontSize: 12,
-                              fontWeight: 800,
-                              cursor: revertingId === act.id ? "not-allowed" : "pointer",
-                              transition: "all 0.15s ease",
-                            }}
-                            title="Reverses the trade and refunds full cash immediately"
-                          >
-                            <RotateCcw size={12} />
-                            {revertingId === act.id ? "Reverting..." : "Revert Trade (Safety Rail)"}
-                          </button>
-                        )}
-
-                        {isReverted && (
-                          <span style={{ fontSize: 11.5, fontWeight: 800, color: "#dc2626", background: "#fee2e2", padding: "4px 8px", borderRadius: 6 }}>
-                            REVERTED & REFUNDED
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Agent's Reasoning Explanation */}
-                    <div
-                      style={{
-                        fontSize: 13,
-                        lineHeight: 1.5,
-                        color: textPrimary,
-                        background: darkMode ? "rgba(0,0,0,0.2)" : "#ffffff",
-                        padding: "10px 14px",
-                        borderRadius: 10,
-                        border: `1px solid ${borderCol}`,
-                      }}
-                    >
-                      <div style={{ fontSize: 11, fontWeight: 800, color: "#006c49", marginBottom: 2 }}>
-                        AGENT REASONING & STRATEGY SIGNAL:
-                      </div>
-                      {act.reason}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 4: BACKTEST SIMULATOR LAB */}
-      {activeTab === "backtest" && (
-        <div
-          style={{
-            borderRadius: 20,
-            padding: 24,
-            background: bgCard,
-            border: `1px solid ${borderCol}`,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-          }}
-        >
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: textPrimary }}>
-              Algorithmic Strategy Backtest Simulator
-            </div>
-            <p style={{ fontSize: 13, color: textSecondary, margin: "2px 0 0" }}>
-              Simulate how Stake&apos;s autonomous strategies would have performed on historical tick feeds with customizable parameters.
-            </p>
-          </div>
-
-          {/* Controls Bar */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: 14,
-              padding: 16,
-              background: bgItem,
-              borderRadius: 16,
-              border: `1px solid ${borderCol}`,
-              marginBottom: 24,
-            }}
-          >
-            <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 800, color: textSecondary, marginBottom: 4 }}>
-                Strategy
-              </label>
-              <select
-                value={backtestStrategy}
-                onChange={(e) => setBacktestStrategy(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: `1px solid ${borderCol}`,
-                  background: inputBg,
-                  fontSize: 13.5,
-                  fontWeight: 700,
-                  color: textPrimary,
-                }}
-              >
-                <option value="dip_buyer">Intelligent Dip Buyer</option>
-                <option value="momentum">Volume Breakout Momentum</option>
-                <option value="dca">Disciplined Value DCA</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 800, color: textSecondary, marginBottom: 4 }}>
-                Ticker Symbol
-              </label>
-              <select
-                value={backtestTicker}
-                onChange={(e) => setBacktestTicker(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: `1px solid ${borderCol}`,
-                  background: inputBg,
-                  fontSize: 13.5,
-                  fontWeight: 700,
-                  color: textPrimary,
-                }}
-              >
-                <option value="NVDA">NVDA (NVIDIA)</option>
-                <option value="AAPL">AAPL (Apple)</option>
-                <option value="TSLA">TSLA (Tesla)</option>
-                <option value="MSFT">MSFT (Microsoft)</option>
-                <option value="AMZN">AMZN (Amazon)</option>
-                <option value="META">META (Meta)</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 800, color: textSecondary, marginBottom: 4 }}>
-                Timeframe
-              </label>
-              <select
-                value={backtestTimeframe}
-                onChange={(e) => setBacktestTimeframe(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: `1px solid ${borderCol}`,
-                  background: inputBg,
-                  fontSize: 13.5,
-                  fontWeight: 700,
-                  color: textPrimary,
-                }}
-              >
-                <option value="1 Month">1 Month (30 Days)</option>
-                <option value="3 Months">3 Months (90 Days)</option>
-                <option value="6 Months">6 Months (180 Days)</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 800, color: textSecondary, marginBottom: 4 }}>
-                Starting Capital ($)
-              </label>
-              <input
-                type="number"
-                value={backtestCapital}
-                onChange={(e) => setBacktestCapital(Number(e.target.value))}
-                step={1000}
-                min={1000}
-                max={100000}
-                style={{
-                  width: "100%",
-                  padding: "9px 12px",
-                  borderRadius: 10,
-                  border: `1px solid ${borderCol}`,
-                  background: inputBg,
-                  fontSize: 13.5,
-                  fontWeight: 700,
-                  color: textPrimary,
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <button
-              onClick={handleRunBacktest}
-              disabled={isRunningBacktest}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "12px 32px",
-                borderRadius: 12,
-                border: "none",
-                background: "linear-gradient(135deg, #006c49, #064e3b)",
-                color: "#ffffff",
-                fontSize: 14.5,
-                fontWeight: 900,
-                cursor: isRunningBacktest ? "not-allowed" : "pointer",
-                boxShadow: "0 4px 16px rgba(0,108,73,0.3)",
-              }}
-            >
-              <Play size={16} />
-              {isRunningBacktest ? "Simulating Historical Ticks..." : "Run Strategy Backtest"}
-            </button>
-          </div>
-
-          {/* Honest error state - no fabricated numbers when the engine fails */}
-          {backtestError && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "14px 18px",
-                borderRadius: 14,
-                background: darkMode ? "rgba(239,68,68,0.1)" : "#fef2f2",
-                border: "1px solid #fecaca",
-                color: "#dc2626",
-                fontSize: 13.5,
-                fontWeight: 700,
-                marginBottom: 8,
-              }}
-            >
-              <AlertTriangle size={18} />
-              {backtestError}
-            </div>
-          )}
-
-          {/* Backtest Results Scorecard */}
-          {backtestResult && (
-            <div>
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                  gap: 14,
-                  marginBottom: 24,
+                  display:
+                    "inline-flex",
+                  padding:
+                    3,
+                  borderRadius:
+                    999,
+                  background:
+                    "#ffffff",
+                  border:
+                    "1px solid #e4e8e6",
                 }}
               >
-                <div style={{ padding: "16px 18px", borderRadius: 14, background: bgItem, border: `1px solid ${borderCol}` }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: textSecondary }}>Total Strategy Return</div>
-                  <div
+                <ChartToggle
+                  active={
+                    chartMode ===
+                    "value"
+                  }
+                  onClick={() =>
+                    setChartMode(
+                      "value"
+                    )
+                  }
+                >
+                  Value
+                </ChartToggle>
+
+                <ChartToggle
+                  active={
+                    chartMode ===
+                    "price"
+                  }
+                  onClick={() =>
+                    setChartMode(
+                      "price"
+                    )
+                  }
+                >
+                  Price
+                </ChartToggle>
+              </div>
+            </div>
+
+            <AreaChart
+              values={
+                visibleGraph
+              }
+            />
+
+            <div
+              style={{
+                position:
+                  "absolute",
+                left: 19,
+                right: 19,
+                bottom: 12,
+                display:
+                  "flex",
+                justifyContent:
+                  "space-between",
+                fontSize:
+                  7.5,
+                color:
+                  "#8d9792",
+              }}
+            >
+              <span>
+                Low $
+                {chartMode ===
+                "price"
+                  ? graphSummary.low.toFixed(
+                      2
+                    )
+                  : fmt(
+                      graphSummary.low
+                    )}
+              </span>
+
+              <span>
+                High $
+                {chartMode ===
+                "price"
+                  ? graphSummary.high.toFixed(
+                      2
+                    )
+                  : fmt(
+                      graphSummary.high
+                    )}
+              </span>
+            </div>
+          </div>
+
+          {/* Insight Cards */}
+          <div
+            style={{
+              display:
+                "grid",
+              gap: 12,
+            }}
+          >
+            <InsightCard
+              title="Capital deployed"
+              value={`$${fmt(
+                totalDeployed
+              )}`}
+              subtitle={`${buyTrades.length} buy transactions`}
+              icon={
+                <Wallet
+                  size={15}
+                />
+              }
+            />
+
+            <InsightCard
+              title="Strong signals"
+              value={
+                strongSignals.length
+              }
+              subtitle="65%+ confidence"
+              icon={
+                <Zap
+                  size={15}
+                />
+              }
+              green
+            />
+
+            <InsightCard
+              title="Available cash"
+              value={`$${fmt(
+                cash
+              )}`}
+              subtitle="Current account balance"
+              icon={
+                <Wallet
+                  size={15}
+                />
+              }
+            />
+
+            <InsightCard
+              title="Max allocation"
+              value={`$${fmt(
+                maxSpend
+              )}`}
+              subtitle="Agent spending limit"
+              icon={
+                <ShieldIcon />
+              }
+            />
+
+            <InsightCard
+              title="Reverted"
+              value={
+                reversedTrades
+              }
+              subtitle="Reversed agent trades"
+              icon={
+                <RotateCcw
+                  size={15}
+                />
+              }
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================
+          BEST SIGNALS
+         ===================================================== */}
+
+      <section>
+        <SectionHeader
+          title="Best opportunities"
+          action={
+            signalError
+              ? "Unavailable"
+              : `${strongSignals.length} signals`
+          }
+        />
+
+        {signalError ? (
+          <div
+            style={{
+              minHeight:
+                110,
+              borderRadius:
+                14,
+              background:
+                "#f1f3f2",
+              display:
+                "grid",
+              placeItems:
+                "center",
+              textAlign:
+                "center",
+              padding:
+                20,
+              color:
+                "#7d8782",
+              fontSize:
+                8.5,
+            }}
+          >
+            Signal data is temporarily unavailable.
+          </div>
+        ) : signalLoading ? (
+          <Loading />
+        ) : strongSignals.length ===
+          0 ? (
+          <div
+            style={{
+              minHeight:
+                110,
+              borderRadius:
+                14,
+              background:
+                "#f1f3f2",
+              display:
+                "grid",
+              placeItems:
+                "center",
+              color:
+                "#7d8782",
+              fontSize:
+                8.5,
+            }}
+          >
+            No high-confidence opportunities right now.
+          </div>
+        ) : (
+          <div
+            style={{
+              display:
+                "grid",
+              gridTemplateColumns:
+                "repeat(3,minmax(0,1fr))",
+              gap: 12,
+            }}
+          >
+            {strongSignals
+              .slice(0, 3)
+              .map(
+                (
+                  signal,
+                  index
+                ) => (
+                  <SignalCard
+                    key={`${signal?.ticker || "signal"}-${index}`}
+                    signal={
+                      signal
+                    }
+                    onReview={() =>
+                      onOpenOrderDesk?.(
+                        signal?.ticker,
+                        "BUY"
+                      )
+                    }
+                  />
+                )
+              )}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/*
+ * ===========================================================
+ * UI COMPONENTS
+ * ===========================================================
+ */
+
+function TopButton({
+  children,
+  onClick,
+  disabled,
+  secondary = false,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        minHeight:
+          30,
+        display:
+          "inline-flex",
+        alignItems:
+          "center",
+        justifyContent:
+          "center",
+        gap: 5,
+        padding:
+          "0 10px",
+        borderRadius:
+          999,
+        border:
+          secondary
+            ? "1px solid #dfe5e1"
+            : "1px solid #0b8f68",
+        background:
+          secondary
+            ? "#ffffff"
+            : "#0b8f68",
+        color:
+          secondary
+            ? "#4b5750"
+            : "#ffffff",
+        fontSize:
+          8,
+        fontWeight:
+          900,
+        cursor:
+          disabled
+            ? "not-allowed"
+            : "pointer",
+        opacity:
+          disabled
+            ? 0.5
+            : 1,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SectionHeader({
+  title,
+  action,
+}) {
+  return (
+    <div
+      style={{
+        display:
+          "flex",
+        alignItems:
+          "center",
+        justifyContent:
+          "space-between",
+        marginBottom:
+          10,
+      }}
+    >
+      <div
+        style={{
+          fontSize:
+            12,
+          fontWeight:
+            900,
+          letterSpacing:
+            "-.02em",
+        }}
+      >
+        {title}
+      </div>
+
+      <span
+        style={{
+          fontSize:
+            8,
+          fontWeight:
+            800,
+          color:
+            "#89938e",
+        }}
+      >
+        {action}
+      </span>
+    </div>
+  );
+}
+
+function StrategyCard({
+  item,
+  active,
+  onClick,
+  signals,
+}) {
+  const strategySignal =
+    signals.find(
+      (signal) => {
+        const name =
+          String(
+            signal?.strategy ||
+              ""
+          ).toLowerCase();
+
+        return (
+          name.includes(
+            item.id
+          ) ||
+          name.includes(
+            item.name
+              .toLowerCase()
+          )
+        );
+      }
+    );
+
+  const ticker =
+    strategySignal?.ticker ||
+    "—";
+
+  const confidence =
+    n(
+      strategySignal?.confidence
+    );
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        textAlign:
+          "left",
+        border:
+          "none",
+        padding:
+          0,
+        background:
+          "transparent",
+        cursor:
+          "pointer",
+      }}
+    >
+      <div
+        style={{
+          minHeight:
+            170,
+          borderRadius:
+            14,
+          background:
+            "#f1f3f2",
+          padding:
+            15,
+          boxSizing:
+            "border-box",
+          position:
+            "relative",
+          border:
+            active
+              ? "1px solid #cfeee1"
+              : "1px solid transparent",
+        }}
+      >
+        <div
+          style={{
+            display:
+              "flex",
+            alignItems:
+              "center",
+            justifyContent:
+              "space-between",
+          }}
+        >
+          <span
+            style={{
+              display:
+                "inline-flex",
+              alignItems:
+                "center",
+              gap: 4,
+              padding:
+                "4px 7px",
+              borderRadius:
+                999,
+              background:
+                active
+                  ? "#def5e9"
+                  : "#ffffff",
+              color:
+                active
+                  ? "#0b8f68"
+                  : "#7b8681",
+              fontSize:
+                7,
+              fontWeight:
+                900,
+            }}
+          >
+            <Sparkles
+              size={8}
+            />
+
+            {active
+              ? "Active"
+              : "Available"}
+          </span>
+
+          <Bot
+            size={14}
+            color={
+              active
+                ? "#0b8f68"
+                : "#97a19c"
+            }
+          />
+        </div>
+
+        <div
+          style={{
+            marginTop:
+              14,
+            fontSize:
+              12,
+            fontWeight:
+              900,
+          }}
+        >
+          {item.name}
+        </div>
+
+        <div
+          style={{
+            marginTop:
+              3,
+            color:
+              "#7e8984",
+            fontSize:
+              8,
+          }}
+        >
+          {item.subtitle}
+        </div>
+
+        <div
+          style={{
+            marginTop:
+              9,
+            fontSize:
+              8,
+            lineHeight:
+              1.45,
+            color:
+              "#818c87",
+          }}
+        >
+          {item.description}
+        </div>
+
+        <div
+          style={{
+            position:
+              "absolute",
+            left: 15,
+            right: 15,
+            bottom: 14,
+            display:
+              "flex",
+            alignItems:
+              "center",
+            justifyContent:
+              "space-between",
+          }}
+        >
+          <span
+            style={{
+              fontSize:
+                7.5,
+              color:
+                "#8a948f",
+            }}
+          >
+            Focus{" "}
+            <strong
+              style={{
+                color:
+                  "#29332e",
+              }}
+            >
+              {ticker}
+            </strong>
+          </span>
+
+          <span
+            style={{
+              fontSize:
+                7.5,
+              color:
+                confidence
+                  ? "#0b8f68"
+                  : "#8a948f",
+              fontWeight:
+                900,
+            }}
+          >
+            {confidence
+              ? `${confidence}% confidence`
+              : "Waiting"}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function ActivityTimeline({
+  actions,
+  loading,
+  onRevert,
+  revertingId,
+}) {
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight:
+            300,
+          borderRadius:
+            14,
+          background:
+            "#f1f3f2",
+          display:
+            "grid",
+          placeItems:
+            "center",
+          color:
+            "#7f8984",
+          fontSize:
+            8,
+        }}
+      >
+        Loading activity...
+      </div>
+    );
+  }
+
+  if (!actions.length) {
+    return (
+      <div
+        style={{
+          minHeight:
+            300,
+          borderRadius:
+            14,
+          background:
+            "#f1f3f2",
+          display:
+            "grid",
+          placeItems:
+            "center",
+          color:
+            "#7f8984",
+          fontSize:
+            8,
+          textAlign:
+            "center",
+        }}
+      >
+        No activity yet.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        minHeight:
+          300,
+        maxHeight:
+          300,
+        overflowY:
+          "auto",
+        borderRadius:
+          14,
+        background:
+          "#ffffff",
+        border:
+          "1px solid #e7ebe8",
+        padding:
+          "13px 12px",
+        boxSizing:
+          "border-box",
+      }}
+    >
+      <div
+        style={{
+          position:
+            "relative",
+        }}
+      >
+        <div
+          style={{
+            position:
+              "absolute",
+            left: 4,
+            top: 3,
+            bottom: 3,
+            width: 1,
+            background:
+              "#dfe6e2",
+          }}
+        />
+
+        <div
+          style={{
+            display:
+              "grid",
+            gap: 14,
+          }}
+        >
+          {actions
+            .slice(0, 8)
+            .map(
+              (
+                action,
+                index
+              ) => (
+                <div
+                  key={
+                    action.id ||
+                    index
+                  }
+                  style={{
+                    position:
+                      "relative",
+                    paddingLeft:
+                      16,
+                  }}
+                >
+                  <span
                     style={{
-                      fontSize: 24,
-                      fontWeight: 900,
-                      color: backtestResult.scorecard.totalReturnPct >= 0 ? "#10b981" : "#ef4444",
-                      fontFamily: "'JetBrains Mono', monospace",
-                      marginTop: 4,
+                      position:
+                        "absolute",
+                      left: 0,
+                      top: 4,
+                      width: 9,
+                      height: 9,
+                      borderRadius:
+                        "50%",
+                      background:
+                        action.reverted
+                          ? "#d5ddd8"
+                          : "#d5f3e6",
+                      border:
+                        "2px solid #0b8f68",
                     }}
-                  >
-                    {backtestResult.scorecard.totalReturnPct >= 0 ? "+" : ""}{backtestResult.scorecard.totalReturnPct}%
-                  </div>
-                  <div style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
-                    Ending: ${fmt(backtestResult.scorecard.endingCapital)}
-                  </div>
-                </div>
+                  />
 
-                <div style={{ padding: "16px 18px", borderRadius: 14, background: bgItem, border: `1px solid ${borderCol}` }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: textSecondary }}>Benchmark Return (S&P)</div>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: textPrimary, fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>
-                    +{backtestResult.scorecard.benchmarkReturnPct}%
-                  </div>
-                  <div style={{ fontSize: 11, color: "#10b981", fontWeight: 700, marginTop: 2 }}>
-                    Alpha: +{(backtestResult.scorecard.totalReturnPct - backtestResult.scorecard.benchmarkReturnPct).toFixed(1)}%
-                  </div>
-                </div>
-
-                <div style={{ padding: "16px 18px", borderRadius: 14, background: bgItem, border: `1px solid ${borderCol}` }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: textSecondary }}>Win Rate</div>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: "#10b981", fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>
-                    {backtestResult.scorecard.winRatePct}%
-                  </div>
-                  <div style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
-                    Total Trades: {backtestResult.scorecard.totalTrades}
-                  </div>
-                </div>
-
-                <div style={{ padding: "16px 18px", borderRadius: 14, background: bgItem, border: `1px solid ${borderCol}` }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: textSecondary }}>Max Drawdown / Sharpe</div>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: textPrimary, fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>
-                    -{backtestResult.scorecard.maxDrawdownPct}%
-                  </div>
-                  <div style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>
-                    Sharpe Ratio: {backtestResult.scorecard.sharpeRatio}
-                  </div>
-                </div>
-              </div>
-
-              {/* Simulated Trades Timeline */}
-              <div style={{ fontSize: 15, fontWeight: 900, color: textPrimary, marginBottom: 12 }}>
-                Simulated Historical Execution Timeline ({backtestResult.trades.length} Trades)
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto" }}>
-                {backtestResult.trades.map((tr, idx) => (
                   <div
-                    key={idx}
                     style={{
-                      padding: "10px 14px",
-                      borderRadius: 12,
-                      background: bgItem,
-                      border: `1px solid ${borderCol}`,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
+                      display:
+                        "flex",
+                      alignItems:
+                        "flex-start",
+                      justifyContent:
+                        "space-between",
+                      gap: 7,
                     }}
                   >
                     <div>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: textSecondary, marginRight: 10 }}>Day {tr.day}</span>
-                      <span style={{ fontSize: 13, fontWeight: 900, color: "#006c49", marginRight: 8 }}>{tr.action}</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: textPrimary }}>{tr.shares} shares @ ${tr.price}</span>
+                      <div
+                        style={{
+                          fontSize:
+                            8,
+                          lineHeight:
+                            1.4,
+                          fontWeight:
+                            800,
+                          color:
+                            "#26322b",
+                        }}
+                      >
+                        {action.reverted
+                          ? "Trade reverted"
+                          : `${action.stock || "Trade"} · ${n(
+                              action.shares
+                            )} shares`}
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop:
+                            2,
+                          fontSize:
+                            7,
+                          color:
+                            "#85918b",
+                        }}
+                      >
+                        {formatRelativeTime(
+                          action.timestamp
+                        )}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: textSecondary }}>
-                      {tr.reason}
-                    </div>
+
+                    {!action.reverted && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onRevert?.(
+                            action.id
+                          )
+                        }
+                        disabled={
+                          revertingId ===
+                          action.id
+                        }
+                        style={{
+                          border:
+                            "none",
+                          background:
+                            "transparent",
+                          color:
+                            "#88928d",
+                          fontSize:
+                            7,
+                          fontWeight:
+                            800,
+                          cursor:
+                            "pointer",
+                        }}
+                      >
+                        {revertingId ===
+                        action.id
+                          ? "..."
+                          : "Revert"}
+                      </button>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* TAB 5: AGENT MEMORY & PERCEPTION */}
-      {activeTab === "memory" && (
-        <div
-          style={{
-            borderRadius: 20,
-            padding: 24,
-            background: bgCard,
-            border: `1px solid ${borderCol}`,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: textPrimary }}>
-                Agent Memory & Market Perception Store
-              </div>
-              <p style={{ fontSize: 13, color: textSecondary, margin: "2px 0 0" }}>
-                Continuous context persisted by the agent across trading sessions.
-              </p>
-            </div>
-
-            <button
-              onClick={fetchMemories}
-              disabled={loadingMemory}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 14px",
-                borderRadius: 10,
-                border: `1px solid ${borderCol}`,
-                background: bgItem,
-                color: textPrimary,
-                fontSize: 12.5,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              <RefreshCw size={13} className={loadingMemory ? "spin" : ""} /> Refresh
-            </button>
-          </div>
-
-          {memories.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 20px", color: textSecondary }}>
-              <Brain size={36} color="#94a3b8" style={{ margin: "0 auto 10px" }} />
-              <div style={{ fontSize: 14, fontWeight: 800, color: textPrimary }}>No Observations Logged Yet</div>
-              <p style={{ fontSize: 13, margin: "4px 0 0" }}>
-                As the agent runs market evaluations and processes user chats, its key findings will be stored here.
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {memories.map((mem) => (
-                <div
-                  key={mem.id}
-                  style={{
-                    padding: "14px 16px",
-                    borderRadius: 14,
-                    background: bgItem,
-                    border: `1px solid ${borderCol}`,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 900, color: "#006c49", textTransform: "uppercase" }}>
-                      {mem.type}
+                  <div
+                    style={{
+                      marginTop:
+                        4,
+                      display:
+                        "flex",
+                      gap: 5,
+                      color:
+                        "#7c8781",
+                      fontSize:
+                        7,
+                    }}
+                  >
+                    <span
+                      style={{
+                        color:
+                          String(
+                            action.action ||
+                              "BUY"
+                          ).toUpperCase() ===
+                          "SELL"
+                            ? "#c24f4f"
+                            : "#0b8f68",
+                        fontWeight:
+                          900,
+                      }}
+                    >
+                      {String(
+                        action.action ||
+                          "BUY"
+                      ).toUpperCase()}
                     </span>
-                    <span style={{ fontSize: 11.5, color: textSecondary }}>
-                      {new Date(mem.timestamp).toLocaleString()}
+
+                    <span>·</span>
+
+                    <span>
+                      $
+                      {n(
+                        action.amount
+                      ).toFixed(
+                        2
+                      )}
                     </span>
-                  </div>
-                  <div style={{ fontSize: 13.5, color: textPrimary, lineHeight: 1.5 }}>
-                    {mem.content}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              )
+            )}
         </div>
-      )}
+      </div>
+    </div>
+  );
+}
+
+function TickerDropdown({
+  ticker,
+  stockMetaList,
+  holdings,
+  onChange,
+}) {
+  const available =
+    Array.from(
+      new Set([
+        ticker,
+        ...Object.keys(
+          holdings || {}
+        ),
+        ...(
+          stockMetaList || []
+        )
+          .slice(0, 8)
+          .map(
+            (item) =>
+              item.ticker
+          ),
+      ])
+    ).filter(Boolean);
+
+  return (
+    <div
+      style={{
+        position:
+          "relative",
+      }}
+    >
+      <select
+        value={
+          ticker || ""
+        }
+        onChange={(event) =>
+          onChange(
+            event.target
+              .value
+          )
+        }
+        style={{
+          appearance:
+            "none",
+          minHeight:
+            27,
+          padding:
+            "0 23px 0 8px",
+          border:
+            "1px solid #e3e8e5",
+          borderRadius:
+            999,
+          background:
+            "#ffffff",
+          color:
+            "#4f5a54",
+          fontSize:
+            7.5,
+          fontWeight:
+            900,
+          outline:
+            "none",
+        }}
+      >
+        {available.map(
+          (item) => (
+            <option
+              key={
+                item
+              }
+              value={
+                item
+              }
+            >
+              {item}
+            </option>
+          )
+        )}
+      </select>
+
+      <ChevronDown
+        size={9}
+        style={{
+          position:
+            "absolute",
+          right: 7,
+          top: "50%",
+          transform:
+            "translateY(-50%)",
+          pointerEvents:
+            "none",
+          color:
+            "#7a8580",
+        }}
+      />
+    </div>
+  );
+}
+
+function ChartToggle({
+  children,
+  active,
+  onClick,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        minHeight:
+          24,
+        padding:
+          "0 8px",
+        border:
+          "none",
+        borderRadius:
+          999,
+        background:
+          active
+            ? "#f1f3f2"
+            : "transparent",
+        color:
+          active
+            ? "#17221c"
+            : "#808a85",
+        fontSize:
+          7,
+        fontWeight:
+          900,
+        cursor:
+          "pointer",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function AreaChart({
+  values,
+}) {
+  if (!values.length) {
+    return (
+      <div
+        style={{
+          position:
+            "absolute",
+          left: 20,
+          right: 20,
+          top: 95,
+          bottom: 35,
+          display:
+            "grid",
+          placeItems:
+            "center",
+          color:
+            "#8a958f",
+          fontSize:
+            8,
+        }}
+      >
+        No chart data available.
+      </div>
+    );
+  }
+
+  const width = 900;
+  const height = 250;
+
+  const min =
+    Math.min(
+      ...values
+    );
+
+  const max =
+    Math.max(
+      ...values
+    );
+
+  const span =
+    Math.max(
+      max - min,
+      1
+    );
+
+  const left = 5;
+  const right = 5;
+  const top = 8;
+  const bottom = 15;
+
+  const graphWidth =
+    width -
+    left -
+    right;
+
+  const graphHeight =
+    height -
+    top -
+    bottom;
+
+  const points =
+    values.map(
+      (value, index) => {
+        const x =
+          values.length ===
+          1
+            ? width / 2
+            : left +
+              (index /
+                (values.length -
+                  1)) *
+                graphWidth;
+
+        const y =
+          top +
+          (1 -
+            (value -
+              min) /
+              span) *
+            graphHeight;
+
+        return {
+          x,
+          y,
+        };
+      }
+    );
+
+  const line =
+    points
+      .map(
+        (
+          point,
+          index
+        ) =>
+          `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`
+      )
+      .join(" ");
+
+  const area = `
+    ${line}
+    L ${points[
+      points.length -
+        1
+    ].x} ${height - bottom}
+    L ${points[0].x} ${
+      height - bottom
+    }
+    Z
+  `;
+
+  return (
+    <div
+      style={{
+        position:
+          "absolute",
+        left: 15,
+        right: 15,
+        top: 105,
+        bottom: 28,
+      }}
+    >
+      <svg
+        width="100%"
+        height="100%"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        style={{
+          display:
+            "block",
+        }}
+      >
+        <defs>
+          <linearGradient
+            id="stakeAgentGradient"
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="1"
+          >
+            <stop
+              offset="0%"
+              stopColor="#6297ef"
+              stopOpacity="0.75"
+            />
+
+            <stop
+              offset="100%"
+              stopColor="#6297ef"
+              stopOpacity="0.08"
+            />
+          </linearGradient>
+        </defs>
+
+        {[0, 1, 2, 3, 4].map(
+          (row) => {
+            const y =
+              top +
+              (row / 4) *
+                graphHeight;
+
+            return (
+              <line
+                key={
+                  row
+                }
+                x1={
+                  left
+                }
+                x2={
+                  width -
+                  right
+                }
+                y1={
+                  y
+                }
+                y2={
+                  y
+                }
+                stroke="#d9dfdc"
+                strokeWidth="1"
+                strokeDasharray="1 6"
+              />
+            );
+          }
+        )}
+
+        <path
+          d={area}
+          fill="url(#stakeAgentGradient)"
+        />
+
+        <path
+          d={line}
+          fill="none"
+          stroke="#6095ef"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {points.length >
+          0 && (
+          <circle
+            cx={
+              points[
+                points.length -
+                  1
+              ].x
+            }
+            cy={
+              points[
+                points.length -
+                  1
+              ].y
+            }
+            r="4.5"
+            fill="#ffffff"
+            stroke="#6095ef"
+            strokeWidth="2"
+          />
+        )}
+      </svg>
+    </div>
+  );
+}
+
+function InsightCard({
+  title,
+  value,
+  subtitle,
+  icon,
+  green = false,
+}) {
+  return (
+    <div
+      style={{
+        minHeight:
+          72,
+        borderRadius:
+          14,
+        background:
+          "#f1f3f2",
+        padding:
+          "13px 14px",
+        boxSizing:
+          "border-box",
+        display:
+          "flex",
+        flexDirection:
+          "column",
+        justifyContent:
+          "space-between",
+      }}
+    >
+      <div
+        style={{
+          display:
+            "flex",
+          alignItems:
+            "center",
+          justifyContent:
+            "space-between",
+        }}
+      >
+        <span
+          style={{
+            fontSize:
+              8,
+            color:
+              "#7d8983",
+          }}
+        >
+          {title}
+        </span>
+
+        <span
+          style={{
+            width: 23,
+            height: 23,
+            display:
+              "grid",
+            placeItems:
+              "center",
+            borderRadius:
+              7,
+            background:
+              "#ffffff",
+            color:
+              green
+                ? "#0b8f68"
+                : "#68746e",
+          }}
+        >
+          {icon}
+        </span>
+      </div>
+
+      <div>
+        <div
+          style={{
+            marginTop:
+              7,
+            fontSize:
+              19,
+            fontWeight:
+              500,
+            letterSpacing:
+              "-.03em",
+            color:
+              green
+                ? "#0b8f68"
+                : "#17221c",
+          }}
+        >
+          {value}
+        </div>
+
+        <div
+          style={{
+            marginTop:
+              2,
+            color:
+              "#86918b",
+            fontSize:
+              7,
+          }}
+        >
+          {subtitle}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <CheckCircle2
+      size={15}
+    />
+  );
+}
+
+function SignalCard({
+  signal,
+  onReview,
+}) {
+  const price =
+    n(signal?.price);
+
+  const change =
+    n(signal?.change);
+
+  const confidence =
+    n(
+      signal?.confidence
+    );
+
+  const positive =
+    change >= 0;
+
+  return (
+    <div
+      style={{
+        minHeight:
+          140,
+        borderRadius:
+          14,
+        background:
+          "#f1f3f2",
+        padding:
+          "13px 14px",
+      }}
+    >
+      <div
+        style={{
+          display:
+            "flex",
+          alignItems:
+            "flex-start",
+          justifyContent:
+            "space-between",
+        }}
+      >
+        <div
+          style={{
+            display:
+              "flex",
+            gap: 7,
+            alignItems:
+              "center",
+          }}
+        >
+          <div
+            style={{
+              width: 29,
+              height: 29,
+              display:
+                "grid",
+              placeItems:
+                "center",
+              borderRadius:
+                8,
+              background:
+                "#ffffff",
+              color:
+                "#0b8f68",
+              fontSize:
+                7.5,
+              fontWeight:
+                900,
+            }}
+          >
+            {signal?.ticker ||
+              "—"}
+          </div>
+
+          <div>
+            <div
+              style={{
+                fontSize:
+                  9,
+                fontWeight:
+                  900,
+              }}
+            >
+              {signal?.ticker ||
+                "Signal"}
+            </div>
+
+            <div
+              style={{
+                marginTop:
+                  2,
+                fontSize:
+                  7,
+                color:
+                  "#7d8882",
+              }}
+            >
+              {signal?.signalType ||
+                "BUY"}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            textAlign:
+              "right",
+          }}
+        >
+          <div
+            style={{
+              fontSize:
+                10,
+              fontWeight:
+                900,
+            }}
+          >
+            ${price.toFixed(
+              2
+            )}
+          </div>
+
+          <div
+            style={{
+              marginTop:
+                2,
+              display:
+                "flex",
+              alignItems:
+                "center",
+              gap: 2,
+              justifyContent:
+                "flex-end",
+              color:
+                positive
+                  ? "#0b8f68"
+                  : "#c24f4f",
+              fontSize:
+                7,
+              fontWeight:
+                900,
+            }}
+          >
+            {positive ? (
+              <TrendingUp
+                size={8}
+              />
+            ) : (
+              <TrendingDown
+                size={8}
+              />
+            )}
+
+            {positive
+              ? "+"
+              : ""}
+            {change.toFixed(
+              2
+            )}
+            %
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop:
+            8,
+          fontSize:
+            7.5,
+          lineHeight:
+            1.45,
+          color:
+            "#76827c",
+          minHeight:
+            22,
+        }}
+      >
+        {signal?.reason ||
+          "Potential setup detected."}
+      </div>
+
+      <div
+        style={{
+          marginTop:
+            8,
+          display:
+            "flex",
+          alignItems:
+            "center",
+          justifyContent:
+            "space-between",
+        }}
+      >
+        <span
+          style={{
+            color:
+              "#0b8f68",
+            fontSize:
+              7,
+            fontWeight:
+              900,
+          }}
+        >
+          {confidence}% confidence
+        </span>
+
+        <button
+          type="button"
+          onClick={
+            onReview
+          }
+          style={{
+            minHeight:
+              25,
+            border:
+              "1px solid #dce4df",
+            background:
+              "#ffffff",
+            borderRadius:
+              7,
+            padding:
+              "0 7px",
+            display:
+              "inline-flex",
+            alignItems:
+              "center",
+            gap: 4,
+            color:
+              "#28342d",
+            fontSize:
+              7,
+            fontWeight:
+              900,
+            cursor:
+              "pointer",
+          }}
+        >
+          Review
+          <ArrowUpRight
+            size={
+              8
+            }
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Loading() {
+  return (
+    <div
+      style={{
+        minHeight:
+          110,
+        borderRadius:
+          14,
+        background:
+          "#f1f3f2",
+        display:
+          "grid",
+        placeItems:
+          "center",
+        color:
+          "#808b85",
+        fontSize:
+          8,
+      }}
+    >
+      <span
+        style={{
+          display:
+            "inline-flex",
+          alignItems:
+            "center",
+          gap: 6,
+        }}
+      >
+        <RefreshCw
+          size={
+            12
+          }
+          style={{
+            animation:
+              "stakeAgentSpin 1s linear infinite",
+          }}
+        />
+        Loading...
+      </span>
     </div>
   );
 }
