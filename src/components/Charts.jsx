@@ -3,9 +3,10 @@ import logoImg from "../assets/logo.png";
 import { fmt, getSmoothSvgPath } from "../utils";
 import { fetchYFinanceChart } from "../api";
 
-export function Logo({ size = 26, textSize = 16, dark = false }) {
+export function Logo({ size = 26, textSize = 16, dark = false, showAi = false, textColor }) {
+  const computedColor = textColor || (dark ? "#ffffff" : "#0f172a");
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <img
         src={logoImg}
         alt="Stake Logo"
@@ -17,17 +18,37 @@ export function Logo({ size = 26, textSize = 16, dark = false }) {
           filter: dark ? "brightness(1.1)" : "none",
         }}
       />
-      <span
+      <div
         style={{
           fontFamily: "'Hanken Grotesk', sans-serif",
           fontWeight: 900,
           fontSize: textSize,
           letterSpacing: "-0.04em",
-          color: dark ? "#f5f7f6" : "#191c1e",
+          color: computedColor,
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
         }}
       >
-        Stake
-      </span>
+        <span style={{ color: computedColor }}>Stake</span>
+        {showAi && (
+          <span
+            style={{
+              background: "linear-gradient(135deg, #10b981 0%, #047857 100%)",
+              color: "#ffffff",
+              fontSize: Math.max(10, Math.round(textSize * 0.62)),
+              fontWeight: 800,
+              padding: "1.5px 5.5px",
+              borderRadius: 5,
+              letterSpacing: "0.03em",
+              boxShadow: "0 2px 6px rgba(16, 185, 129, 0.25)",
+              lineHeight: 1.2,
+            }}
+          >
+            AI
+          </span>
+        )}
+      </div>
     </div>
   );
 }

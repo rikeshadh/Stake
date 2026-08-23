@@ -396,7 +396,7 @@ export function StockDetail({
       </div>
 
       {/* 2. ACTIONS & POSITION SECTION */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 20, marginBottom: 24 }}>
         {/* Quick Buy / Sell Trading Desk Launcher */}
         <div
           style={{

@@ -1,6 +1,6 @@
 {
   "name": "Stake",
-  "description": "Stake Global Exchange — Fractional shares, zero commissions, and agentic trading workspace",
+  "description": "Stake Global Autonomous Equities Terminal",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

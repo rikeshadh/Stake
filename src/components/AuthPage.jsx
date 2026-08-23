@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   ArrowRight,
-  ArrowLeft,
   Lock,
   Mail,
   User,
@@ -10,27 +9,25 @@ import {
   Eye,
   EyeOff,
   Sparkles,
-  TrendingUp,
-  TrendingDown,
+  ArrowLeft,
 } from "lucide-react";
 import { Logo } from "./Charts";
 import { registerUser, loginUser } from "../api";
 import "../styles/auth.css";
 
-const RISING_STOCK_BUBBLES = [
-  { ticker: "NVDA", price: "$137.86", chg: "+2.8%", isUp: true, left: "8%", delay: "0s", duration: "8.5s", path: "path-1" },
-  { ticker: "TSLA", price: "$248.50", chg: "-2.1%", isUp: false, left: "65%", delay: "1.2s", duration: "9.2s", path: "path-2" },
-  { ticker: "AAPL", price: "$228.45", chg: "+1.4%", isUp: true, left: "34%", delay: "2.8s", duration: "7.8s", path: "path-3" },
-  { ticker: "INTC", price: "$21.30", chg: "-3.4%", isUp: false, left: "16%", delay: "4.1s", duration: "8.2s", path: "path-4" },
-  { ticker: "COIN", price: "$276.46", chg: "+4.6%", isUp: true, left: "52%", delay: "5.5s", duration: "9.0s", path: "path-1" },
-  { ticker: "MSFT", price: "$430.20", chg: "+0.9%", isUp: true, left: "78%", delay: "3.2s", duration: "8.6s", path: "path-2" },
-  { ticker: "AMD", price: "$156.80", chg: "+3.2%", isUp: true, left: "24%", delay: "6.8s", duration: "7.5s", path: "path-3" },
-  { ticker: "PLTR", price: "$42.60", chg: "+5.1%", isUp: true, left: "44%", delay: "0.8s", duration: "8.0s", path: "path-4" },
+const AMBIENT_RISING_BUBBLES = [
+  { ticker: "NVDA", price: "$137.86", chg: "+2.8%", up: true, path: "path-1", left: "10%", delay: "0s", duration: "14s" },
+  { ticker: "AAPL", price: "$228.45", chg: "+1.4%", up: true, path: "path-2", left: "32%", delay: "3s", duration: "16s" },
+  { ticker: "TSLA", price: "$248.50", chg: "-2.1%", up: false, path: "path-3", left: "64%", delay: "1.5s", duration: "15s" },
+  { ticker: "MSFT", price: "$430.20", chg: "+0.9%", up: true, path: "path-4", left: "22%", delay: "6s", duration: "18s" },
+  { ticker: "AMD", price: "$158.30", chg: "+2.6%", up: true, path: "path-1", left: "78%", delay: "4s", duration: "15s" },
+  { ticker: "PLTR", price: "$42.60", chg: "+5.1%", up: true, path: "path-2", left: "48%", delay: "7s", duration: "17s" },
 ];
 
 export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLanding }) {
   const [mode, setMode] = useState(initialMode); // "login" | "signup"
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -48,6 +45,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   const isInputValid = usernameOrEmail.trim().length >= 2;
   const isEmailValid = emailRegex.test(usernameOrEmail.trim());
+  const isUsernameValid = username.trim().length >= 3;
   const isPasswordValid = password.length >= 6;
   const isNameValid = fullName.trim().length >= 2;
   const doPasswordsMatch = mode === "login" || password === confirmPassword;
@@ -72,7 +70,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  // Form Validation with clear, direct messages (no 'Notice' popups)
+  // Form Validation with clean messages
   const validateForm = () => {
     setErrorMsg("");
 
@@ -99,6 +97,11 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
     if (mode === "signup") {
       if (!fullName.trim() || fullName.trim().length < 2) {
         setErrorMsg("Please enter your full legal name.");
+        return false;
+      }
+
+      if (!username.trim() || username.trim().length < 3) {
+        setErrorMsg("Please enter a username (at least 3 characters).");
         return false;
       }
 
@@ -130,8 +133,10 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
       if (mode === "signup") {
         res = await registerUser({
           email: cleanIdentifier,
+          username: username.trim(),
           name: fullName.trim(),
           password,
+          preferredProfile: "balanced",
         });
       } else {
         res = await loginUser(cleanIdentifier, password);
@@ -167,77 +172,115 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
 
   return (
     <div className="stake-auth-layout">
-      {/* LEFT HERO IMAGE COLUMN WITH FASTER, RANDOMIZED RISING STOCK BUBBLES */}
+      {/* =========================================================
+          LEFT HERO COLUMN: Image-Matched Atmospheric Dark Hero
+         ========================================================= */}
       <div className="stake-auth-left">
-        {/* Animated Rising Stock Bubbles Field */}
+        {/* Background Upward Floating Stream */}
         <div className="stake-auth-bubble-field">
-          {RISING_STOCK_BUBBLES.map((bubble, idx) => (
+          {AMBIENT_RISING_BUBBLES.map((bubble, i) => (
             <div
-              key={`${bubble.ticker}-${idx}`}
-              className={`stake-rising-stock-bubble ${bubble.isUp ? "up" : "down"} ${bubble.path}`}
+              key={i}
+              className={`stake-rising-stock-bubble ${bubble.up ? "up" : "down"} ${bubble.path}`}
               style={{
                 left: bubble.left,
                 animationDelay: bubble.delay,
                 animationDuration: bubble.duration,
               }}
             >
-              <div className="bubble-ticker-tag">{bubble.ticker}</div>
-              <div className="bubble-price-tag">{bubble.price}</div>
-              <div className={`bubble-chg-tag ${bubble.isUp ? "up" : "down"}`}>
-                {bubble.isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                <span>{bubble.chg}</span>
-              </div>
+              <span className="bubble-ticker-tag">{bubble.ticker}</span>
+              <span className="bubble-price-tag">{bubble.price}</span>
+              <span className={`bubble-chg-tag ${bubble.up ? "up" : "down"}`}>
+                {bubble.chg}
+              </span>
             </div>
           ))}
         </div>
 
-        {/* Centered Large Hero Content */}
+        {/* Floating Stock Badges around hero as in design */}
+        <div className="stake-hero-floating-pill green pill-pos-top-left">
+          <span>NVDA</span>
+          <span style={{ color: "#ffffff" }}>$137.86</span>
+          <span className="pill-chg">↗ +2.8%</span>
+        </div>
+
+        <div className="stake-hero-floating-pill green pill-pos-top-right">
+          <span>PLTR</span>
+          <span style={{ color: "#ffffff" }}>$42.60</span>
+          <span className="pill-chg">↗ +5.1%</span>
+        </div>
+
+        <div className="stake-hero-floating-pill green pill-pos-mid-left">
+          <span>AAPL</span>
+          <span style={{ color: "#ffffff" }}>$228.45</span>
+          <span className="pill-chg">↗ +1.4%</span>
+        </div>
+
+        <div className="stake-hero-floating-pill red pill-pos-mid-right">
+          <span>TSLA</span>
+          <span style={{ color: "#ffffff" }}>$248.50</span>
+          <span className="pill-chg">↘ -2.1%</span>
+        </div>
+
+        <div className="stake-hero-floating-pill green pill-pos-bot-right">
+          <span>MSFT</span>
+          <span style={{ color: "#ffffff" }}>$430.20</span>
+          <span className="pill-chg">↗ +0.9%</span>
+        </div>
+
+        <div className="stake-hero-floating-pill red pill-pos-bot-left">
+          <span>INTC</span>
+          <span style={{ color: "#ffffff" }}>$21.30</span>
+          <span className="pill-chg">↘ -3.4%</span>
+        </div>
+
+        {/* Hero Centerpiece Content */}
         <div className="stake-auth-left-content">
-          <div style={{ marginBottom: 28, display: "flex", justifyContent: "center" }}>
-            <Logo size={40} textSize={26} dark={true} />
+          <div className="stake-hero-brand-block">
+            <Logo size={32} textSize={24} dark={true} textColor="#ffffff" />
+            <div className="stake-hero-badge-tag">STAKE GLOBAL EXCHANGE</div>
           </div>
 
-          <div className="stake-auth-eyebrow">
-            STAKE GLOBAL EXCHANGE
-          </div>
-
-          <h1 className="stake-auth-headline">
-            Invest smarter.<br />
-            Grow your wealth.
+          <h1 className="stake-auth-headline-display">
+            Invest smarter.<br />Grow your wealth.
           </h1>
 
-          <p className="stake-auth-lead">
+          <p className="stake-auth-lead-display">
             Institutional-grade fractional equities, zero commissions, real-time Level 2 market data, and autonomous algorithmic execution.
           </p>
         </div>
       </div>
 
-      {/* RIGHT AUTH FORM COLUMN */}
+      {/* =========================================================
+          RIGHT AUTH COLUMN: Clean Form with Demo Below Google
+         ========================================================= */}
       <div className="stake-auth-right">
         <div className="stake-auth-form-wrapper">
-          {/* Top Bar with Aligned Back Button */}
+          {/* Top Bar: Back Button */}
           <div className="stake-auth-top-bar">
-            {onBackToLanding ? (
+            {onBackToLanding && (
               <button
                 type="button"
-                onClick={onBackToLanding}
                 className="stake-back-landing-btn"
+                onClick={onBackToLanding}
               >
                 <ArrowLeft size={16} />
                 <span>Back</span>
               </button>
-            ) : <div />}
+            )}
           </div>
 
-          <h2 className="stake-auth-title">
-            {mode === "signup" ? "Create account." : "Welcome back."}
-          </h2>
-
-          <p className="stake-auth-desc">
-            {mode === "signup"
-              ? "Open your account, complete identity verification, and start investing."
-              : "Enter your username or email to access your trading terminal."}
-          </p>
+          {/* Title & Desc */}
+          <div style={{ marginBottom: 20 }}>
+            <h2 className="stake-auth-title">
+              {mode === "signup" ? "Create your account." : "Welcome back."}
+            </h2>
+            <p className="stake-auth-desc">
+              {mode === "signup"
+                ? "Start trading US equities and ETFs with real-time institutional tools."
+                : "Enter your username or email to access your trading terminal."}
+            </p>
+          </div>
 
           {/* Segmented Mode Switcher */}
           <div className="stake-mode-pill-box">
@@ -249,7 +292,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
                 setErrorMsg("");
               }}
             >
-              Log in
+              Log In
             </button>
             <button
               type="button"
@@ -259,15 +302,15 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
                 setErrorMsg("");
               }}
             >
-              Sign up
+              Sign Up
             </button>
           </div>
 
-          {/* Clean inline error banner (no Notice header) */}
+          {/* Inline Error & Success Banners */}
           {errorMsg && (
             <div className="stake-error-banner">
-              <AlertCircle size={17} style={{ flexShrink: 0, color: "#ef4444" }} />
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#991b1b" }}>
+              <AlertCircle size={16} style={{ flexShrink: 0, color: "#ef4444" }} />
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#991b1b" }}>
                 {errorMsg}
               </div>
             </div>
@@ -280,21 +323,39 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
             </div>
           )}
 
-          {/* Form with noValidate to completely remove native browser tooltip popups */}
+          {/* Form */}
           <form onSubmit={handleSubmit} noValidate>
-            {/* Full Name for Signup */}
+            {/* Legal Full Name for Signup */}
             {mode === "signup" && (
               <div className="stake-form-group">
-                <label className="stake-label">Legal Full Name</label>
+                <label className="stake-label">Full Legal Name</label>
                 <div className="stake-input-wrapper">
                   <User size={16} className="stake-input-icon" />
                   <input
                     type="text"
                     className={`stake-input ${touched.name && !isNameValid ? "error" : ""}`}
-                    placeholder="e.g. Alex Chen"
+                    placeholder="e.g. Alex Rivera"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     onBlur={() => handleBlur("name")}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Username for Signup */}
+            {mode === "signup" && (
+              <div className="stake-form-group">
+                <label className="stake-label">Username</label>
+                <div className="stake-input-wrapper">
+                  <span className="stake-input-icon" style={{ fontSize: 13, fontWeight: 800, color: "#64748b" }}>@</span>
+                  <input
+                    type="text"
+                    className={`stake-input ${touched.username && !isUsernameValid ? "error" : ""}`}
+                    placeholder="e.g. alex_rivera"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    onBlur={() => handleBlur("username")}
                   />
                 </div>
               </div>
@@ -310,7 +371,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
                 <input
                   type={mode === "signup" ? "email" : "text"}
                   className={`stake-input ${touched.identifier && !isInputValid ? "error" : ""}`}
-                  placeholder={mode === "signup" ? "name@domain.com" : "Username or email address"}
+                  placeholder={mode === "signup" ? "trader@stake.com" : "Username or email address"}
                   value={usernameOrEmail}
                   onChange={(e) => setUsernameOrEmail(e.target.value)}
                   onBlur={() => handleBlur("identifier")}
@@ -326,7 +387,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
                   <button
                     type="button"
                     style={{ background: "none", border: "none", color: "#006c49", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}
-                    onClick={() => setSuccessMsg("Password reset instructions sent to your registered contact.")}
+                    onClick={() => setSuccessMsg("Password reset link sent to your email address.")}
                   >
                     Forgot password?
                   </button>
@@ -352,7 +413,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
                 </button>
               </div>
 
-              {/* Password Strength Indicator for Signup */}
+              {/* Password Strength for Signup */}
               {mode === "signup" && password.length > 0 && (
                 <div style={{ marginTop: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
@@ -393,7 +454,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
               </div>
             )}
 
-            {/* Terms and conditions checkbox for Signup */}
+            {/* Terms Checkbox for Signup */}
             {mode === "signup" && (
               <label className="stake-checkbox-label">
                 <input
@@ -402,7 +463,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
                   onChange={(e) => setAgreeTerms(e.target.checked)}
                 />
                 <span>
-                  I agree to Stake's <strong>Terms of Service</strong>, <strong>Privacy Policy</strong>, and <strong>Risk Disclosures</strong>.
+                  I agree to the <strong>Terms of Service</strong>, <strong>Privacy Policy</strong>, and <strong>Risk Disclosures</strong>.
                 </span>
               </label>
             )}
@@ -417,7 +478,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
                 <span>Authenticating...</span>
               ) : mode === "signup" ? (
                 <>
-                  <span>Create Free Account</span>
+                  <span>Create Account</span>
                   <ArrowRight size={18} />
                 </>
               ) : (
@@ -436,7 +497,15 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
             <button
               type="button"
               className="stake-social-btn"
-              onClick={() => onLoginSuccess({ email: "google.user@stake.com", name: "Google Trader", accountNumber: "STK-GGL992140", password: "OAuth", mode: "login" })}
+              onClick={() =>
+                onLoginSuccess({
+                  email: "google.trader@stake.com",
+                  name: "Google Trader",
+                  accountNumber: "STK-GGL-88210",
+                  cash: 50000,
+                  holdings: { NVDA: { shares: 10, costBasis: 1378.6, avgPrice: 137.86 } },
+                })
+              }
             >
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -450,7 +519,15 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
             <button
               type="button"
               className="stake-social-btn"
-              onClick={() => onLoginSuccess({ email: "apple.user@stake.com", name: "Apple Trader", accountNumber: "STK-APL884120", password: "OAuth", mode: "login" })}
+              onClick={() =>
+                onLoginSuccess({
+                  email: "apple.trader@stake.com",
+                  name: "Apple Trader",
+                  accountNumber: "STK-APL-44910",
+                  cash: 50000,
+                  holdings: { AAPL: { shares: 20, costBasis: 4569.0, avgPrice: 228.45 } },
+                })
+              }
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="#000000">
                 <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.85c.65-.79 1.1-1.88.98-2.98-.95.04-2.1.63-2.77 1.42-.59.68-1.11 1.79-.97 2.86 1.06.08 2.14-.54 2.76-1.3z"/>
@@ -459,16 +536,16 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
             </button>
           </div>
 
-          {/* Small Discreet Demo Account Button Below Socials */}
-          <div className="stake-demo-btn-container">
+          {/* Quick Demo Access positioned directly below Google/Apple */}
+          <div className="stake-demo-bottom-action">
             <button
               type="button"
-              id="auth-demo-account-btn"
-              className="stake-demo-subtle-btn"
+              id="bottom-quick-demo-login-btn"
+              className="stake-demo-bottom-btn"
               onClick={handleQuickDemoLogin}
-              title="Instant login with a pre-funded demo account"
+              title="Instant exploration with $50,000 demo paper funds"
             >
-              <Sparkles size={14} />
+              <Sparkles size={15} color="#006c49" />
               <span>Explore with Demo Account</span>
             </button>
           </div>

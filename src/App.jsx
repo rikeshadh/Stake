@@ -95,6 +95,7 @@ export default function App() {
     }
   });
 
+  const [guestMode, setGuestMode] = useState(false);
   const [authModal, setAuthModal] =
     useState(null);
 
@@ -178,6 +179,70 @@ export default function App() {
     useState(
       () => user?.alerts || []
     );
+
+  // Notification Inbox State
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const saved = localStorage.getItem("stake_notifications");
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return [
+      {
+        id: "notif-welcome",
+        category: "TRADE",
+        type: "buy",
+        title: "Trading Terminal Active",
+        message: "Welcome to Stake Equities. Live feed and order router are operational.",
+        timestamp: "Just now",
+        unread: true,
+      },
+    ];
+  });
+
+  const addNotification = useCallback((notif) => {
+    const item = {
+      id: notif.id || `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      category: notif.category || "PRICE_ALERT",
+      type: notif.type || "alert",
+      title: notif.title || "Notification",
+      message: notif.message || "",
+      ticker: notif.ticker,
+      timestamp: notif.timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      unread: true,
+    };
+    setNotifications((prev) => {
+      const updated = [item, ...prev.slice(0, 49)];
+      try {
+        localStorage.setItem("stake_notifications", JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+  }, []);
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, unread: false }));
+      try {
+        localStorage.setItem("stake_notifications", JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+  }, []);
+
+  const clearAllNotifications = useCallback(() => {
+    setNotifications([]);
+    try {
+      localStorage.removeItem("stake_notifications");
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // =========================================================
   // Autonomous Agent
@@ -626,6 +691,14 @@ export default function App() {
           )} (Target: $${alt.targetPrice})`
         );
 
+        addNotification({
+          category: "PRICE_ALERT",
+          type: "alert",
+          ticker: alt.symbol,
+          title: `Price Alert: ${alt.symbol} Breached Target`,
+          message: `${alt.symbol} reached $${p.toFixed(2)} rising above your target of $${alt.targetPrice.toFixed(2)}.`,
+        });
+
         setAlerts((prev) =>
           prev.map((a) =>
             a.id === alt.id
@@ -650,6 +723,14 @@ export default function App() {
           )} (Target: $${alt.targetPrice})`
         );
 
+        addNotification({
+          category: "PRICE_ALERT",
+          type: "alert",
+          ticker: alt.symbol,
+          title: `Price Alert: ${alt.symbol} Dropped Below Target`,
+          message: `${alt.symbol} dropped to $${p.toFixed(2)} hitting your support trigger of $${alt.targetPrice.toFixed(2)}.`,
+        });
+
         setAlerts((prev) =>
           prev.map((a) =>
             a.id === alt.id
@@ -667,6 +748,7 @@ export default function App() {
     stocks,
     alerts,
     showToast,
+    addNotification,
   ]);
 
   // =========================================================
@@ -1069,6 +1151,14 @@ export default function App() {
           )}`
         );
 
+        addNotification({
+          category: "TRADE",
+          type: "buy",
+          ticker: cleanTicker,
+          title: `Buy Order Executed: ${cleanTicker}`,
+          message: `Purchased ${fmtShares(tradeShares)} shares of ${cleanTicker} at $${tradePrice.toFixed(2)} ($${tradeValue.toFixed(2)} total).`,
+        });
+
         return true;
       }
 
@@ -1236,6 +1326,14 @@ export default function App() {
           2
         )}`
       );
+
+      addNotification({
+        category: "TRADE",
+        type: "sell",
+        ticker: cleanTicker,
+        title: `Sell Order Executed: ${cleanTicker}`,
+        message: `Sold ${fmtShares(tradeShares)} shares of ${cleanTicker} at $${tradePrice.toFixed(2)} ($${proceeds.toFixed(2)} proceeds).`,
+      });
 
       return true;
     };
@@ -1423,22 +1521,15 @@ export default function App() {
         )
       );
 
-      if (
-        authUser.kycStatus ===
-        "UNVERIFIED"
-      ) {
-        setTab(
-          "kyc"
-        );
+      setSelectedStock(null);
 
+      if (authUser.kycStatus === "UNVERIFIED") {
+        setTab("kyc");
         showToast(
           "Welcome! Please complete your KYC verification first to activate live trading."
         );
       } else {
-        setTab(
-          "home"
-        );
-
+        setTab("home");
         showToast(
           `Welcome back, ${
             authUser.name ||
@@ -1573,56 +1664,40 @@ export default function App() {
     };
 
   // =========================================================
-  // Unauthenticated Experience
+  // Unauthenticated / Auth Modal / Guest Routing
   // =========================================================
 
-  if (!user) {
+  if (!user && !guestMode) {
     if (authModal) {
       return (
         <AuthPage
-          initialMode={
-            authModal
-          }
-          onLoginSuccess={
-            handleLoginSuccess
-          }
-          onBackToLanding={() =>
-            setAuthModal(
-              null
-            )
-          }
+          initialMode={authModal}
+          onLoginSuccess={handleLoginSuccess}
+          onBackToLanding={() => setAuthModal(null)}
         />
       );
     }
 
     return (
-      <LandingPage
-        onOpenLogin={() =>
-          setAuthModal(
-            "login"
-          )
-        }
-        onOpenSignup={() =>
-          setAuthModal(
-            "signup"
-          )
-        }
-        onOpenAuth={(mode) =>
-          setAuthModal(
-            mode
-          )
-        }
-        onEnterApp={() =>
-          setAuthModal(
-            "login"
-          )
-        }
-        stockMetaList={
-          stockMetaList
-        }
-        stocks={
-          stocks
-        }
+      <div className="relative min-h-screen">
+        <LandingPage
+          onOpenLogin={() => setAuthModal("login")}
+          onOpenSignup={() => setAuthModal("signup")}
+          onOpenAuth={(mode) => setAuthModal(mode)}
+          onEnterApp={() => setGuestMode(true)}
+          stockMetaList={stockMetaList}
+          stocks={stocks}
+        />
+      </div>
+    );
+  }
+
+  if (authModal) {
+    return (
+      <AuthPage
+        initialMode={authModal}
+        onLoginSuccess={handleLoginSuccess}
+        onBackToLanding={() => setAuthModal(null)}
       />
     );
   }
@@ -1805,6 +1880,18 @@ export default function App() {
           user
         }
 
+        isGuestMode={
+          !user && guestMode
+        }
+
+        onOpenAuth={(mode) =>
+          setAuthModal(mode)
+        }
+
+        onExitGuest={() =>
+          setGuestMode(false)
+        }
+
         kycStatus={
           kycStatus
         }
@@ -1841,6 +1928,19 @@ export default function App() {
               !a.triggered
           ).length
         }
+        notifications={notifications}
+        onAddNotification={addNotification}
+        onMarkAllRead={markAllNotificationsRead}
+        onClearNotifications={clearAllNotifications}
+        onSelectStock={(t) => {
+          setSelectedStock(t);
+          setTab("market");
+        }}
+        onOpenTrade={(t, side) => {
+          setSelectedStock(t);
+          setOrderDeskMode(side || "BUY");
+          setOrderDeskOpen(true);
+        }}
       />
 
       {/* Main */}

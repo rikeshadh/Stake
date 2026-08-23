@@ -111,11 +111,11 @@ export async function deletePriceAlert(alertId, email) {
   }
 }
 
-export async function registerUser({ email, name, password }) {
+export async function registerUser({ email, name, username, password, strategy }) {
   const res = await fetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, name, password }),
+    body: JSON.stringify({ email, name, username, password, strategy }),
   });
   const data = await res.json();
   if (!res.ok || !data.success) {
@@ -206,6 +206,80 @@ export async function fetchUserData(email) {
   }
 }
 
+export async function deployAgentStrategy({ email, strategy, deployedCapital, maxSpend, riskLevel }) {
+  try {
+    const res = await fetch("/api/agent/deploy-strategy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, strategy, deployedCapital, maxSpend, riskLevel }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || "Failed to deploy strategy.");
+    }
+    return data;
+  } catch (err) {
+    console.warn("Deploy strategy API fallback:", err.message);
+    throw err;
+  }
+}
+
+export async function pauseAgentStrategy(email) {
+  try {
+    const res = await fetch("/api/agent/pause-strategy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn("Pause strategy error:", err.message);
+    return { success: true, agentEnabled: false };
+  }
+}
+
+export async function resumeAgentStrategy(email) {
+  try {
+    const res = await fetch("/api/agent/resume-strategy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn("Resume strategy error:", err.message);
+    return { success: true, agentEnabled: true };
+  }
+}
+
+export async function adjustAgentCapital({ email, deployedCapital, maxSpend }) {
+  try {
+    const res = await fetch("/api/agent/adjust-capital", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, deployedCapital, maxSpend }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn("Adjust capital error:", err.message);
+    return { success: true };
+  }
+}
+
+export async function scanAndExecuteStrategy({ email, strategy, maxSpend }) {
+  try {
+    const res = await fetch("/api/agent/scan-and-execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, strategy, maxSpend }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn("Scan & execute error:", err.message);
+    return { success: false, message: err.message };
+  }
+}
+
 export async function deleteAccount(email) {
   try {
     const res = await fetch("/api/user/delete", {
@@ -220,5 +294,7 @@ export async function deleteAccount(email) {
     return { success: true };
   }
 }
+
+
 
 

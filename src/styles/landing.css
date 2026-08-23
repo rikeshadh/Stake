@@ -6,6 +6,14 @@
   font-family: var(--font-body);
   overflow-x: hidden;
   text-align: left;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.stake-landing-root::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+  width: 0;
+  height: 0;
 }
 
 /* HERO SECTION (Generous natural spacing, beautiful display typography) */

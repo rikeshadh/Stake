@@ -11,7 +11,8 @@ import {
   Shield,
   Dices,
   Lock,
-  Edit3
+  Edit3,
+  Sparkles,
 } from "lucide-react";
 import { submitKycData } from "../api";
 
@@ -21,10 +22,10 @@ export function KycPage({
   showToast,
 }) {
   const existingKyc = user?.kycData || {};
-  const hasExistingData = (user?.kycStatus === "VERIFIED" || Object.keys(existingKyc).length > 0);
+  const isVerifiedUser = user?.kycStatus === "VERIFIED" || Boolean(existingKyc.status === "VERIFIED" || existingKyc.documentNumber);
 
-  // If user already has KYC data, default to details view (isEditing = false)
-  const [isEditing, setIsEditing] = useState(!hasExistingData);
+  // Default to form filling if unverified (e.g. creating account), or details view if already verified (hamburger menu)
+  const [isEditing, setIsEditing] = useState(!isVerifiedUser);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState("");
@@ -32,23 +33,23 @@ export function KycPage({
   const [verificationStageText, setVerificationStageText] = useState("");
 
   const [formData, setFormData] = useState(() => ({
-    fullName: existingKyc.fullName || user?.name || "Active Trader",
-    dob: existingKyc.dob || "1994-08-15",
-    nationality: existingKyc.nationality || "United States",
-    phoneNumber: existingKyc.phoneNumber || "+1 (555) 382-9481",
-    taxId: existingKyc.taxId || "XXX-XX-8492",
-    address: existingKyc.address || "Wall St, Financial District, New York, NY",
+    fullName: existingKyc.fullName || user?.name || "",
+    dob: existingKyc.dob || "",
+    nationality: existingKyc.nationality || "",
+    phoneNumber: existingKyc.phoneNumber || "",
+    taxId: existingKyc.taxId || "",
+    address: existingKyc.address || "",
     documentType: existingKyc.documentType || "PASSPORT",
-    documentNumber: existingKyc.documentNumber || "US-98421045",
-    frontDocName: existingKyc.frontDocName || "passport_identity_scan.pdf",
-    backDocName: existingKyc.backDocName || "passport_back_cover.pdf",
-    selfieConfirmed: existingKyc.selfieConfirmed !== undefined ? existingKyc.selfieConfirmed : true,
-    employment: existingKyc.employment || "Full-Time Employed",
-    occupation: existingKyc.occupation || "Financial Analyst / Trader",
-    annualIncome: existingKyc.annualIncome || "$100,000 - $250,000",
-    netWorth: existingKyc.netWorth || "$250,000 - $500,000",
+    documentNumber: existingKyc.documentNumber || "",
+    frontDocName: existingKyc.frontDocName || "",
+    backDocName: existingKyc.backDocName || "",
+    selfieConfirmed: existingKyc.selfieConfirmed !== undefined ? existingKyc.selfieConfirmed : false,
+    employment: existingKyc.employment || "",
+    occupation: existingKyc.occupation || "",
+    annualIncome: existingKyc.annualIncome || "",
+    netWorth: existingKyc.netWorth || "",
     investmentGoal: existingKyc.investmentGoal || "Long-term Capital Growth & Equities",
-    riskTolerance: existingKyc.riskTolerance || "Aggressive Growth & Equities",
+    riskTolerance: existingKyc.riskTolerance || "",
   }));
 
   const handleInputChange = (field, val) => {
@@ -56,7 +57,7 @@ export function KycPage({
     setValidationError("");
   };
 
-  // Populate random demo identity
+  // Populate random demo identity on demand
   const handleGenerateRandomDemo = () => {
     const firstNames = ["Alex", "Jordan", "Morgan", "Taylor", "Sam", "Chris", "Pat", "Riley"];
     const lastNames = ["Chen", "Vance", "Kowalski", "Miller", "Dubois", "Smith", "Zhang", "Nakamoto"];
@@ -86,7 +87,7 @@ export function KycPage({
       riskTolerance: "Moderate to Aggressive Growth",
     });
     setValidationError("");
-    if (showToast) showToast("Populated random Demo Account identity details!");
+    if (showToast) showToast("Populated Demo Account identity details!");
   };
 
   const validateStep = (s) => {
@@ -261,60 +262,6 @@ export function KycPage({
           </button>
         </div>
 
-        {/* Verification Status Banner */}
-        <div
-          style={{
-            background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(6, 182, 212, 0.08))",
-            borderRadius: 16,
-            border: "1px solid rgba(16, 185, 129, 0.25)",
-            padding: "16px 20px",
-            marginBottom: 24,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 12,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: "50%",
-                background: "#059669",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Shield size={22} />
-            </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#065f46" }}>
-                Identity Status: FINRA & SEC Tier-1 Compliant
-              </div>
-              <div style={{ fontSize: 12, color: "#047857" }}>
-                Verified At: {formData.verifiedAt ? new Date(formData.verifiedAt).toLocaleDateString() : "Active Record"} • ID: {formData.verificationId || "KYC-US-88421045"}
-              </div>
-            </div>
-          </div>
-          <div
-            style={{
-              fontSize: 11.5,
-              fontWeight: 700,
-              color: "#059669",
-              background: "#ffffff",
-              padding: "6px 12px",
-              borderRadius: 8,
-              border: "1px solid rgba(16, 185, 129, 0.2)",
-            }}
-          >
-            AES-256 Encrypted
-          </div>
-        </div>
-
         {/* Breakdown Grid of KYC Details */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Section 1: Personal Details */}
@@ -478,7 +425,7 @@ export function KycPage({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {hasExistingData && (
+          {isVerifiedUser && (
             <button
               type="button"
               id="kyc-cancel-edit-btn"
@@ -497,33 +444,34 @@ export function KycPage({
                 cursor: "pointer",
               }}
             >
-              Cancel Edit
+              <ArrowLeft size={14} />
+              <span>Back to Details</span>
             </button>
           )}
 
-          {/* Demo Account quick fill button */}
+          {/* Quick Demo Pre-fill Button */}
           <button
             type="button"
-            id="kyc-demo-account-btn"
+            id="kyc-demo-btn"
             onClick={handleGenerateRandomDemo}
             style={{
               display: "flex",
               alignItems: "center",
               gap: 6,
-              padding: "8px 14px",
+              padding: "8px 16px",
               borderRadius: 10,
               background: "rgba(16, 185, 129, 0.12)",
               border: "1px solid rgba(16, 185, 129, 0.3)",
               color: "#059669",
-              fontSize: 12.5,
+              fontSize: 13,
               fontWeight: 800,
               cursor: "pointer",
               transition: "all 0.15s ease",
             }}
-            title="Instantly generate random Demo Account profile data"
+            title="Auto-fill form with sample Demo identity profile"
           >
-            <Dices size={15} />
-            <span>Demo Account</span>
+            <Sparkles size={15} />
+            <span>Demo</span>
           </button>
         </div>
       </div>

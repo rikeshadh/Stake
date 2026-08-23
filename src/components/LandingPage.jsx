@@ -53,20 +53,20 @@ export function LandingPage({
 
   const faqs = [
     {
-      q: "What is Stake Equities Platform?",
-      a: "Stake is a high-speed equities trading terminal equipped with autonomous AI trading intelligence, real-time Level 2 market depth, fast order execution, and integrated cash wallet clearing.",
+      q: "What is Stake AI Equities Platform?",
+      a: "Stake AI is a high-speed equities trading terminal equipped with autonomous AI trading intelligence, real-time Level 2 market depth, fast order execution, and integrated cash wallet clearing.",
     },
     {
-      q: "How does the Autonomous Agent AI work?",
-      a: "The Stake AI Trading Agent continuously scans order flow and market price anomalies. You can configure strategies like 'Dip Buyer' or 'Breakout Rider', set maximum spend limits, and activate or pause autonomous executions with a single click.",
+      q: "How does the Autonomous Stake AI Agent work?",
+      a: "The Stake AI Trading Agent continuously scans order flow and market price anomalies. You can select custom quantitative strategies (such as Dip Buyer, Momentum Breakout, or Value DCA), set capital deployment limits, and activate or pause autonomous executions in real time.",
     },
     {
-      q: "How do I deposit or withdraw funds?",
-      a: "You can deposit instant demo or live collateral using the unified wallet drawer, supporting instant transfers and debit/card clearing with full transaction tracking.",
+      q: "How do I deposit or deploy capital?",
+      a: "You can deposit instant collateral using the unified wallet, deploy custom capital allocation pools into Stake AI strategies, and manage positions with full transparency and safety rollbacks.",
     },
     {
-      q: "Is Stake compatible with mobile and desktop?",
-      a: "Yes! Stake features a responsive, desktop-first and mobile-optimized interface with smooth interactive charts, quick order execution, and live tickers.",
+      q: "Is Stake AI compatible with mobile and desktop?",
+      a: "Yes! Stake AI features a responsive, desktop-first and mobile-optimized interface with smooth interactive charts, quick order execution, and live tickers.",
     },
   ];
 
@@ -228,14 +228,14 @@ export function LandingPage({
           CONTENT SECTION
           ========================================================================= */}
       <div className="stake-content-section">
-        {/* Interactive Live Terminal Card Mockup (Shows Global Market Condition, not personal balance) */}
-        <section style={{ maxWidth: 1060, margin: "0 auto", padding: "48px 24px 32px" }}>
+        {/* Interactive Live Terminal Card Mockup (Shows Global Market Condition) */}
+        <section style={{ maxWidth: 1240, margin: "0 auto", padding: "56px 24px 40px" }}>
           <div
             style={{
               background: "#081510",
               borderRadius: 24,
               border: "1px solid rgba(0,229,153,0.25)",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+              boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
               overflow: "hidden",
               color: "#ffffff",
             }}
@@ -246,36 +246,32 @@ export function LandingPage({
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                padding: "14px 20px",
+                padding: "16px 28px",
                 background: "rgba(0,0,0,0.4)",
                 borderBottom: "1px solid rgba(255,255,255,0.08)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#ff5f56" }} />
-                <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#ffbd2e" }} />
-                <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#27c93f" }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginLeft: 12, letterSpacing: "0.06em", fontFamily: "var(--font-mono)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f56" }} />
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ffbd2e" }} />
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#27c93f" }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", marginLeft: 14, letterSpacing: "0.08em", fontFamily: "var(--font-mono)" }}>
                   STAKE TERMINAL • LIVE FEED
                 </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 800, color: "#00e599", background: "rgba(0,229,153,0.12)", padding: "4px 10px", borderRadius: 999 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#00e599", display: "inline-block" }} />
-                GLOBAL MARKETS OPEN • LEVEL 2
               </div>
             </div>
 
             {/* Terminal Card Body - Market Condition Overview */}
-            <div style={{ padding: "28px 32px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
+            <div style={{ padding: "36px 40px 40px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 24, marginBottom: 32 }}>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", fontFamily: "var(--font-mono)", textTransform: "uppercase" }}>
-                    GLOBAL MARKET CONDITION & BREADTH
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", fontFamily: "var(--font-mono)", textTransform: "uppercase" }}>
+                    GLOBAL MARKET CONDITION
                   </div>
-                  <div style={{ fontSize: 34, fontWeight: 800, color: "#ffffff", fontFamily: "var(--font-mono)", marginTop: 4 }}>
-                    5,948.72 <span style={{ fontSize: 16, color: "#94a3b8", fontWeight: 600 }}>S&P 500 / NASDAQ</span>
+                  <div style={{ fontSize: 42, fontWeight: 900, color: "#ffffff", fontFamily: "var(--font-mono)", marginTop: 6, letterSpacing: "-0.02em" }}>
+                    5,948.72 <span style={{ fontSize: 18, color: "#94a3b8", fontWeight: 600 }}>S&P 500 / NASDAQ</span>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#34d399", display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontFamily: "var(--font-mono)" }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 700, color: "#34d399", display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontFamily: "var(--font-mono)" }}>
                     <span>▲ +78.40 (+1.34%) today</span>
                     <span style={{ color: "#64748b" }}>•</span>
                     <span style={{ color: "#a7f3d0" }}>Risk-On Bullish Sentiment</span>
@@ -283,22 +279,22 @@ export function LandingPage({
                 </div>
 
                 {/* Market Breadth & Turnover Badges */}
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", padding: "8px 14px", borderRadius: 12 }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, fontFamily: "var(--font-mono)" }}>MARKET BREADTH</div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#34d399", fontFamily: "var(--font-mono)", marginTop: 2 }}>
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", padding: "12px 18px", borderRadius: 14, minWidth: 140 }}>
+                    <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}>MARKET BREADTH</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#34d399", fontFamily: "var(--font-mono)", marginTop: 4 }}>
                       78% Advancing (3.5:1)
                     </div>
                   </div>
-                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", padding: "8px 14px", borderRadius: 12 }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, fontFamily: "var(--font-mono)" }}>24H TURNOVER</div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#ffffff", fontFamily: "var(--font-mono)", marginTop: 2 }}>
+                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", padding: "12px 18px", borderRadius: 14, minWidth: 140 }}>
+                    <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}>24H TURNOVER</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#ffffff", fontFamily: "var(--font-mono)", marginTop: 4 }}>
                       $ 428.6 B
                     </div>
                   </div>
-                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", padding: "8px 14px", borderRadius: 12 }}>
-                    <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, fontFamily: "var(--font-mono)" }}>VIX VOLATILITY</div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#38bdf8", fontFamily: "var(--font-mono)", marginTop: 2 }}>
+                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", padding: "12px 18px", borderRadius: 14, minWidth: 140 }}>
+                    <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}>VIX VOLATILITY</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#38bdf8", fontFamily: "var(--font-mono)", marginTop: 4 }}>
                       14.28 (Low)
                     </div>
                   </div>
@@ -306,7 +302,7 @@ export function LandingPage({
               </div>
 
               {/* Stock Snapshot Grid (Global Market Leaders) */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 18 }}>
                 {[
                   { ticker: "NVDA", name: "NVIDIA Corp.", price: "$137.86", chg: "+2.84%", isUp: true, vol: "48.2M" },
                   { ticker: "AAPL", name: "Apple Inc.", price: "$228.45", chg: "+1.42%", isUp: true, vol: "32.0M" },
@@ -316,22 +312,23 @@ export function LandingPage({
                   <div
                     key={s.ticker}
                     style={{
-                      padding: "14px 18px",
+                      padding: "18px 22px",
                       background: "rgba(255,255,255,0.04)",
-                      borderRadius: 14,
+                      borderRadius: 16,
                       border: "1px solid rgba(255,255,255,0.08)",
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
+                      transition: "transform 0.2s ease, border-color 0.2s ease",
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: "#ffffff", fontFamily: "var(--font-mono)" }}>{s.ticker}</div>
-                      <div style={{ fontSize: 11.5, color: "#94a3b8", fontFamily: "var(--font-body)" }}>{s.name}</div>
+                      <div style={{ fontSize: 17, fontWeight: 800, color: "#ffffff", fontFamily: "var(--font-mono)" }}>{s.ticker}</div>
+                      <div style={{ fontSize: 12.5, color: "#94a3b8", fontFamily: "var(--font-body)", marginTop: 2 }}>{s.name}</div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 14.5, fontWeight: 700, color: "#ffffff", fontFamily: "var(--font-mono)" }}>{s.price}</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#34d399", fontFamily: "var(--font-mono)" }}>{s.chg}</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#ffffff", fontFamily: "var(--font-mono)" }}>{s.price}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#34d399", fontFamily: "var(--font-mono)", marginTop: 2 }}>{s.chg}</div>
                     </div>
                   </div>
                 ))}

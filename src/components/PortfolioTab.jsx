@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownLeft } from "lucide-react";
-import { BigChart } from "./Charts";
+import { BigChart, Sparkline } from "./Charts";
 import { DashboardOverview } from "./DashboardOverview";
 import { fmt, fmtShares, initials, formatMoney } from "../utils";
 
@@ -240,6 +240,27 @@ export function PortfolioTab({
                       <div style={{ fontSize: 12, color: textSecondary, fontWeight: 500 }}>
                         {fmtShares(h.shares)} shares • Avg: $ {fmt(h.costBasis / h.shares)}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* 24-hr Performance Mini-Sparkline */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 84, height: 28 }}>
+                      <Sparkline
+                        history={
+                          stocks[ticker]?.history && stocks[ticker].history.length > 2
+                            ? stocks[ticker].history.slice(-8)
+                            : [
+                                (stocks[ticker]?.open || curPrice * 0.98),
+                                (stocks[ticker]?.open || curPrice * 0.98) * 1.005,
+                                curPrice * 0.995,
+                                curPrice,
+                              ]
+                        }
+                        color={gain >= 0 ? "#10b981" : "#ef4444"}
+                        w={84}
+                        h={28}
+                      />
                     </div>
                   </div>
 

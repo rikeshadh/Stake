@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import {
   TrendingUp,
   TrendingDown,
@@ -12,8 +12,14 @@ import {
   Star,
   ChevronRight,
   Zap,
+  Sparkles,
+  CheckCircle2,
+  HelpCircle,
+  Layers,
+  Bot,
 } from "lucide-react";
 import { Sparkline } from "./Charts";
+import { TooltipBadge } from "./TooltipBadge";
 import { fmt, fmtShares, initials, formatMoney } from "../utils";
 
 export function HomeDashboard({
@@ -36,9 +42,11 @@ export function HomeDashboard({
   dayChange = () => 0,
 }) {
   const [moversTab, setMoversTab] = useState("gainers"); // "gainers" | "losers" | "turnover"
+  const [showGuide, setShowGuide] = useState(true);
 
   // Calculate holdings metrics
   const holdingTickers = Object.keys(holdings).filter((t) => holdings[t]?.shares > 0.0001);
+  const isNewAccount = holdingTickers.length === 0 && (cashBalance === 0 || cashBalance < 100);
   const totalStockValue = holdingTickers.reduce((acc, t) => {
     const curPrice = stocks[t]?.price || 0;
     return acc + holdings[t].shares * curPrice;
@@ -92,11 +100,269 @@ export function HomeDashboard({
       transition={{ duration: 0.22, ease: "easeOut" }}
       style={{ paddingTop: 16, textAlign: "left" }}
     >
+      {/* 0. NEW ACCOUNT ONBOARDING & TOOLTIP STEPPER (Clean, Dismissible) */}
+      {showGuide && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)",
+            borderRadius: 20,
+            padding: "20px 24px",
+            border: "1px solid rgba(16, 185, 129, 0.3)",
+            boxShadow: "0 4px 18px rgba(16, 185, 129, 0.06)",
+            marginBottom: 24,
+            position: "relative",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 10,
+                  background: "#10b981",
+                  color: "#ffffff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, color: textPrimary, margin: 0 }}>
+                    {isNewAccount ? "New Account Setup & Quick-Start Guide" : "Stake Trading Tips & System Overview"}
+                  </h3>
+                  <TooltipBadge
+                    title="Account Guidance"
+                    text="Hover or tap on any (?) tooltip across Stake to learn about financial metrics, fractional execution, and automated AI trading."
+                  />
+                </div>
+                <p style={{ fontSize: 12.5, color: textSecondary, margin: "2px 0 0" }}>
+                  Follow these 4 essential steps to start investing in US fractional equities.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowGuide(false)}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: textSecondary,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "4px 8px",
+                borderRadius: 6,
+              }}
+              title="Dismiss Guide"
+            >
+              Dismiss
+            </button>
+          </div>
+
+          {/* 4 Interactive Step Cards with Tooltips */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {/* Step 1: Identity & KYC */}
+            <div
+              style={{
+                background: "#ffffff",
+                borderRadius: 14,
+                padding: "14px 16px",
+                border: "1px solid #e2e8f0",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>STEP 1</span>
+                  <TooltipBadge
+                    title="Identity & Compliance"
+                    text="SEC & FINRA compliant verification. Takes under 2 minutes and unlocks bank linking, wire deposits, and instantaneous trade clearing."
+                  />
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: textPrimary, marginTop: 3 }}>
+                  Verify Identity
+                </div>
+                <div style={{ fontSize: 11.5, color: textSecondary, marginTop: 2 }}>
+                  {kycStatus === "VERIFIED" ? "✓ KYC Verified & Compliant" : "Complete KYC to unlock trading"}
+                </div>
+              </div>
+              <button
+                onClick={onOpenKyc}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${kycStatus === "VERIFIED" ? "rgba(16,185,129,0.3)" : "#10b981"}`,
+                  background: kycStatus === "VERIFIED" ? "#f0fdf4" : "#10b981",
+                  color: kycStatus === "VERIFIED" ? "#059669" : "#ffffff",
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  width: "100%",
+                }}
+              >
+                {kycStatus === "VERIFIED" ? "KYC Completed" : "Start KYC"}
+              </button>
+            </div>
+
+            {/* Step 2: Deposit Funds */}
+            <div
+              style={{
+                background: "#ffffff",
+                borderRadius: 14,
+                padding: "14px 16px",
+                border: "1px solid #e2e8f0",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>STEP 2</span>
+                  <TooltipBadge
+                    title="Wallet & Purchasing Power"
+                    text="Deposit cash instantly via zero-fee ACH bank transfer, Debit Card, or Wire. Demo mode includes $50,000 in paper trading capital."
+                  />
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: textPrimary, marginTop: 3 }}>
+                  Fund Wallet
+                </div>
+                <div style={{ fontSize: 11.5, color: textSecondary, marginTop: 2 }}>
+                  Balance: {privacyMode ? "••••" : formatMoney(cashBalance, currency)}
+                </div>
+              </div>
+              <button
+                onClick={onOpenWallet}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  color: textPrimary,
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  width: "100%",
+                }}
+              >
+                Deposit Funds
+              </button>
+            </div>
+
+            {/* Step 3: Discover & Buy Stocks */}
+            <div
+              style={{
+                background: "#ffffff",
+                borderRadius: 14,
+                padding: "14px 16px",
+                border: "1px solid #e2e8f0",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>STEP 3</span>
+                  <TooltipBadge
+                    title="Fractional Share Orders"
+                    text="Trade 9,500+ US stocks and ETFs starting from $1.00 or 0.0001 shares with zero commission and real-time Level 2 order book execution."
+                  />
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: textPrimary, marginTop: 3 }}>
+                  Buy Equities
+                </div>
+                <div style={{ fontSize: 11.5, color: textSecondary, marginTop: 2 }}>
+                  {holdingTickers.length > 0 ? `${holdingTickers.length} active positions` : "Explore 30+ US stocks"}
+                </div>
+              </div>
+              <button
+                onClick={() => onNavigateTab("market")}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  color: textPrimary,
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  width: "100%",
+                }}
+              >
+                Browse Markets
+              </button>
+            </div>
+
+            {/* Step 4: AI Quant Agent */}
+            <div
+              style={{
+                background: "#ffffff",
+                borderRadius: 14,
+                padding: "14px 16px",
+                border: "1px solid #e2e8f0",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>STEP 4</span>
+                  <TooltipBadge
+                    title="Autonomous Algorithmic Agent"
+                    text="Activate autonomous quantitative strategies powered by RSI, MACD, and Gemini news sentiment analysis to automatically trade 24/7."
+                  />
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: textPrimary, marginTop: 3 }}>
+                  Automate with AI
+                </div>
+                <div style={{ fontSize: 11.5, color: textSecondary, marginTop: 2 }}>
+                  Algorithmic trading engine
+                </div>
+              </div>
+              <button
+                onClick={() => onNavigateTab("agent")}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  color: textPrimary,
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  width: "100%",
+                }}
+              >
+                Configure Agent
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. TOP SECTION: PORTFOLIO HERO & LIVE MARKET SUMMARY WIDGET */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
           gap: 20,
           marginBottom: 24,
         }}
@@ -116,9 +382,15 @@ export function HomeDashboard({
         >
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#059669", fontFamily: "'JetBrains Mono', monospace" }}>
-                PORTFOLIO OVERVIEW
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#059669", fontFamily: "'JetBrains Mono', monospace" }}>
+                  PORTFOLIO OVERVIEW
+                </span>
+                <TooltipBadge
+                  title="Net Consolidated Wealth"
+                  text="Total combined valuation of all settled wallet cash plus current market equity values."
+                />
+              </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <button
                   onClick={() => setPrivacyMode(!privacyMode)}
@@ -130,7 +402,7 @@ export function HomeDashboard({
                     color: privacyMode ? "#059669" : textSecondary,
                     cursor: "pointer",
                   }}
-                  title={privacyMode ? "Show Balances" : "Hide Balances"}
+                  title={privacyMode ? "Show Balances" : "Hide Balances (Privacy Mode)"}
                 >
                   {privacyMode ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -190,6 +462,10 @@ export function HomeDashboard({
                 <span>
                   {totalReturn >= 0 ? "+" : ""}{formatMoney(totalReturn, currency)} ({totalReturn >= 0 ? "+" : ""}{fmt(totalReturnPct)}%) Total Return
                 </span>
+                <TooltipBadge
+                  title="Total Unrealized P&L"
+                  text="Profit or loss relative to total purchase cost basis of current stock holdings."
+                />
               </div>
             )}
           </div>
@@ -206,14 +482,26 @@ export function HomeDashboard({
             }}
           >
             <div style={{ background: bgRow, padding: "10px 14px", borderRadius: 12, border: `1px solid ${borderCol}` }}>
-              <span style={{ fontSize: 11, color: textSecondary, fontWeight: 600 }}>AVAILABLE WALLET</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: textSecondary, fontWeight: 600 }}>AVAILABLE WALLET</span>
+                <TooltipBadge
+                  title="Purchasing Power"
+                  text="Unencumbered settled cash ready for immediate stock purchases."
+                />
+              </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: textPrimary, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
                 {privacyMode ? "••••••••" : formatMoney(cashBalance, currency)}
               </div>
             </div>
 
             <div style={{ background: bgRow, padding: "10px 14px", borderRadius: 12, border: `1px solid ${borderCol}` }}>
-              <span style={{ fontSize: 11, color: textSecondary, fontWeight: 600 }}>EQUITIES HOLDINGS</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: textSecondary, fontWeight: 600 }}>EQUITIES HOLDINGS</span>
+                <TooltipBadge
+                  title="Equities Valuation"
+                  text="Aggregate mark-to-market valuation of active stock positions."
+                />
+              </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: textPrimary, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
                 {privacyMode ? "••••••••" : formatMoney(totalStockValue, currency)}
               </div>
@@ -281,9 +569,15 @@ export function HomeDashboard({
         >
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#059669", fontFamily: "'JetBrains Mono', monospace" }}>
-                BENCHMARK INDICES
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#059669", fontFamily: "'JetBrains Mono', monospace" }}>
+                  BENCHMARK INDICES
+                </span>
+                <TooltipBadge
+                  title="Market Benchmarks"
+                  text="Key index and mega-cap benchmarks updated with live real-time pricing."
+                />
+              </div>
               <span style={{ fontSize: 11, color: textSecondary, fontWeight: 500 }}>LIVE STREAMING</span>
             </div>
 

@@ -12,10 +12,10 @@
   background: #f8fafc;
 }
 
-/* Left Hero Column (Dark Green / Atmospheric) */
+/* Left Hero Column (Dark Green / Atmospheric, Fixed & Non-scrollable) */
 .stake-auth-left {
-  flex: 1.1;
-  background: radial-gradient(circle at 50% 50%, #0e2a1e 0%, #06110c 60%, #040906 100%);
+  flex: 1.15;
+  background: radial-gradient(circle at 45% 40%, #0d3826 0%, #071c13 50%, #030b07 100%);
   color: #ffffff;
   padding: 48px 48px;
   display: flex;
@@ -23,14 +23,40 @@
   justify-content: center;
   align-items: center;
   text-align: center;
-  position: relative;
+  position: sticky;
+  top: 0;
+  height: 100vh;
   overflow: hidden; /* Restricts all bubbles to this image/hero column only */
   box-sizing: border-box;
+  user-select: none;
 }
 
 @media (max-width: 960px) {
+  .stake-auth-layout {
+    flex-direction: column;
+    min-height: 100vh;
+  }
   .stake-auth-left {
     display: none;
+  }
+  .stake-auth-right {
+    min-height: 100vh;
+    padding: 24px 20px 48px;
+    justify-content: center;
+  }
+  .stake-auth-form-wrapper {
+    max-width: 440px;
+    margin: 0 auto;
+    padding: 12px 0 24px;
+  }
+  .stake-auth-title {
+    font-size: 24px;
+  }
+  .stake-auth-desc {
+    font-size: 13.5px;
+  }
+  .stake-input {
+    font-size: 16px; /* Prevents iOS auto-zoom */
   }
 }
 
@@ -45,8 +71,22 @@
   background-image: radial-gradient(rgba(0, 229, 153, 0.08) 1px, transparent 1px);
   background-size: 32px 32px;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.6;
   z-index: 0;
+}
+
+/* Ambient Radial Green Light */
+.stake-auth-left::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 620px;
+  height: 620px;
+  background: radial-gradient(circle, rgba(0, 229, 153, 0.12) 0%, rgba(0, 229, 153, 0.03) 50%, transparent 70%);
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* ==========================================================================
@@ -226,7 +266,7 @@
   background: rgba(248, 113, 113, 0.15);
 }
 
-/* Foreground Typography on Left Column - Centered & Prominent */
+/* Foreground Typography on Left Column - Image Matching Hero */
 .stake-auth-left-content {
   position: relative;
   z-index: 5;
@@ -235,61 +275,245 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  max-width: 560px;
+  max-width: 620px;
+  padding: 0 24px;
 }
 
-.stake-auth-eyebrow {
+.stake-hero-brand-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.stake-hero-badge-tag {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   color: #00e599;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  margin-bottom: 20px;
+  text-shadow: 0 0 12px rgba(0, 229, 153, 0.4);
 }
 
-.stake-auth-headline {
+.stake-auth-headline-display {
   font-family: var(--font-display);
   font-size: clamp(44px, 4.8vw, 68px);
   font-weight: 800;
-  line-height: 1.08;
-  letter-spacing: -0.025em;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
   color: #ffffff;
-  margin: 0 0 22px;
+  margin: 0 0 24px;
   text-align: center;
+  text-shadow: 0 4px 28px rgba(0, 0, 0, 0.6);
 }
 
-.stake-auth-lead {
+.stake-auth-lead-display {
   font-family: var(--font-body);
-  font-size: 16px;
+  font-size: 15px;
   color: #94a3b8;
-  line-height: 1.65;
-  max-width: 480px;
+  line-height: 1.6;
+  max-width: 500px;
   margin: 0 auto;
   text-align: center;
 }
 
+/* Floating Stock Pill Badges (Positioned like the design reference with continuous upward float) */
+.stake-hero-floating-pill {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  user-select: none;
+  z-index: 6;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  transition: transform 0.25s ease;
+  animation-duration: 4.8s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.stake-hero-floating-pill.green {
+  background: rgba(4, 20, 14, 0.85);
+  border: 1px solid rgba(0, 229, 153, 0.35);
+  color: #ffffff;
+}
+
+.stake-hero-floating-pill.green .pill-chg {
+  color: #00e599;
+  background: rgba(0, 229, 153, 0.15);
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.stake-hero-floating-pill.red {
+  background: rgba(26, 10, 12, 0.85);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #ffffff;
+}
+
+.stake-hero-floating-pill.red .pill-chg {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.15);
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+/* Specific Placements & Upward Floating Keyframes */
+.pill-pos-top-left {
+  top: 30%;
+  left: 6%;
+  animation-name: pillFloatUp1;
+  animation-delay: 0s;
+}
+
+.pill-pos-top-right {
+  top: 33%;
+  right: 16%;
+  animation-name: pillFloatUp2;
+  animation-delay: 1.2s;
+}
+
+.pill-pos-mid-left {
+  top: 54%;
+  left: 18%;
+  animation-name: pillFloatUp3;
+  animation-delay: 0.6s;
+}
+
+.pill-pos-mid-right {
+  top: 55%;
+  right: 12%;
+  animation-name: pillFloatUp4;
+  animation-delay: 1.8s;
+}
+
+.pill-pos-bot-right {
+  bottom: 24%;
+  right: 8%;
+  animation-name: pillFloatUp5;
+  animation-delay: 2.2s;
+}
+
+.pill-pos-bot-left {
+  bottom: 12%;
+  left: 12%;
+  animation-name: pillFloatUp6;
+  animation-delay: 0.9s;
+}
+
+@keyframes pillFloatUp1 {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-22px) scale(1.02); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+@keyframes pillFloatUp2 {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-26px) scale(1.03); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+@keyframes pillFloatUp3 {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-20px) scale(0.99); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+@keyframes pillFloatUp4 {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-24px) scale(1.03); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+@keyframes pillFloatUp5 {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-28px) scale(1.02); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+@keyframes pillFloatUp6 {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-22px) scale(1.01); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+/* Demo account bottom link */
+.stake-demo-bottom-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+  width: 100%;
+}
+
+.stake-demo-bottom-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  color: #006c49;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 10px;
+  transition: all 0.18s ease;
+  font-family: var(--font-body);
+}
+
+.stake-demo-bottom-btn:hover {
+  background: rgba(0, 108, 73, 0.08);
+  color: #004d34;
+  transform: translateY(-1px);
+}
+
 /* ==========================================================================
-   RIGHT AUTH FORM COLUMN (Clean Unboxed Layout)
+   RIGHT/LEFT AUTH FORM COLUMN (Clean Unboxed Layout with Smooth Scroll)
    ========================================================================== */
 .stake-auth-right {
   flex: 1;
   background: #ffffff;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 40px 36px;
+  justify-content: flex-start;
+  padding: 36px 32px;
   box-sizing: border-box;
+  overflow-y: auto;
+  min-height: 100vh;
+  scrollbar-width: thin;
+}
+
+.stake-auth-right::-webkit-scrollbar {
+  width: 5px;
+}
+
+.stake-auth-right::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
 }
 
 /* Clean Unboxed Form Wrapper */
 .stake-auth-form-wrapper {
   width: 100%;
   max-width: 420px;
+  margin: auto 0;
   background: transparent;
   border: none;
   box-shadow: none;
-  padding: 0;
+  padding: 12px 0 28px 0;
   text-align: left;
 }
 
@@ -297,7 +521,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .stake-back-landing-btn {
@@ -310,17 +534,19 @@
   font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
-  padding: 0;
-  transition: color 0.15s ease;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
 }
 
 .stake-back-landing-btn:hover {
   color: #0f172a;
+  background: #f1f5f9;
 }
 
 .stake-auth-title {
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 700;
   color: #0f172a;
   margin: 0 0 6px;
@@ -329,9 +555,9 @@
 
 .stake-auth-desc {
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 13.5px;
   color: #64748b;
-  margin: 0 0 24px;
+  margin: 0 0 20px;
   line-height: 1.5;
 }
 
@@ -341,7 +567,7 @@
   background: #f1f5f9;
   padding: 4px;
   border-radius: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   border: 1px solid #e2e8f0;
   width: 100%;
   box-sizing: border-box;
@@ -349,7 +575,7 @@
 
 .stake-mode-pill-btn {
   flex: 1 1 50%;
-  padding: 10px 0;
+  padding: 9px 0;
   border: none;
   background: transparent;
   font-size: 13.5px;
@@ -374,15 +600,15 @@
 
 /* Form Groups & Inputs */
 .stake-form-group {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .stake-label {
   display: block;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 700;
   color: #1e293b;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
 }
 
 .stake-input-wrapper {
@@ -403,8 +629,8 @@
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 12px;
-  padding: 12px 14px 12px 42px;
-  font-size: 14px;
+  padding: 10px 14px 10px 40px;
+  font-size: 13.5px;
   color: #0f172a;
   outline: none;
   transition: all 0.15s ease;
@@ -600,3 +826,92 @@
   background: rgba(0, 108, 73, 0.08);
   color: #004d34;
 }
+
+/* ==========================================================================
+   SLIDEOVER DRAWER LAYOUT
+   ========================================================================== */
+.stake-auth-slideover-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+}
+
+.stake-auth-slideover-panel {
+  width: 100%;
+  max-width: 480px;
+  background: #ffffff;
+  height: 100vh;
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 10000;
+}
+
+.stake-auth-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.stake-auth-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #059669;
+}
+
+.stake-auth-close-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stake-auth-close-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.stake-auth-panel-body {
+  padding: 24px 28px 36px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .stake-auth-slideover-panel {
+    max-width: 100%;
+  }
+  .stake-auth-panel-body {
+    padding: 20px 18px 28px;
+  }
+}
+

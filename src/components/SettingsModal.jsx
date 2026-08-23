@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   Globe,
@@ -8,7 +8,9 @@ import {
   Sliders,
   Trash2,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Database,
+  Server,
 } from "lucide-react";
 import { CURRENCIES } from "../utils";
 
@@ -28,7 +30,107 @@ export function SettingsModal({
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // MongoDB Cluster Connection state
+  const [mongoUri, setMongoUri] = useState("");
+  const [dbStatus, setDbStatus] = useState({
+    connected: false,
+    mode: "In-Memory Dual-State Engine",
+    error: null,
+    loading: true,
+  });
+  const [connectingDb, setConnectingDb] = useState(false);
+  const [dbFeedback, setDbFeedback] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let isMounted = true;
+    async function checkDb() {
+      try {
+        const res = await fetch("/api/database/status");
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setDbStatus({
+              connected: Boolean(data.connected),
+              mode: data.mode || "In-Memory Dual-State Engine",
+              error: data.error,
+              loading: false,
+            });
+          }
+        }
+      } catch {
+        if (isMounted) {
+          setDbStatus((prev) => ({ ...prev, loading: false }));
+        }
+      }
+    }
+
+    checkDb();
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const handleConnectMongo = async () => {
+    if (!mongoUri.trim()) {
+      setDbFeedback({ type: "error", message: "Please enter your MongoDB connection string." });
+      return;
+    }
+
+    if (!mongoUri.startsWith("mongodb://") && !mongoUri.startsWith("mongodb+srv://")) {
+      setDbFeedback({
+        type: "error",
+        message: "Invalid connection format. Must start with mongodb:// or mongodb+srv://",
+      });
+      return;
+    }
+
+    setConnectingDb(true);
+    setDbFeedback(null);
+
+    try {
+      const res = await fetch("/api/database/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uri: mongoUri.trim() }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDbStatus({
+          connected: true,
+          mode: "MongoDB Atlas Cluster",
+          error: null,
+          loading: false,
+        });
+        setDbFeedback({
+          type: "success",
+          message: "Connected successfully to MongoDB Atlas Cluster! Your accounts and records are now persistently stored in your cluster.",
+        });
+        setMongoUri("");
+      } else {
+        setDbStatus((prev) => ({
+          ...prev,
+          connected: false,
+          error: data.message || "Failed to connect to cluster.",
+        }));
+        setDbFeedback({
+          type: "error",
+          message: data.message || "Could not connect to MongoDB cluster. Check username, password & IP whitelist (0.0.0.0/0).",
+        });
+      }
+    } catch (err) {
+      setDbFeedback({
+        type: "error",
+        message: err.message || "Connection request failed.",
+      });
+    } finally {
+      setConnectingDb(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (deleteConfirmText.trim().toUpperCase() !== "DELETE") return;
@@ -50,283 +152,220 @@ export function SettingsModal({
     <>
       <div
         id="settings-modal-backdrop"
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "rgba(15, 23, 42, 0.65)",
-          backdropFilter: "blur(6px)",
-          WebkitBackdropFilter: "blur(6px)",
-          zIndex: 100,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 20,
-          fontFamily: "'Hanken Grotesk', sans-serif",
-        }}
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 font-sans text-slate-900"
         onClick={onClose}
       >
         <div
           id="settings-modal-dialog"
           onClick={(e) => e.stopPropagation()}
-          style={{
-            width: "100%",
-            maxWidth: 580,
-            background: "#ffffff",
-            borderRadius: 24,
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 24px 60px rgba(0, 0, 0, 0.2)",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            maxHeight: "90vh",
-            textAlign: "left",
-          }}
+          className="w-full max-w-xl bg-white rounded-3xl border border-slate-200 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-left animate-in fade-in zoom-in-95 duration-100"
         >
           {/* Modal Header */}
-          <div
-            style={{
-              padding: "20px 24px",
-              borderBottom: "1px solid #e2e8f0",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              background: "#f8fafc",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: "rgba(16, 185, 129, 0.12)",
-                  color: "#059669",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Sliders size={20} />
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                <Sliders size={19} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#0f172a" }}>
-                  Settings
+                <h3 className="text-base font-bold text-slate-900 leading-tight">
+                  Terminal & Cluster Settings
                 </h3>
-                <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>
-                  Customize currency, privacy mode, and account preferences
+                <p className="text-xs text-slate-500">
+                  Configure preferences, currency & MongoDB Atlas Cluster
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "#64748b",
-                padding: 4,
-                borderRadius: 6,
-              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
 
           {/* Modal Body */}
-          <div style={{ padding: 24, overflowY: "auto", display: "flex", flexDirection: "column", gap: 24 }}>
+          <div className="p-6 overflow-y-auto space-y-6">
+            {/* MongoDB Atlas Cluster Connection Box */}
+            <div className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Database size={17} className="text-emerald-600" />
+                  <h4 className="text-sm font-bold text-slate-900">
+                    MongoDB Atlas Cluster
+                  </h4>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    dbStatus.connected
+                      ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                      : "bg-amber-100 text-amber-800 border border-amber-200"
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      dbStatus.connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                    }`}
+                  />
+                  {dbStatus.connected ? "Cluster Connected" : "In-Memory Dual Mode"}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                Connect your custom MongoDB Atlas cluster database for permanent user storage, trade audit logs, and account persistence.
+              </p>
+
+              {dbFeedback && (
+                <div
+                  className={`p-3 rounded-xl text-xs font-medium mb-3 flex items-start gap-2 ${
+                    dbFeedback.type === "success"
+                      ? "bg-emerald-100/70 text-emerald-800 border border-emerald-200"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                  }`}
+                >
+                  {dbFeedback.type === "success" ? (
+                    <Check size={15} className="mt-0.5 flex-shrink-0 text-emerald-600" />
+                  ) : (
+                    <AlertTriangle size={15} className="mt-0.5 flex-shrink-0 text-rose-600" />
+                  )}
+                  <span>{dbFeedback.message}</span>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    id="settings-mongodb-uri-input"
+                    type="password"
+                    placeholder="mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/stake_db"
+                    value={mongoUri}
+                    onChange={(e) => setMongoUri(e.target.value)}
+                    className="flex-1 px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 bg-white"
+                  />
+                  <button
+                    id="settings-connect-mongo-btn"
+                    type="button"
+                    onClick={handleConnectMongo}
+                    disabled={connectingDb}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                  >
+                    {connectingDb ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" />
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Server size={13} />
+                        <span>Connect Cluster</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                  <span>Tip: In MongoDB Atlas, allow IP Access: <code>0.0.0.0/0</code></span>
+                  <span>SSL/TLS Enabled</span>
+                </div>
+              </div>
+            </div>
+
             {/* Currency Selection Section */}
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <Globe size={16} color="#059669" />
-                <label style={{ fontSize: 13.5, fontWeight: 800, color: "#0f172a" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <Globe size={16} className="text-emerald-600" />
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
                   Display Currency
                 </label>
               </div>
-              <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
-                Select your preferred global currency. All share prices and account balances will update instantly across the entire platform.
-              </p>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-                  gap: 8,
-                }}
-              >
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {Object.entries(CURRENCIES).map(([code, curr]) => {
                   const isSelected = currency === code;
                   return (
                     <button
                       key={code}
-                      id={`settings-currency-btn-${code}`}
+                      id={`currency-btn-${code}`}
+                      type="button"
                       onClick={() => setCurrency(code)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        border: isSelected ? "2px solid #10b981" : "1px solid #e2e8f0",
-                        background: isSelected ? "rgba(16, 185, 129, 0.08)" : "#f8fafc",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all 0.15s ease",
-                      }}
+                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-emerald-50 border-emerald-500 text-emerald-800 font-bold"
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                      }`}
                     >
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: isSelected ? "#059669" : "#0f172a" }}>
-                          {curr.code} ({curr.symbol})
-                        </div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{curr.name.split(" ")[0]}</div>
+                      <div className="text-xs">
+                        <div className="font-bold">{code}</div>
+                        <div className="text-[11px] text-slate-400">{curr.symbol} {curr.name}</div>
                       </div>
-                      {isSelected && <Check size={16} color="#059669" />}
+                      {isSelected && <Check size={14} className="text-emerald-600" />}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Privacy & Balances Section */}
-            <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 18 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <Shield size={16} color="#059669" />
-                <label style={{ fontSize: 13.5, fontWeight: 800, color: "#0f172a" }}>
-                  Privacy & Security
-                </label>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 14px",
-                  background: "#f8fafc",
-                  borderRadius: 12,
-                  border: "1px solid #e2e8f0",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
-                    Mask Financial Balances
-                  </div>
-                  <div style={{ fontSize: 11.5, color: "#64748b" }}>
-                    Hide portfolio totals and cash balances with asterisks (••••) while keeping individual share prices visible
-                  </div>
+            {/* Privacy Mode Section */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                  <Shield size={15} className="text-emerald-600" /> Privacy Mode (Mask Balances)
                 </div>
-                <input
-                  id="settings-privacy-mode-toggle"
-                  type="checkbox"
-                  checked={privacyMode}
-                  onChange={(e) => setPrivacyMode(e.target.checked)}
-                  style={{ width: 18, height: 18, accentColor: "#10b981", cursor: "pointer" }}
-                />
+                <p className="text-[11.5px] text-slate-500 mt-0.5">
+                  Mask sensitive net worth and account cash totals with asterisks (••••••)
+                </p>
               </div>
+              <input
+                id="settings-privacy-mode-toggle"
+                type="checkbox"
+                checked={privacyMode}
+                onChange={(e) => setPrivacyMode(e.target.checked)}
+                className="w-5 h-5 accent-emerald-600 cursor-pointer"
+              />
             </div>
 
             {/* KYC Status & Verification Link */}
-            <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 18 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <User size={16} color="#059669" />
-                <label style={{ fontSize: 13.5, fontWeight: 800, color: "#0f172a" }}>
-                  Identity & Regulatory Compliance
-                </label>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 14px",
-                  background: "#f8fafc",
-                  borderRadius: 12,
-                  border: "1px solid #e2e8f0",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
-                    KYC Verification Status:{" "}
-                    <span style={{ color: kycStatus === "VERIFIED" ? "#10b981" : "#ef4444", fontWeight: 800 }}>
-                      {kycStatus === "VERIFIED" ? "Verified" : "Pending Verification"}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11.5, color: "#64748b" }}>
-                    FINRA Rule 2090 identity documentation and customer record
-                  </div>
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                  <User size={15} className="text-emerald-600" /> Identity & Regulatory Compliance
                 </div>
-                <button
-                  id="settings-view-kyc-btn"
-                  onClick={() => {
-                    onClose();
-                    if (onOpenKyc) onOpenKyc();
-                  }}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: "rgba(16, 185, 129, 0.12)",
-                    color: "#059669",
-                    fontWeight: 800,
-                    fontSize: 12.5,
-                    cursor: "pointer",
-                  }}
-                >
-                  {kycStatus === "VERIFIED" ? "View" : "Complete KYC"}
-                </button>
+                <div className="text-[11.5px] text-slate-500 mt-0.5">
+                  Status:{" "}
+                  <strong className={kycStatus === "VERIFIED" ? "text-emerald-600" : "text-rose-600"}>
+                    {kycStatus === "VERIFIED" ? "Verified" : "Pending Verification"}
+                  </strong>
+                </div>
               </div>
+              <button
+                id="settings-view-kyc-btn"
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onOpenKyc) onOpenKyc();
+                }}
+                className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 hover:bg-slate-100 cursor-pointer shadow-2xs"
+              >
+                {kycStatus === "VERIFIED" ? "View KYC" : "Complete KYC"}
+              </button>
             </div>
 
             {/* Danger Zone: Delete Account */}
-            <div style={{ borderTop: "1px solid #fee2e2", paddingTop: 18 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <Trash2 size={16} color="#ef4444" />
-                <label style={{ fontSize: 13.5, fontWeight: 800, color: "#b91c1c" }}>
-                  Danger Zone
-                </label>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "14px 16px",
-                  background: "rgba(239, 68, 68, 0.04)",
-                  borderRadius: 14,
-                  border: "1px solid #fecaca",
-                }}
-              >
+            <div className="pt-3 border-t border-rose-100">
+              <div className="p-4 rounded-2xl bg-rose-50/50 border border-rose-200 flex items-center justify-between">
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: "#991b1b" }}>
-                    Delete Account
+                  <div className="text-xs font-bold text-rose-800 flex items-center gap-1.5">
+                    <Trash2 size={15} /> Delete Account & Cloud Records
                   </div>
-                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                    Permanently delete your profile ({user?.email || "trader@stake.com"}), holdings, order history, and cloud records.
-                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Permanently delete {user?.email || "active account"} and reset all portfolio data.
+                  </p>
                 </div>
                 <button
                   id="settings-delete-account-btn"
+                  type="button"
                   onClick={() => {
                     setDeleteConfirmText("");
                     setShowDeleteModal(true);
                   }}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: 10,
-                    border: "1px solid #ef4444",
-                    background: "#ffffff",
-                    color: "#dc2626",
-                    fontWeight: 800,
-                    fontSize: 12.5,
-                    cursor: "pointer",
-                    boxShadow: "0 2px 6px rgba(239, 68, 68, 0.1)",
-                    transition: "all 0.15s ease",
-                    whiteSpace: "nowrap",
-                  }}
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-2xs"
                 >
                   Delete Account
                 </button>
@@ -335,189 +374,71 @@ export function SettingsModal({
           </div>
 
           {/* Modal Footer */}
-          <div
-            style={{
-              padding: "14px 24px",
-              borderTop: "1px solid #e2e8f0",
-              background: "#f8fafc",
-              display: "flex",
-              justifyContent: "flex-end",
-            }}
-          >
+          <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex justify-end">
             <button
               onClick={onClose}
-              style={{
-                padding: "8px 20px",
-                borderRadius: 10,
-                background: "#059669",
-                color: "#ffffff",
-                border: "none",
-                fontWeight: 800,
-                fontSize: 13,
-                cursor: "pointer",
-              }}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs transition-colors"
             >
-              Save & Close
+              Done
             </button>
           </div>
         </div>
       </div>
 
-      {/* Dedicated High-Priority Delete Account Pop-up Confirmation Modal */}
+      {/* Delete Account Pop-up Confirmation Modal */}
       {showDeleteModal && (
         <div
           id="delete-account-modal-backdrop"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(15, 23, 42, 0.75)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            zIndex: 200,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-            fontFamily: "'Hanken Grotesk', sans-serif",
-          }}
-          onClick={() => !isDeleting && setShowDeleteModal(false)}
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 font-sans text-slate-900"
+          onClick={() => setShowDeleteModal(false)}
         >
           <div
             id="delete-account-modal-dialog"
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: 460,
-              background: "#ffffff",
-              borderRadius: 24,
-              border: "1px solid #fee2e2",
-              boxShadow: "0 25px 50px -12px rgba(220, 38, 38, 0.25)",
-              overflow: "hidden",
-              textAlign: "left",
-            }}
+            className="w-full max-w-md bg-white rounded-3xl p-6 border border-slate-200 shadow-2xl animate-in fade-in zoom-in-95 duration-100"
           >
-            <div style={{ padding: "24px 24px 18px", borderBottom: "1px solid #fecaca", background: "#fef2f2" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 14,
-                    background: "#fee2e2",
-                    color: "#dc2626",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <AlertTriangle size={24} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: "#991b1b" }}>
-                    Delete Account Permanently?
-                  </h3>
-                  <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "#b91c1c" }}>
-                    This action is immediate and cannot be recovered.
-                  </p>
-                </div>
-              </div>
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mb-4 mx-auto">
+              <AlertTriangle size={24} />
             </div>
 
-            <div style={{ padding: 24 }}>
-              <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.6, margin: "0 0 16px" }}>
-                Deleting your account will remove your investment portfolio, trading transaction history, cash ledger, and KYC compliance records from Stake Global Exchange.
-              </p>
+            <h3 className="text-lg font-bold text-center text-slate-900">
+              Delete Trading Account?
+            </h3>
+            <p className="text-xs text-slate-500 text-center mt-2 leading-relaxed">
+              This action cannot be undone. All holdings, order history, cash balances, and cloud records for <strong>{user?.email || "your account"}</strong> will be permanently deleted.
+            </p>
 
-              <div style={{ background: "#f8fafc", borderRadius: 12, padding: "12px 14px", border: "1px solid #e2e8f0", marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Account to be purged
-                </div>
-                <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0f172a", marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
-                  {user?.email || "trader@stake.com"}
-                </div>
-              </div>
-
-              <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>
-                Type <span style={{ color: "#dc2626", fontWeight: 900, fontFamily: "'JetBrains Mono', monospace" }}>DELETE</span> to confirm:
+            <div className="my-5">
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                Type <span className="text-rose-600 font-mono">DELETE</span> to confirm:
               </label>
               <input
-                id="delete-account-confirm-input"
+                id="delete-confirm-input"
                 type="text"
-                autoFocus
                 placeholder="DELETE"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  border: deleteConfirmText.trim().toUpperCase() === "DELETE" ? "2px solid #dc2626" : "1px solid #cbd5e1",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
+                className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 font-mono uppercase tracking-wider focus:outline-hidden focus:ring-2 focus:ring-rose-500"
               />
+            </div>
 
-              <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                <button
-                  id="delete-account-cancel-btn"
-                  onClick={() => setShowDeleteModal(false)}
-                  disabled={isDeleting}
-                  style={{
-                    flex: 1,
-                    padding: "10px 16px",
-                    borderRadius: 12,
-                    border: "1px solid #e2e8f0",
-                    background: "#ffffff",
-                    color: "#475569",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  id="delete-account-execute-btn"
-                  onClick={handleDelete}
-                  disabled={deleteConfirmText.trim().toUpperCase() !== "DELETE" || isDeleting}
-                  style={{
-                    flex: 1.4,
-                    padding: "10px 16px",
-                    borderRadius: 12,
-                    border: "none",
-                    background: deleteConfirmText.trim().toUpperCase() === "DELETE" ? "#dc2626" : "#f1f5f9",
-                    color: deleteConfirmText.trim().toUpperCase() === "DELETE" ? "#ffffff" : "#94a3b8",
-                    fontWeight: 800,
-                    fontSize: 13,
-                    cursor: deleteConfirmText.trim().toUpperCase() === "DELETE" && !isDeleting ? "pointer" : "not-allowed",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
-                    boxShadow: deleteConfirmText.trim().toUpperCase() === "DELETE" ? "0 4px 12px rgba(220, 38, 38, 0.3)" : "none",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  {isDeleting ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Deleting Account...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 size={15} />
-                      <span>Permanently Delete</span>
-                    </>
-                  )}
-                </button>
-              </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                id="confirm-delete-account-btn"
+                type="button"
+                disabled={deleteConfirmText.trim().toUpperCase() !== "DELETE" || isDeleting}
+                onClick={handleDelete}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+              >
+                {isDeleting ? "Deleting..." : "Permanently Delete"}
+              </button>
             </div>
           </div>
         </div>
@@ -525,4 +446,3 @@ export function SettingsModal({
     </>
   );
 }
-

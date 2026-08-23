@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   Clock,
   Layers,
-  ArrowRight,
   Receipt
 } from "lucide-react";
 import { fmt, fmtShares, CURRENCIES } from "../utils";
@@ -23,6 +22,7 @@ export function TransactionHistory({
   currency = "USD",
 }) {
   const [filterType, setFilterType] = useState("ALL"); // ALL, BUY, SELL
+  const [authFilter, setAuthFilter] = useState("ALL"); // ALL, AUTHENTICATED, GUEST
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState("NEWEST"); // NEWEST, OLDEST, VALUE_HIGH, VALUE_LOW
 
@@ -37,12 +37,18 @@ export function TransactionHistory({
       safeFilterType === "ALL" ||
       txType === safeFilterType;
 
+    const isGuestTx = tx?.isDemo || tx?.isGuest || (tx?.id && tx.id.toString().includes("DEMO"));
+    const matchesAuth =
+      authFilter === "ALL" ||
+      (authFilter === "AUTHENTICATED" && !isGuestTx) ||
+      (authFilter === "GUEST" && isGuestTx);
+
     const matchesSearch =
       !searchQuery ||
       (tx.stock || tx.ticker || tx.scrip || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       tx.id?.toString().toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesType && matchesSearch;
+    return matchesType && matchesAuth && matchesSearch;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -149,26 +155,7 @@ export function TransactionHistory({
         }}
       >
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 800,
-                color: "#059669",
-                letterSpacing: "0.06em",
-                fontFamily: "'JetBrains Mono', monospace",
-                background: "rgba(16,185,129,0.1)",
-                padding: "3px 8px",
-                borderRadius: 6,
-              }}
-            >
-              PORTFOLIO LEDGER
-            </span>
-            <span style={{ fontSize: 12, color: textSecondary, fontWeight: 600 }}>
-              Account: {user?.accountNumber || "STK-LIVE-884210"}
-            </span>
-          </div>
-          <h1 style={{ fontSize: 24, fontWeight: 900, color: textPrimary, margin: "6px 0 2px" }}>
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: textPrimary, margin: "0 0 2px" }}>
             Order Logs & History
           </h1>
           <p style={{ fontSize: 13, color: textSecondary, margin: 0 }}>
@@ -345,6 +332,33 @@ export function TransactionHistory({
               boxSizing: "border-box",
             }}
           />
+        </div>
+
+        {/* Auth / Guest Scope Filter Pills */}
+        <div style={{ display: "flex", gap: 3, background: bgInput, padding: 3, borderRadius: 8, border: `1px solid ${borderCol}` }}>
+          {[
+            { id: "ALL", label: "All Scope" },
+            { id: "AUTHENTICATED", label: "Authenticated" },
+            { id: "GUEST", label: "Guest / Demo" },
+          ].map((a) => (
+            <button
+              key={a.id}
+              onClick={() => setAuthFilter(a.id)}
+              style={{
+                padding: "5px 11px",
+                borderRadius: 6,
+                border: "none",
+                fontSize: 11.5,
+                fontWeight: authFilter === a.id ? 700 : 500,
+                cursor: "pointer",
+                background: authFilter === a.id ? (a.id === "GUEST" ? "#f59e0b" : "#0284c7") : "transparent",
+                color: authFilter === a.id ? "#ffffff" : textSecondary,
+                transition: "all 0.15s ease",
+              }}
+            >
+              {a.label}
+            </button>
+          ))}
         </div>
 
         {/* Action Type Filter Pills */}
