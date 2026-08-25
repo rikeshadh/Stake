@@ -108,9 +108,13 @@ export function AgentTab({
   const [revertingId, setRevertingId] = useState(null);
 
   // Profile & Strategy Selection State (Requirement 2)
-  const [selectedProfileId, setSelectedProfileId] = useState("balanced");
+  const [selectedProfileId, setSelectedProfileId] = useState(() => {
+    const activeStrat = agentStrategy || user?.agentStrategy;
+    if (!activeStrat) return null;
+    return STRATEGIES.find((s) => s.id === activeStrat)?.profile || null;
+  });
   const [selectedStrategyId, setSelectedStrategyId] = useState(
-    agentStrategy || user?.agentStrategy || "dip_buyer"
+    agentStrategy || user?.agentStrategy || null
   );
 
   // Benchmark Comparison Toggle State (Requirement 6)
@@ -133,16 +137,15 @@ export function AgentTab({
   const scanFunctionRef = useRef(null);
 
   const currentStrategy = useMemo(() => {
-    return (
-      STRATEGIES.find((item) => item.id === (agentStrategy || selectedStrategyId)) ||
-      STRATEGIES[0]
-    );
+    const targetId = agentStrategy || selectedStrategyId;
+    if (!targetId) return null;
+    return STRATEGIES.find((item) => item.id === targetId) || null;
   }, [agentStrategy, selectedStrategyId]);
 
   const currentProfile = useMemo(() => {
+    if (!selectedProfileId) return null;
     return (
-      PROFILES.find((p) => p.id === selectedProfileId) ||
-      PROFILES[1]
+      PROFILES.find((p) => p.id === selectedProfileId) || null
     );
   }, [selectedProfileId]);
 
@@ -150,8 +153,9 @@ export function AgentTab({
   const deployedCapital = numberValue(user?.agentDeployedCapital);
   const userEmail = user?.email || "trader@stake.com";
 
-  // Filter strategies based on selected profile
+  // Filter strategies based on selected profile (or show all if none selected)
   const filteredStrategies = useMemo(() => {
+    if (!selectedProfileId) return STRATEGIES;
     return STRATEGIES.filter((s) => s.profile === selectedProfileId);
   }, [selectedProfileId]);
 
@@ -159,7 +163,8 @@ export function AgentTab({
   const benchmarkChartData = useMemo(() => {
     const pointsCount = benchmarkTimeframe === "1mo" ? 22 : benchmarkTimeframe === "3mo" ? 45 : 90;
     const baseReturnSpy = benchmarkTimeframe === "1mo" ? 2.4 : benchmarkTimeframe === "3mo" ? 6.2 : 14.8;
-    const alphaMultiplier = currentStrategy.id === "momentum" ? 1.55 : currentStrategy.id === "dip_buyer" ? 1.32 : 1.15;
+    const stratId = currentStrategy?.id || "dip_buyer";
+    const alphaMultiplier = stratId === "momentum" ? 1.55 : stratId === "dip_buyer" ? 1.32 : 1.15;
     
     const data = [];
 
@@ -312,6 +317,10 @@ export function AgentTab({
    */
 
   const handleTogglePause = async () => {
+    if (!currentStrategy) {
+      showToast?.("Please configure and select a quantitative strategy first.");
+      return;
+    }
     try {
       if (agentEnabled) {
         await pauseAgentStrategy({ email: userEmail });
@@ -335,6 +344,11 @@ export function AgentTab({
    */
 
   const handleDeployStrategy = async () => {
+    if (!selectedStrategyId || !currentStrategy) {
+      showToast?.("Please select a quantitative strategy model below first.");
+      return;
+    }
+
     const capital = Number(deployCapitalInput);
     const spend = Number(maxSpendInput);
 
@@ -510,11 +524,13 @@ export function AgentTab({
                 />
                 {agentEnabled ? "Autonomous Live" : "Engine Paused"}
               </span>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100/70 text-emerald-800 border border-emerald-200">
-                {currentProfile.name} Profile
-              </span>
+              {currentProfile ? (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100/70 text-emerald-800 border border-emerald-200">
+                  {currentProfile.name} Profile
+                </span>
+              ) : null}
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
-                {currentStrategy.name}
+                {currentStrategy ? currentStrategy.name : "Unconfigured Model"}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
@@ -586,13 +602,26 @@ export function AgentTab({
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-bold text-slate-900 font-mono">
-              {strongSignals.length > 0 ? `${strongSignals[0].confidence || 88}%` : "85%"}
-            </div>
-            <div className="text-xs font-semibold text-emerald-600 flex items-center gap-1 mt-1">
-              <Sparkles size={13} />
-              <span>High Conviction Setup</span>
-            </div>
+            {agentEnabled || currentStrategy ? (
+              <>
+                <div className="text-2xl font-bold text-slate-900 font-mono">
+                  {strongSignals.length > 0 ? `${strongSignals[0].confidence || 88}%` : "85%"}
+                </div>
+                <div className="text-xs font-semibold text-emerald-600 flex items-center gap-1 mt-1">
+                  <Sparkles size={13} />
+                  <span>High Conviction Setup</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-slate-400 font-mono">
+                  --
+                </div>
+                <div className="text-xs font-medium text-slate-400 flex items-center gap-1 mt-1">
+                  <span>Engine Paused / Standby</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -638,7 +667,7 @@ export function AgentTab({
             </button>
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            Max limit: ${fmt(agentMaxSpend || maxSpendInput || 500)} / trade
+            Max limit: ${fmt(user?.agentMaxSpend || (agentStrategy ? maxSpendInput : 0))} / trade
           </div>
         </div>
 
@@ -664,14 +693,14 @@ export function AgentTab({
       </div>
 
       {/* =========================================================
-          3. INTERACTIVE STRATEGY SELECTION & PROFILES (Requirement 2)
+          SECTION 1: INTERACTIVE STRATEGY SELECTION & PROFILES (Requirement 2)
          ========================================================= */}
       <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-extrabold text-emerald-600 uppercase tracking-wider font-mono">
-                QUANTITATIVE STRATEGY SELECTION
+                SECTION 1 · QUANTITATIVE STRATEGY & RISK CONFIGURATION
               </span>
             </div>
             <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2 mt-0.5">
@@ -687,7 +716,7 @@ export function AgentTab({
           </span>
         </div>
 
-        {/* 3.1 Investment Profile Selection Tabs (Growth / Balanced / Conservative) */}
+        {/* 1.1 Investment Profile Selection Tabs (Growth / Balanced / Conservative) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mb-6">
           {PROFILES.map((prof) => {
             const isSelected = selectedProfileId === prof.id;
@@ -697,13 +726,6 @@ export function AgentTab({
                 key={prof.id}
                 onClick={() => {
                   setSelectedProfileId(prof.id);
-                  // Default to first strategy under this profile
-                  const firstStrat = STRATEGIES.find((s) => s.profile === prof.id);
-                  if (firstStrat) {
-                    setSelectedStrategyId(firstStrat.id);
-                    setDeployCapitalInput(firstStrat.allocationPreset);
-                    setMaxSpendInput(firstStrat.maxSpendPreset);
-                  }
                 }}
                 className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
                   isSelected
@@ -740,10 +762,12 @@ export function AgentTab({
           })}
         </div>
 
-        {/* 3.2 Strategy Models Grid for Active Profile */}
+        {/* 1.2 Strategy Models Grid for Active Profile */}
         <div className="mb-6">
           <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-            Available Models for &ldquo;{currentProfile.name}&rdquo; Profile:
+            {currentProfile
+              ? `Available Models for “${currentProfile.name}” Profile:`
+              : "Select an Investment Profile above or choose a Quantitative Model below:"}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -755,6 +779,7 @@ export function AgentTab({
                   key={strat.id}
                   onClick={() => {
                     setSelectedStrategyId(strat.id);
+                    setSelectedProfileId(strat.profile);
                     setDeployCapitalInput(strat.allocationPreset);
                     setMaxSpendInput(strat.maxSpendPreset);
                   }}
@@ -821,7 +846,7 @@ export function AgentTab({
           </div>
         </div>
 
-        {/* 3.3 Capital Deployment & Execution Configuration Bar */}
+        {/* 1.3 Capital Deployment & Execution Configuration Bar */}
         <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col lg:flex-row items-center justify-between gap-4">
           {/* Capital Input & Presets */}
           <div className="flex-1 w-full flex flex-col sm:flex-row sm:items-center gap-3">
@@ -901,14 +926,14 @@ export function AgentTab({
       </div>
 
       {/* =========================================================
-          4. BENCHMARK COMPARISON TOGGLE & VISUALIZER (Requirement 6)
+          SECTION 2: BENCHMARK COMPARISON TOGGLE & VISUALIZER (Requirement 6)
          ========================================================= */}
       <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-extrabold text-emerald-600 uppercase tracking-wider font-mono">
-                QUANTITATIVE BENCHMARKING
+                SECTION 2 · QUANTITATIVE BENCHMARKING & ALPHA COMPARISON
               </span>
             </div>
             <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2 mt-0.5">
@@ -957,25 +982,25 @@ export function AgentTab({
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
             <span className="text-[10px] font-bold text-slate-400 uppercase">Alpha vs S&P 500</span>
             <div className="text-base font-extrabold text-emerald-600 font-mono mt-1">
-              {currentStrategy.alphaVsSpy || "+5.4%"}
+              {currentStrategy?.alphaVsSpy || "+5.4%"}
             </div>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
             <span className="text-[10px] font-bold text-slate-400 uppercase">Strategy Sharpe Ratio</span>
             <div className="text-base font-extrabold text-slate-900 font-mono mt-1">
-              {currentStrategy.sharpeRatio || 2.35} <span className="text-xs text-slate-400 font-sans">(SPY: 1.42)</span>
+              {currentStrategy?.sharpeRatio || 2.35} <span className="text-xs text-slate-400 font-sans">(SPY: 1.42)</span>
             </div>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
             <span className="text-[10px] font-bold text-slate-400 uppercase">Max Drawdown</span>
             <div className="text-base font-extrabold text-emerald-700 font-mono mt-1">
-              {currentStrategy.maxDrawdown || "-4.8%"} <span className="text-xs text-slate-400 font-sans">(SPY: -12.4%)</span>
+              {currentStrategy?.maxDrawdown || "-4.8%"} <span className="text-xs text-slate-400 font-sans">(SPY: -12.4%)</span>
             </div>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
             <span className="text-[10px] font-bold text-slate-400 uppercase">Win Rate</span>
             <div className="text-base font-extrabold text-slate-900 font-mono mt-1">
-              {currentStrategy.winRate || "78%"}
+              {currentStrategy?.winRate || "78%"}
             </div>
           </div>
         </div>
@@ -1003,7 +1028,7 @@ export function AgentTab({
                       <div className="bg-white p-3 rounded-xl shadow-lg border border-slate-200 text-xs">
                         <div className="font-bold text-slate-900 mb-1">{label}</div>
                         <div className="text-emerald-600 font-bold">
-                          {currentStrategy.name}: +{payload[0]?.value}%
+                          {currentStrategy?.name || "AI Strategy"}: +{payload[0]?.value}%
                         </div>
                         {compareBenchmark && payload[1] && (
                           <div className="text-blue-600 font-semibold mt-0.5">
@@ -1026,7 +1051,7 @@ export function AgentTab({
                 height={36}
                 formatter={(value) => (
                   <span className="text-xs font-bold text-slate-700">
-                    {value === "strategy" ? `${currentStrategy.name} (Stake AI)` : "S&P 500 Index (SPY Benchmark)"}
+                    {value === "strategy" ? `${currentStrategy?.name || "Stake AI"} (Stake AI)` : "S&P 500 Index (SPY Benchmark)"}
                   </span>
                 )}
               />
@@ -1055,7 +1080,7 @@ export function AgentTab({
       </div>
 
       {/* =========================================================
-          5. LIVE RADAR SIGNALS & REVERT AUDIT LOG
+          SECTION 3 & 4: LIVE RADAR SIGNALS & REVERT AUDIT LOG
          ========================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
         {/* Left 7 Columns: Live Quantitative Market Radar */}
@@ -1063,9 +1088,14 @@ export function AgentTab({
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <BrainCircuit size={17} className="text-emerald-600" />
-              <h2 className="text-sm font-bold text-slate-900">
-                Live Quantitative Market Radar
-              </h2>
+              <div>
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block font-mono">
+                  SECTION 3 · RADAR SCANNER
+                </span>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Live Quantitative Market Radar
+                </h2>
+              </div>
             </div>
             <span className="text-xs font-semibold text-slate-500">
               {strongSignals.length} Active Signals
@@ -1116,9 +1146,14 @@ export function AgentTab({
             <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Activity size={16} className="text-emerald-600" />
-                <h2 className="text-sm font-bold text-slate-900">
-                  Live Execution Audit Trail
-                </h2>
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block font-mono">
+                    SECTION 4 · AUDIT TRAIL
+                  </span>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Live Execution Audit Trail
+                  </h2>
+                </div>
               </div>
               <span className="text-xs font-semibold text-slate-500">
                 {actions.length} logs

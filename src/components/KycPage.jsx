@@ -9,7 +9,6 @@ import {
   ArrowLeft,
   Briefcase,
   Shield,
-  Dices,
   Lock,
   Edit3,
   Sparkles,
@@ -57,37 +56,34 @@ export function KycPage({
     setValidationError("");
   };
 
-  // Populate random demo identity on demand
+  // Populate random demo identity on demand, preserving any existing name entered by user
   const handleGenerateRandomDemo = () => {
-    const firstNames = ["Alex", "Jordan", "Morgan", "Taylor", "Sam", "Chris", "Pat", "Riley"];
-    const lastNames = ["Chen", "Vance", "Kowalski", "Miller", "Dubois", "Smith", "Zhang", "Nakamoto"];
-    const randomFirst = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const randomLast = lastNames[Math.floor(Math.random() * lastNames.length)];
     const randomYear = Math.floor(1980 + Math.random() * 22);
     const randomMonth = String(Math.floor(1 + Math.random() * 12)).padStart(2, "0");
     const randomDay = String(Math.floor(1 + Math.random() * 28)).padStart(2, "0");
 
-    setFormData({
-      fullName: `${randomFirst} ${randomLast}`,
-      dob: `${randomYear}-${randomMonth}-${randomDay}`,
-      nationality: "United States",
-      phoneNumber: `+1 (555) ${Math.floor(100 + Math.random() * 899)}-${Math.floor(1000 + Math.random() * 8999)}`,
-      taxId: `XXX-XX-${Math.floor(1000 + Math.random() * 8999)}`,
-      address: `${Math.floor(100 + Math.random() * 899)} Wall Street, New York, NY 10005`,
-      documentType: "PASSPORT",
-      documentNumber: `US-${Math.floor(10000000 + Math.random() * 89999999)}`,
-      frontDocName: "passport_identity_scan.pdf",
-      backDocName: "passport_back_cover.pdf",
+    setFormData((prev) => ({
+      ...prev,
+      fullName: prev.fullName?.trim() || user?.name?.trim() || "Rikesh Adhikari",
+      dob: prev.dob || `${randomYear}-${randomMonth}-${randomDay}`,
+      nationality: prev.nationality?.trim() || "United States",
+      phoneNumber: prev.phoneNumber?.trim() || `+1 (555) ${Math.floor(100 + Math.random() * 899)}-${Math.floor(1000 + Math.random() * 8999)}`,
+      taxId: prev.taxId?.trim() || `XXX-XX-${Math.floor(1000 + Math.random() * 8999)}`,
+      address: prev.address?.trim() || `${Math.floor(100 + Math.random() * 899)} Wall Street, New York, NY 10005`,
+      documentType: prev.documentType || "PASSPORT",
+      documentNumber: prev.documentNumber?.trim() || `US-${Math.floor(10000000 + Math.random() * 89999999)}`,
+      frontDocName: prev.frontDocName || "passport_identity_scan.pdf",
+      backDocName: prev.backDocName || "passport_back_cover.pdf",
       selfieConfirmed: true,
-      employment: "Full-Time Employed",
-      occupation: "Quantitative Analyst / Developer",
-      annualIncome: "$100,000 - $250,000",
-      netWorth: "$250,000 - $500,000",
-      investmentGoal: "Long-term Capital Growth & Equities",
-      riskTolerance: "Moderate to Aggressive Growth",
-    });
+      employment: prev.employment || "Full-Time Employed",
+      occupation: prev.occupation?.trim() || "Quantitative Analyst / Developer",
+      annualIncome: prev.annualIncome || "$100,000 - $250,000",
+      netWorth: prev.netWorth || "$250,000 - $500,000",
+      investmentGoal: prev.investmentGoal || "Long-term Capital Growth & Equities",
+      riskTolerance: prev.riskTolerance || "Moderate to Aggressive Growth",
+    }));
     setValidationError("");
-    if (showToast) showToast("Populated Demo Account identity details!");
+    if (showToast) showToast("Populated Demo verification details!");
   };
 
   const validateStep = (s) => {
@@ -1069,30 +1065,6 @@ export function KycPage({
                 <span>{validationError}</span>
               </div>
             )}
-
-            {/* Small Demo Account button next to Next Step */}
-            <button
-              type="button"
-              id="kyc-footer-demo-btn"
-              onClick={handleGenerateRandomDemo}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "8px 12px",
-                borderRadius: 10,
-                border: "1px solid rgba(16, 185, 129, 0.35)",
-                background: "rgba(16, 185, 129, 0.1)",
-                color: "#059669",
-                fontSize: 12.5,
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-              title="Populate random demo account identity"
-            >
-              <Dices size={14} />
-              <span>Demo Account</span>
-            </button>
 
             {step < 4 ? (
               <button

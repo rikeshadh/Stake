@@ -111,6 +111,61 @@ export async function deletePriceAlert(alertId, email) {
   }
 }
 
+export function getStoredAuthToken() {
+  try {
+    return localStorage.getItem("stake_auth_token") || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredAuthToken(token) {
+  try {
+    if (token) {
+      localStorage.setItem("stake_auth_token", token);
+    } else {
+      localStorage.removeItem("stake_auth_token");
+    }
+  } catch (e) {
+    console.warn("Storage error:", e);
+  }
+}
+
+export function getStoredUser() {
+  try {
+    const raw = localStorage.getItem("stake_active_user");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && parsed.email ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearAuthSession() {
+  try {
+    localStorage.removeItem("stake_auth_token");
+    localStorage.removeItem("stake_active_user");
+  } catch (e) {
+    console.warn("Storage clear error:", e);
+  }
+}
+
+export async function verifyAuthToken(email) {
+  try {
+    const token = getStoredAuthToken();
+    const query = email ? `?email=${encodeURIComponent(email)}` : "";
+    const res = await fetch(`/api/auth/me${query}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("Session expired");
+    const data = await res.json();
+    return data.user || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function registerUser({ email, name, username, password, strategy }) {
   const res = await fetch("/api/auth/register", {
     method: "POST",
@@ -120,6 +175,16 @@ export async function registerUser({ email, name, username, password, strategy }
   const data = await res.json();
   if (!res.ok || !data.success) {
     throw new Error(data.message || "Registration failed. Please try again.");
+  }
+  if (data.token) {
+    setStoredAuthToken(data.token);
+  }
+  if (data.user) {
+    try {
+      localStorage.setItem("stake_active_user", JSON.stringify(data.user));
+    } catch (e) {
+      console.warn("User storage error:", e);
+    }
   }
   return data;
 }
@@ -133,6 +198,16 @@ export async function loginUser(email, password = "") {
   const data = await res.json();
   if (!res.ok || !data.success) {
     throw new Error(data.message || "Login failed. Please check your credentials.");
+  }
+  if (data.token) {
+    setStoredAuthToken(data.token);
+  }
+  if (data.user) {
+    try {
+      localStorage.setItem("stake_active_user", JSON.stringify(data.user));
+    } catch (e) {
+      console.warn("User storage error:", e);
+    }
   }
   return data;
 }

@@ -5,6 +5,28 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Stake AI - Autonomous Institutional Equities</title>
+    <script>
+      // Suppress benign Vite WebSocket disconnect errors in sandboxed preview iframe
+      window.addEventListener('unhandledrejection', function(event) {
+        if (event && event.reason && (
+          String(event.reason).includes('WebSocket') ||
+          String(event.reason.message || '').includes('WebSocket') ||
+          String(event.reason).includes('failed to connect to websocket')
+        )) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      });
+      window.addEventListener('error', function(event) {
+        if (event && (
+          String(event.message || '').includes('WebSocket') ||
+          String(event.message || '').includes('failed to connect to websocket')
+        )) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      });
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

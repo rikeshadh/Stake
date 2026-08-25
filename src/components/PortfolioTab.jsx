@@ -312,7 +312,7 @@ export function PortfolioTab({
                         cursor: "pointer",
                       }}
                     >
-                      Buy +
+                      Buy
                     </button>
                     <button
                       onClick={() => {

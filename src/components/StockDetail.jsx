@@ -18,9 +18,10 @@ import {
   Globe,
 } from "lucide-react";
 import { CandlestickChart } from "./Charts";
+import { RechartsStockTrend } from "./RechartsStockTrend";
 import { SetAlertModal } from "./SetAlertModal";
 import { fetchYFinanceQuote, fetchYFinanceChart } from "../api";
-import { fmt, fmtShares, initials } from "../utils";
+import { fmt, fmtShares, initials, formatStockPrice, formatMoney, getCurrencySymbol } from "../utils";
 
 const RANGES = ["1D", "1W", "1M", "3M", "1Y", "ALL"];
 
@@ -37,10 +38,11 @@ export function StockDetail({
   dayChange,
   darkMode = false,
   onSaveAlert,
+  currency = "USD",
 }) {
-  const [chartType, setChartType] = useState("line");
+  const [chartType, setChartType] = useState("recharts"); // "recharts" | "candlestick" | "line"
   const [showVolume, setShowVolume] = useState(false);
-  const [range, setRange] = useState("ALL");
+  const [range, setRange] = useState("1M");
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [liveQuote, setLiveQuote] = useState(null);
   const [liveHistory, setLiveHistory] = useState(null);
@@ -91,7 +93,6 @@ export function StockDetail({
   const currentPrice = liveQuote?.price || stockData.price;
   const chg = liveQuote?.changePercent ? liveQuote.changePercent / 100 : dayChange(selected);
   const isUp = chg >= 0;
-  const currency = stockData?.currency || liveQuote?.currency || "$";
   const userHolding = holdings[selected];
   const hasPosition = userHolding && userHolding.shares > 0.0001;
 
@@ -240,7 +241,7 @@ export function StockDetail({
 
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 32, fontWeight: 900, fontFamily: "'JetBrains Mono', monospace", color: textPrimary }}>
-            {currency} {fmt(currentPrice)}
+            {formatStockPrice(currentPrice, currency)}
           </div>
           <div
             style={{
@@ -261,7 +262,7 @@ export function StockDetail({
         </div>
       </div>
 
-      {/* 1. FULL WIDTH STOCK CANDLESTICK & VOLUME CHART */}
+      {/* 1. FULL WIDTH STOCK TREND & CANDLESTICK CHART (Recharts Integrated) */}
       <div
         style={{
           width: "100%",
@@ -276,11 +277,12 @@ export function StockDetail({
       >
         {/* Chart Header Controls */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
-          {/* Chart Type & Volume Toggle Group */}
+          {/* Chart Type Toggle Group */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 4, background: darkMode ? "#1a2520" : "rgba(0,0,0,0.04)", padding: 3, borderRadius: 10 }}>
               <button
-                onClick={() => setChartType("line")}
+                id="stock-chart-type-recharts"
+                onClick={() => setChartType("recharts")}
                 style={{
                   padding: "6px 14px",
                   borderRadius: 8,
@@ -288,18 +290,19 @@ export function StockDetail({
                   cursor: "pointer",
                   fontSize: 12.5,
                   fontWeight: 700,
-                  background: chartType === "line" ? "#006c49" : "transparent",
-                  color: chartType === "line" ? "#ffffff" : textSecondary,
+                  background: chartType === "recharts" ? "#006c49" : "transparent",
+                  color: chartType === "recharts" ? "#ffffff" : textSecondary,
                   transition: "all 0.15s ease",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
                 }}
               >
-                <LineChart size={14} /> Smooth Line
+                <TrendingUp size={14} /> Recharts Trend
               </button>
 
               <button
+                id="stock-chart-type-candlestick"
                 onClick={() => setChartType("candlestick")}
                 style={{
                   padding: "6px 14px",
@@ -318,80 +321,118 @@ export function StockDetail({
               >
                 <BarChart2 size={14} /> Candlesticks
               </button>
-            </div>
 
-            {/* Small Tick to Enable Volume Bars */}
-            <button
-              onClick={() => setShowVolume(!showVolume)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 12px",
-                borderRadius: 9,
-                border: `1px solid ${showVolume ? "#10b981" : borderCol}`,
-                background: showVolume ? (darkMode ? "rgba(16,185,129,0.14)" : "#f0fdf4") : "transparent",
-                color: showVolume ? "#10b981" : textSecondary,
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <div
+              <button
+                id="stock-chart-type-line"
+                onClick={() => setChartType("line")}
                 style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: 3,
-                  border: `1.5px solid ${showVolume ? "#10b981" : textSecondary}`,
-                  background: showVolume ? "#10b981" : "transparent",
-                  display: "flex",
+                  padding: "6px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  background: chartType === "line" ? "#006c49" : "transparent",
+                  color: chartType === "line" ? "#ffffff" : textSecondary,
+                  transition: "all 0.15s ease",
+                  display: "inline-flex",
                   alignItems: "center",
-                  justifyContent: "center",
+                  gap: 6,
                 }}
               >
-                {showVolume && <Check size={11} color="#ffffff" strokeWidth={3.5} />}
-              </div>
-              <span>Volume bars</span>
-            </button>
-          </div>
+                <LineChart size={14} /> Classic Line
+              </button>
+            </div>
 
-          {/* Timeframe Selector Moved Here */}
-          <div style={{ display: "flex", gap: 4, background: darkMode ? "#1a2520" : "rgba(0,0,0,0.04)", padding: 3, borderRadius: 10 }}>
-            {RANGES.map((r) => (
+            {/* Volume Toggle for Candlestick/Classic */}
+            {chartType !== "recharts" && (
               <button
-                key={r}
-                onClick={() => setRange(r)}
+                onClick={() => setShowVolume(!showVolume)}
                 style={{
-                  padding: "5px 12px",
-                  borderRadius: 8,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 12px",
+                  borderRadius: 9,
+                  border: `1px solid ${showVolume ? "#10b981" : borderCol}`,
+                  background: showVolume ? (darkMode ? "rgba(16,185,129,0.14)" : "#f0fdf4") : "transparent",
+                  color: showVolume ? "#10b981" : textSecondary,
                   fontSize: 12,
+                  fontWeight: 700,
                   cursor: "pointer",
-                  fontWeight: range === r ? 800 : 600,
-                  border: "none",
-                  background: range === r ? "#006c49" : "transparent",
-                  color: range === r ? "#ffffff" : textSecondary,
                   transition: "all 0.15s ease",
                 }}
               >
-                {r}
+                <div
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 3,
+                    border: `1.5px solid ${showVolume ? "#10b981" : textSecondary}`,
+                    background: showVolume ? "#10b981" : "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {showVolume && <Check size={11} color="#ffffff" strokeWidth={3.5} />}
+                </div>
+                <span>Volume bars</span>
               </button>
-            ))}
+            )}
           </div>
+
+          {/* Timeframe Selector for Candlestick / Classic mode */}
+          {chartType !== "recharts" && (
+            <div style={{ display: "flex", gap: 4, background: darkMode ? "#1a2520" : "rgba(0,0,0,0.04)", padding: 3, borderRadius: 10 }}>
+              {RANGES.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRange(r)}
+                  style={{
+                    padding: "5px 12px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    fontWeight: range === r ? 800 : 600,
+                    border: "none",
+                    background: range === r ? "#006c49" : "transparent",
+                    color: range === r ? "#ffffff" : textSecondary,
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* The Full Width Interactive Chart with Synchronized Volume Bar Chart */}
+        {/* The Recharts Interactive Trend Line Component (Primary) or Candlestick Chart */}
         <div style={{ width: "100%", marginTop: 8 }}>
-          <CandlestickChart
-            history={chartDataHistory}
-            candles={liveCandles}
-            height={320}
-            currency={currency}
-            darkMode={darkMode}
-            showVolume={showVolume}
-            chartType={chartType}
-            onChartTypeChange={setChartType}
-          />
+          {chartType === "recharts" ? (
+            <RechartsStockTrend
+              ticker={selected}
+              basePrice={currentPrice}
+              currency={currency}
+              liveQuote={liveQuote}
+              liveHistory={liveHistory}
+              liveCandles={liveCandles}
+              height={340}
+              darkMode={darkMode}
+            />
+          ) : (
+            <CandlestickChart
+              history={chartDataHistory}
+              candles={liveCandles}
+              height={320}
+              currency={currency}
+              darkMode={darkMode}
+              showVolume={showVolume}
+              chartType={chartType}
+              onChartTypeChange={setChartType}
+            />
+          )}
         </div>
       </div>
 
@@ -470,7 +511,7 @@ export function StockDetail({
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, fontSize: 12, color: textSecondary, fontWeight: 600 }}>
-              <span>Available Cash: {currency} {fmt(cashBalance)}</span>
+              <span>Available Cash: {formatMoney(cashBalance, currency)}</span>
               <span>Holding: {hasPosition ? fmtShares(userHolding.shares) : "0"} Shares</span>
             </div>
           </div>
@@ -504,7 +545,7 @@ export function StockDetail({
               <div style={{ background: bgItem, padding: "10px 12px", borderRadius: 12 }}>
                 <div style={{ fontSize: 11, color: textSecondary, fontWeight: 600 }}>VALUE</div>
                 <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4, color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>
-                  {currency} {fmt(userHolding.shares * currentPrice)}
+                  {formatMoney(userHolding.shares * currentPrice, currency)}
                 </div>
               </div>
               <div style={{ background: bgItem, padding: "10px 12px", borderRadius: 12 }}>
@@ -519,14 +560,14 @@ export function StockDetail({
                   }}
                 >
                   {userHolding.shares * currentPrice - userHolding.costBasis >= 0 ? "+" : ""}
-                  {currency} {fmt(userHolding.shares * currentPrice - userHolding.costBasis)}
+                  {formatMoney(userHolding.shares * currentPrice - userHolding.costBasis, currency)}
                 </div>
               </div>
             </div>
 
             <div style={{ borderTop: `1px solid ${borderCol}`, marginTop: 14, paddingTop: 10, display: "flex", justifyContent: "space-between", fontSize: 12.5, color: textSecondary }}>
-              <span>Avg Cost: {currency} {fmt(userHolding.costBasis / userHolding.shares)}</span>
-              <span>Total Cost Basis: {currency} {fmt(userHolding.costBasis)}</span>
+              <span>Avg Cost: {formatStockPrice(userHolding.costBasis / userHolding.shares, currency)}</span>
+              <span>Total Cost Basis: {formatMoney(userHolding.costBasis, currency)}</span>
             </div>
           </div>
         ) : (
@@ -562,7 +603,7 @@ export function StockDetail({
         const pct52 = Math.min(100, Math.max(0, ((currentPrice - low52) / range52Diff) * 100));
         const distFrom52High = ((currentPrice - high52) / high52) * 100;
         const peRatio = liveQuote?.pe || stockMeta.pe || 24.5;
-        const mcapDisplay = stockMeta.mcap || liveQuote?.mcap || `${currency} 348.81 B`;
+        const mcapDisplay = stockMeta.mcap || liveQuote?.mcap || `${getCurrencySymbol(currency)} 348.81 B`;
         const epsVal = liveQuote?.eps ? Number(liveQuote.eps) : Number((currentPrice / (peRatio || 25)).toFixed(2));
         const bookVal = Number((currentPrice * 0.32).toFixed(2));
         const pbRatio = (currentPrice / Math.max(0.01, bookVal)).toFixed(2);
@@ -573,7 +614,7 @@ export function StockDetail({
         const volDisplay = liveQuote?.volume
           ? (liveQuote.volume > 1e6 ? `${(liveQuote.volume / 1e6).toFixed(2)}M Shares` : `${(liveQuote.volume / 1e3).toFixed(1)}K Shares`)
           : "24.8M Shares";
-        const turnoverDisplay = liveQuote?.turnover || `${currency} ${fmt(currentPrice * (liveQuote?.volume || 24800000))}`;
+        const turnoverDisplay = liveQuote?.turnover || formatMoney(currentPrice * (liveQuote?.volume || 24800000), currency);
 
         return (
           <div
@@ -725,8 +766,8 @@ export function StockDetail({
                   <Activity size={15} color="#10b981" />
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 800, color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>
-                  <span>{currency} {fmt(low52)}</span>
-                  <span>{currency} {fmt(high52)}</span>
+                  <span>{formatStockPrice(low52, currency)}</span>
+                  <span>{formatStockPrice(high52, currency)}</span>
                 </div>
                 {/* Range progress track */}
                 <div style={{ width: "100%", height: 6, borderRadius: 99, background: darkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)", marginTop: 8, position: "relative" }}>
@@ -783,12 +824,12 @@ export function StockDetail({
                   <Layers size={15} color="#10b981" />
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 900, color: textPrimary, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.02em" }}>
-                  {currency} {fmt(epsVal, 2)}
+                  {formatStockPrice(epsVal, currency, 2)}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 11.5, color: textSecondary, fontWeight: 600 }}>
                   <span>P/B Ratio: <strong style={{ color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>{pbRatio}x</strong></span>
                   <span>•</span>
-                  <span>Book Val: <strong style={{ color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>{currency} {fmt(bookVal, 2)}</strong></span>
+                  <span>Book Val: <strong style={{ color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>{formatStockPrice(bookVal, currency, 2)}</strong></span>
                 </div>
               </div>
             </div>
@@ -808,9 +849,9 @@ export function StockDetail({
                     { label: "Market Capitalization", value: mcapDisplay },
                     { label: "P/E Ratio (TTM)", value: `${Number(peRatio).toFixed(2)}x` },
                     { label: "Forward P/E", value: `${(Number(peRatio) * 0.88).toFixed(2)}x` },
-                    { label: "EPS (Trailing 12M)", value: `${currency} ${fmt(epsVal, 2)}` },
+                    { label: "EPS (Trailing 12M)", value: formatStockPrice(epsVal, currency, 2) },
                     { label: "Price to Book (P/B)", value: `${pbRatio}x` },
-                    { label: "Book Value Per Share", value: `${currency} ${fmt(bookVal, 2)}` },
+                    { label: "Book Value Per Share", value: formatStockPrice(bookVal, currency, 2) },
                     { label: "Dividend Yield", value: stockMeta.dividendYield ? `${stockMeta.dividendYield}%` : "1.65%" },
                   ].map((row, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5 }}>
@@ -831,13 +872,13 @@ export function StockDetail({
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {[
-                    { label: "52-Week High", value: `${currency} ${fmt(high52)}`, highlight: "#10b981" },
-                    { label: "52-Week Low", value: `${currency} ${fmt(low52)}`, highlight: "#ef4444" },
-                    { label: "Today's High / Low", value: `${currency} ${fmt(dayHigh)} / ${fmt(dayLow)}` },
-                    { label: "Open Price", value: `${currency} ${fmt(openVal)}` },
-                    { label: "Previous Close", value: `${currency} ${fmt(prevCloseVal)}` },
-                    { label: "50-Day Moving Avg", value: `${currency} ${fmt(currentPrice * 0.96)}` },
-                    { label: "200-Day Moving Avg", value: `${currency} ${fmt(currentPrice * 0.91)}` },
+                    { label: "52-Week High", value: formatStockPrice(high52, currency), highlight: "#10b981" },
+                    { label: "52-Week Low", value: formatStockPrice(low52, currency), highlight: "#ef4444" },
+                    { label: "Today's High / Low", value: `${formatStockPrice(dayHigh, currency)} / ${formatStockPrice(dayLow, currency)}` },
+                    { label: "Open Price", value: formatStockPrice(openVal, currency) },
+                    { label: "Previous Close", value: formatStockPrice(prevCloseVal, currency) },
+                    { label: "50-Day Moving Avg", value: formatStockPrice(currentPrice * 0.96, currency) },
+                    { label: "200-Day Moving Avg", value: formatStockPrice(currentPrice * 0.91, currency) },
                   ].map((row, i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5 }}>
                       <span style={{ color: textSecondary, fontWeight: 600 }}>{row.label}</span>

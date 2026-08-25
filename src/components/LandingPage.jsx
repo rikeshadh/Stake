@@ -5,6 +5,7 @@ import {
   TrendingUp,
   TrendingDown,
   ChevronRight,
+  ChevronDown,
   Shield,
   HelpCircle,
   X,
@@ -96,6 +97,7 @@ export function LandingPage({
           {/* Right Action Buttons */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button
+              id="landing-header-login-btn"
               onClick={handleOpenLogin}
               style={{
                 padding: "8px 22px",
@@ -114,6 +116,7 @@ export function LandingPage({
             </button>
 
             <button
+              id="landing-header-signup-btn"
               onClick={handleOpenSignup}
               style={{
                 padding: "8px 22px",
@@ -134,54 +137,6 @@ export function LandingPage({
           </div>
         </header>
 
-        {/* Floating Card: Top-Left (COIN) */}
-        <div className="stock-hero-card top-left">
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", fontFamily: "var(--font-mono)" }}>COIN</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#ffffff", margin: "4px 0 8px", fontFamily: "var(--font-mono)" }}>$276.46</div>
-          <svg width="100%" height="24" viewBox="0 0 100 24" fill="none">
-            <path d="M0 20 L25 18 L50 14 L75 8 L100 2" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#34d399", marginTop: 4, fontFamily: "var(--font-mono)" }}>
-            ▲ +4.2%
-          </div>
-        </div>
-
-        {/* Floating Card: Top-Right (TSLA) */}
-        <div className="stock-hero-card top-right">
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", fontFamily: "var(--font-mono)" }}>TSLA</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#ffffff", margin: "4px 0 8px", fontFamily: "var(--font-mono)" }}>$248.50</div>
-          <svg width="100%" height="24" viewBox="0 0 100 24" fill="none">
-            <path d="M0 8 L25 12 L50 9 L75 16 L100 14" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#f87171", marginTop: 4, fontFamily: "var(--font-mono)" }}>
-            ▼ -1.4%
-          </div>
-        </div>
-
-        {/* Floating Card: Bottom-Left (NVDA) */}
-        <div className="stock-hero-card bottom-left">
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", fontFamily: "var(--font-mono)" }}>NVDA</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#ffffff", margin: "4px 0 8px", fontFamily: "var(--font-mono)" }}>$137.86</div>
-          <svg width="100%" height="24" viewBox="0 0 100 24" fill="none">
-            <path d="M0 18 L30 16 L65 10 L100 6" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#34d399", marginTop: 4, fontFamily: "var(--font-mono)" }}>
-            ▲ +2.1%
-          </div>
-        </div>
-
-        {/* Floating Card: Bottom-Right (AAPL) */}
-        <div className="stock-hero-card bottom-right">
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.06em", fontFamily: "var(--font-mono)" }}>AAPL</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "#ffffff", margin: "4px 0 8px", fontFamily: "var(--font-mono)" }}>$185.92</div>
-          <svg width="100%" height="24" viewBox="0 0 100 24" fill="none">
-            <path d="M0 20 L35 15 L70 14 L100 4" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#34d399", marginTop: 4, fontFamily: "var(--font-mono)" }}>
-            ▲ +1.1%
-          </div>
-        </div>
-
         {/* Hero Centerpiece */}
         <div className="stake-hero-center" style={{ margin: "40px auto 30px" }}>
           <h1 className="stake-hero-title">
@@ -193,23 +148,28 @@ export function LandingPage({
             Trade fractional US shares with zero commissions, real-time Level 2 order books, and autonomous AI agents designed to execute with algorithmic precision.
           </p>
 
-          <div className="stake-hero-actions">
-            <button className="stake-btn-mint" onClick={handleOpenSignup}>
+          <div className="stake-hero-actions" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
+            <button id="hero-start-trading-btn" className="stake-btn-mint" onClick={handleOpenSignup}>
               Start Trading Now <ArrowRight size={17} />
             </button>
-
           </div>
         </div>
 
         {/* Bottom subtle indicator */}
         <div style={{ textAlign: "center", zIndex: 10, paddingBottom: 12 }}>
           <button
-            onClick={handleEnter}
+            id="landing-scroll-explore-btn"
+            onClick={() => {
+              const el = document.getElementById("live-terminal");
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            }}
             style={{
               background: "none",
               border: "none",
-              color: "#64748b",
-              fontSize: 12.5,
+              color: "#94a3b8",
+              fontSize: 13,
               fontWeight: 600,
               cursor: "pointer",
               display: "inline-flex",
@@ -218,8 +178,11 @@ export function LandingPage({
               transition: "color 0.15s ease",
               fontFamily: "var(--font-body)",
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#00e599")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
           >
-            Scroll to explore live terminal & markets <ChevronRight size={14} />
+            <span>Scroll to explore</span>
+            <ChevronDown size={15} />
           </button>
         </div>
       </section>
@@ -229,7 +192,7 @@ export function LandingPage({
           ========================================================================= */}
       <div className="stake-content-section">
         {/* Interactive Live Terminal Card Mockup (Shows Global Market Condition) */}
-        <section style={{ maxWidth: 1240, margin: "0 auto", padding: "56px 24px 40px" }}>
+        <section id="live-terminal" style={{ maxWidth: 1240, margin: "0 auto", padding: "56px 24px 40px", scrollMarginTop: "20px" }}>
           <div
             style={{
               background: "#081510",

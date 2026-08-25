@@ -5,11 +5,13 @@
    ========================================================================== */
 
 .stake-auth-layout {
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
   display: flex;
   width: 100%;
   font-family: var(--font-body);
-  background: #f8fafc;
+  background: #ffffff;
 }
 
 /* Left Hero Column (Dark Green / Atmospheric, Fixed & Non-scrollable) */
@@ -23,9 +25,9 @@
   justify-content: center;
   align-items: center;
   text-align: center;
-  position: sticky;
-  top: 0;
+  position: relative;
   height: 100vh;
+  max-height: 100vh;
   overflow: hidden; /* Restricts all bubbles to this image/hero column only */
   box-sizing: border-box;
   user-select: none;
@@ -33,14 +35,20 @@
 
 @media (max-width: 960px) {
   .stake-auth-layout {
-    flex-direction: column;
+    height: auto;
+    max-height: none;
     min-height: 100vh;
+    overflow-y: auto;
+    flex-direction: column;
   }
   .stake-auth-left {
     display: none;
   }
   .stake-auth-right {
+    height: auto;
+    max-height: none;
     min-height: 100vh;
+    overflow-y: visible;
     padding: 24px 20px 48px;
     justify-content: center;
   }
@@ -371,42 +379,42 @@
 
 /* Specific Placements & Upward Floating Keyframes */
 .pill-pos-top-left {
-  top: 30%;
+  top: 14%;
   left: 6%;
   animation-name: pillFloatUp1;
   animation-delay: 0s;
 }
 
 .pill-pos-top-right {
-  top: 33%;
-  right: 16%;
+  top: 14%;
+  right: 6%;
   animation-name: pillFloatUp2;
   animation-delay: 1.2s;
 }
 
 .pill-pos-mid-left {
-  top: 54%;
-  left: 18%;
+  top: 70%;
+  left: 6%;
   animation-name: pillFloatUp3;
   animation-delay: 0.6s;
 }
 
 .pill-pos-mid-right {
-  top: 55%;
-  right: 12%;
+  top: 70%;
+  right: 6%;
   animation-name: pillFloatUp4;
   animation-delay: 1.8s;
 }
 
 .pill-pos-bot-right {
-  bottom: 24%;
-  right: 8%;
+  bottom: 8%;
+  right: 12%;
   animation-name: pillFloatUp5;
   animation-delay: 2.2s;
 }
 
 .pill-pos-bot-left {
-  bottom: 12%;
+  bottom: 8%;
   left: 12%;
   animation-name: pillFloatUp6;
   animation-delay: 0.9s;
@@ -414,37 +422,37 @@
 
 @keyframes pillFloatUp1 {
   0% { transform: translateY(0px) scale(1); }
-  50% { transform: translateY(-22px) scale(1.02); }
+  50% { transform: translateY(-18px) scale(1.02); }
   100% { transform: translateY(0px) scale(1); }
 }
 
 @keyframes pillFloatUp2 {
   0% { transform: translateY(0px) scale(1); }
-  50% { transform: translateY(-26px) scale(1.03); }
+  50% { transform: translateY(-20px) scale(1.03); }
   100% { transform: translateY(0px) scale(1); }
 }
 
 @keyframes pillFloatUp3 {
   0% { transform: translateY(0px) scale(1); }
-  50% { transform: translateY(-20px) scale(0.99); }
+  50% { transform: translateY(-18px) scale(0.99); }
   100% { transform: translateY(0px) scale(1); }
 }
 
 @keyframes pillFloatUp4 {
   0% { transform: translateY(0px) scale(1); }
-  50% { transform: translateY(-24px) scale(1.03); }
+  50% { transform: translateY(-20px) scale(1.03); }
   100% { transform: translateY(0px) scale(1); }
 }
 
 @keyframes pillFloatUp5 {
   0% { transform: translateY(0px) scale(1); }
-  50% { transform: translateY(-28px) scale(1.02); }
+  50% { transform: translateY(-22px) scale(1.02); }
   100% { transform: translateY(0px) scale(1); }
 }
 
 @keyframes pillFloatUp6 {
   0% { transform: translateY(0px) scale(1); }
-  50% { transform: translateY(-22px) scale(1.01); }
+  50% { transform: translateY(-18px) scale(1.01); }
   100% { transform: translateY(0px) scale(1); }
 }
 
@@ -489,11 +497,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 36px 32px;
+  padding: 36px 32px 48px;
   box-sizing: border-box;
   overflow-y: auto;
-  min-height: 100vh;
+  overflow-x: hidden;
+  height: 100vh;
+  max-height: 100vh;
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 .stake-auth-right::-webkit-scrollbar {
@@ -711,9 +722,45 @@
 }
 
 .stake-submit-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.7;
   cursor: not-allowed;
   transform: none;
+}
+
+.stake-btn-spinner {
+  animation: stakeBtnSpin 0.75s linear infinite;
+}
+
+@keyframes stakeBtnSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Subtle shake animation for form feedback on error */
+@keyframes stakeInputShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  15%, 45%, 75% {
+    transform: translateX(-6px);
+  }
+  30%, 60%, 90% {
+    transform: translateX(6px);
+  }
+}
+
+.stake-form-shake .stake-input-wrapper {
+  animation: stakeInputShake 0.45s ease-in-out;
+}
+
+.stake-form-shake .stake-input {
+  animation: stakeInputShake 0.45s ease-in-out;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
 }
 
 /* Error and Success Banners */

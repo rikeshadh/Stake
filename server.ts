@@ -338,7 +338,7 @@ const userSchema = new mongoose.Schema({
   currency: { type: String, default: "USD" },
   cash: { type: Number, default: 50000 },
   holdings: { type: mongoose.Schema.Types.Mixed, default: {} },
-  watchlist: { type: [String], default: ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "GOOGL", "META", "COIN"] },
+  watchlist: { type: [String], default: [] },
   agentEnabled: { type: Boolean, default: false },
   agentDeployedCapital: { type: Number, default: 0 },
   agentMaxSpend: { type: Number, default: 500 },
@@ -703,7 +703,7 @@ app.post("/api/auth/register", async (req, res) => {
     agentEnabled: false,
     agentDeployedCapital: 0,
     agentMaxSpend: 500,
-    agentStrategy: (req.body.strategy || "dip_buyer").trim(),
+    agentStrategy: (req.body.strategy || "").trim(),
     privacyMode: false,
     kycStatus: "UNVERIFIED",
     kycData: {},
@@ -722,7 +722,8 @@ app.post("/api/auth/register", async (req, res) => {
       const safeUser = created.toObject();
       delete safeUser.passwordHash;
       delete safeUser.passwordSalt;
-      return res.json({ success: true, user: safeUser });
+      const token = `stk_auth_${crypto.randomBytes(24).toString("hex")}`;
+      return res.json({ success: true, token, user: safeUser });
     } catch (e: any) {
       console.error("Register error:", e);
       return res.status(500).json({ success: false, message: e.message || "Failed to create user account" });
@@ -737,7 +738,8 @@ app.post("/api/auth/register", async (req, res) => {
   const safeUser = { ...newUser };
   delete safeUser.passwordHash;
   delete safeUser.passwordSalt;
-  return res.json({ success: true, user: safeUser });
+  const token = `stk_auth_${crypto.randomBytes(24).toString("hex")}`;
+  return res.json({ success: true, token, user: safeUser });
 });
 
 app.post("/api/auth/login", async (req, res) => {
@@ -782,7 +784,8 @@ app.post("/api/auth/login", async (req, res) => {
       const safeUser = user.toObject ? user.toObject() : { ...user };
       delete safeUser.passwordHash;
       delete safeUser.passwordSalt;
-      return res.json({ success: true, user: safeUser });
+      const token = `stk_auth_${crypto.randomBytes(24).toString("hex")}`;
+      return res.json({ success: true, token, user: safeUser });
     } catch (e: any) {
       console.error("Mongo login error:", e);
     }
@@ -814,6 +817,27 @@ app.post("/api/auth/login", async (req, res) => {
   const safeUser = { ...user };
   delete safeUser.passwordHash;
   delete safeUser.passwordSalt;
+  const token = `stk_auth_${crypto.randomBytes(24).toString("hex")}`;
+  return res.json({ success: true, token, user: safeUser });
+});
+
+// GET /api/auth/me - Verify stored token and retrieve current user session
+app.get("/api/auth/me", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const emailParam = (req.query.email as string || "").toLowerCase().trim();
+  
+  if (!authHeader && !emailParam) {
+    return res.status(401).json({ success: false, message: "No authorization token provided" });
+  }
+
+  const user = await getUserRecord(emailParam || "trader@stake.com");
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+
+  const safeUser = { ...user };
+  delete (safeUser as any).passwordHash;
+  delete (safeUser as any).passwordSalt;
   return res.json({ success: true, user: safeUser });
 });
 
@@ -1533,7 +1557,7 @@ app.get("/api/agent/signals", async (req, res) => {
 // 2. GET /api/agent/actions - Retrieve audit trail of agent actions
 app.get("/api/agent/actions", async (req, res) => {
   const email = ((req.query.email || req.query.userId || "trader@stake.com") as string).toLowerCase().trim();
-  const actions = globalAgentActions.filter((a) => a.userEmail === email || !a.userEmail || a.userEmail === "trader@stake.com");
+  const actions = globalAgentActions.filter((a) => a.userEmail === email);
   return res.json({ success: true, actions });
 });
 

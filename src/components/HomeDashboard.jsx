@@ -13,13 +13,8 @@ import {
   ChevronRight,
   Zap,
   Sparkles,
-  CheckCircle2,
-  HelpCircle,
-  Layers,
-  Bot,
 } from "lucide-react";
 import { Sparkline } from "./Charts";
-import { TooltipBadge } from "./TooltipBadge";
 import { fmt, fmtShares, initials, formatMoney } from "../utils";
 
 export function HomeDashboard({
@@ -134,10 +129,6 @@ export function HomeDashboard({
                   <h3 style={{ fontSize: 16, fontWeight: 800, color: textPrimary, margin: 0 }}>
                     {isNewAccount ? "New Account Setup & Quick-Start Guide" : "Stake Trading Tips & System Overview"}
                   </h3>
-                  <TooltipBadge
-                    title="Account Guidance"
-                    text="Hover or tap on any (?) tooltip across Stake to learn about financial metrics, fractional execution, and automated AI trading."
-                  />
                 </div>
                 <p style={{ fontSize: 12.5, color: textSecondary, margin: "2px 0 0" }}>
                   Follow these 4 essential steps to start investing in US fractional equities.
@@ -163,7 +154,7 @@ export function HomeDashboard({
             </button>
           </div>
 
-          {/* 4 Interactive Step Cards with Tooltips */}
+          {/* 4 Interactive Step Cards */}
           <div
             style={{
               display: "grid",
@@ -187,10 +178,6 @@ export function HomeDashboard({
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>STEP 1</span>
-                  <TooltipBadge
-                    title="Identity & Compliance"
-                    text="SEC & FINRA compliant verification. Takes under 2 minutes and unlocks bank linking, wire deposits, and instantaneous trade clearing."
-                  />
                 </div>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: textPrimary, marginTop: 3 }}>
                   Verify Identity
@@ -233,10 +220,6 @@ export function HomeDashboard({
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>STEP 2</span>
-                  <TooltipBadge
-                    title="Wallet & Purchasing Power"
-                    text="Deposit cash instantly via zero-fee ACH bank transfer, Debit Card, or Wire. Demo mode includes $50,000 in paper trading capital."
-                  />
                 </div>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: textPrimary, marginTop: 3 }}>
                   Fund Wallet
@@ -279,10 +262,6 @@ export function HomeDashboard({
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>STEP 3</span>
-                  <TooltipBadge
-                    title="Fractional Share Orders"
-                    text="Trade 9,500+ US stocks and ETFs starting from $1.00 or 0.0001 shares with zero commission and real-time Level 2 order book execution."
-                  />
                 </div>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: textPrimary, marginTop: 3 }}>
                   Buy Equities
@@ -325,10 +304,6 @@ export function HomeDashboard({
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>STEP 4</span>
-                  <TooltipBadge
-                    title="Autonomous Algorithmic Agent"
-                    text="Activate autonomous quantitative strategies powered by RSI, MACD, and Gemini news sentiment analysis to automatically trade 24/7."
-                  />
                 </div>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: textPrimary, marginTop: 3 }}>
                   Automate with AI
@@ -386,10 +361,6 @@ export function HomeDashboard({
                 <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#059669", fontFamily: "'JetBrains Mono', monospace" }}>
                   PORTFOLIO OVERVIEW
                 </span>
-                <TooltipBadge
-                  title="Net Consolidated Wealth"
-                  text="Total combined valuation of all settled wallet cash plus current market equity values."
-                />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <button
@@ -462,10 +433,6 @@ export function HomeDashboard({
                 <span>
                   {totalReturn >= 0 ? "+" : ""}{formatMoney(totalReturn, currency)} ({totalReturn >= 0 ? "+" : ""}{fmt(totalReturnPct)}%) Total Return
                 </span>
-                <TooltipBadge
-                  title="Total Unrealized P&L"
-                  text="Profit or loss relative to total purchase cost basis of current stock holdings."
-                />
               </div>
             )}
           </div>
@@ -484,10 +451,6 @@ export function HomeDashboard({
             <div style={{ background: bgRow, padding: "10px 14px", borderRadius: 12, border: `1px solid ${borderCol}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 11, color: textSecondary, fontWeight: 600 }}>AVAILABLE WALLET</span>
-                <TooltipBadge
-                  title="Purchasing Power"
-                  text="Unencumbered settled cash ready for immediate stock purchases."
-                />
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: textPrimary, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
                 {privacyMode ? "••••••••" : formatMoney(cashBalance, currency)}
@@ -497,10 +460,6 @@ export function HomeDashboard({
             <div style={{ background: bgRow, padding: "10px 14px", borderRadius: 12, border: `1px solid ${borderCol}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 11, color: textSecondary, fontWeight: 600 }}>EQUITIES HOLDINGS</span>
-                <TooltipBadge
-                  title="Equities Valuation"
-                  text="Aggregate mark-to-market valuation of active stock positions."
-                />
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: textPrimary, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
                 {privacyMode ? "••••••••" : formatMoney(totalStockValue, currency)}
@@ -573,10 +532,6 @@ export function HomeDashboard({
                 <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#059669", fontFamily: "'JetBrains Mono', monospace" }}>
                   BENCHMARK INDICES
                 </span>
-                <TooltipBadge
-                  title="Market Benchmarks"
-                  text="Key index and mega-cap benchmarks updated with live real-time pricing."
-                />
               </div>
               <span style={{ fontSize: 11, color: textSecondary, fontWeight: 500 }}>LIVE STREAMING</span>
             </div>

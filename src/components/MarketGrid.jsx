@@ -36,11 +36,10 @@ export function MarketGrid({
 }) {
   const [search, setSearch] = useState("");
   const [selectedSector, setSelectedSector] = useState("All");
-  const [authFilter, setAuthFilter] = useState("ALL"); // "ALL" | "AUTHENTICATED" | "GUEST"
   const [sort, setSort] = useState("movers"); // "movers" | "az" | "price_high" | "price_low"
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
 
-  // Filter stocks by search, sector, and access tier
+  // Filter stocks by search and sector
   let filtered = stockMetaList.filter((s) => {
     const matchesSearch =
       s.ticker.toLowerCase().includes(search.toLowerCase()) ||
@@ -57,13 +56,7 @@ export function MarketGrid({
       (selectedSector.includes("Fintech") && (s.sector?.includes("Fintech") || s.sector?.includes("Payments"))) ||
       (selectedSector.includes("Electric") && (s.sector?.includes("EV") || s.sector?.includes("Auto")));
 
-    const isGuestFeatured = ["NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "TSLA", "META", "AMD", "NFLX", "DIS", "PLTR", "BABA", "ASML"].includes(s.ticker);
-    const matchesAuth =
-      authFilter === "ALL" ||
-      (authFilter === "AUTHENTICATED" && !isGuestFeatured) ||
-      (authFilter === "GUEST" && isGuestFeatured);
-
-    return matchesSearch && matchesSector && matchesAuth;
+    return matchesSearch && matchesSector;
   });
 
   // Sort logic
@@ -213,48 +206,6 @@ export function MarketGrid({
               ✕
             </button>
           )}
-        </div>
-
-        {/* Access Tier / Scope Filters (Auth vs Guest) */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <div style={{ display: "flex", gap: 6, background: "#f1f5f9", padding: 3, borderRadius: 10, border: `1px solid ${borderCol}` }}>
-            {[
-              { id: "ALL", label: "All Equities", count: stockMetaList.length },
-              { id: "AUTHENTICATED", label: "Live Traded (Auth)", count: stockMetaList.length - 13 },
-              { id: "GUEST", label: "Guest / Demo Feeds", count: 13 },
-            ].map((f) => {
-              const active = authFilter === f.id;
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => setAuthFilter(f.id)}
-                  style={{
-                    padding: "5px 12px",
-                    borderRadius: 7,
-                    border: "none",
-                    background: active ? (f.id === "GUEST" ? "#f59e0b" : f.id === "AUTHENTICATED" ? "#0284c7" : "#059669") : "transparent",
-                    color: active ? "#ffffff" : textSecondary,
-                    fontSize: 11.5,
-                    fontWeight: active ? 800 : 600,
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                  }}
-                >
-                  <span>{f.label}</span>
-                  <span style={{ opacity: 0.85, fontSize: 10, background: active ? "rgba(0,0,0,0.18)" : "#e2e8f0", padding: "1px 5px", borderRadius: 999 }}>
-                    {f.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <span style={{ fontSize: 11.5, color: textSecondary, fontWeight: 500 }}>
-            Showing <b>{filtered.length}</b> listed assets
-          </span>
         </div>
 
         {/* Sector Pills */}

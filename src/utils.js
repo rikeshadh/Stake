@@ -1,11 +1,5 @@
 export const CURRENCIES = {
   USD: { code: "USD", symbol: "$", name: "US Dollar ($)", rate: 1.0 },
-  EUR: { code: "EUR", symbol: "€", name: "Euro (€)", rate: 0.92 },
-  GBP: { code: "GBP", symbol: "£", name: "British Pound (£)", rate: 0.79 },
-  AUD: { code: "AUD", symbol: "A$", name: "Australian Dollar (A$)", rate: 1.52 },
-  CAD: { code: "CAD", symbol: "C$", name: "Canadian Dollar (C$)", rate: 1.36 },
-  JPY: { code: "JPY", symbol: "¥", name: "Japanese Yen (¥)", rate: 155.0 },
-  INR: { code: "INR", symbol: "₹", name: "Indian Rupee (₹)", rate: 83.5 },
   NPR: { code: "NPR", symbol: "Rs", name: "Nepalese Rupee (Rs)", rate: 133.5 },
 };
 
@@ -20,18 +14,38 @@ export function formatMoney(amount, currencyCode = "USD", d = 2) {
   })}`;
 }
 
+/**
+ * Formats stock share prices in the selected active currency (USD or NPR).
+ * When Nepalese Rupee (Rs) is selected, price is converted at current rate.
+ */
 export function formatStockPrice(priceInUSD, currencyCode = "USD", d = 2) {
-  return formatMoney(priceInUSD, currencyCode, d);
+  const curr = CURRENCIES[currencyCode] || CURRENCIES.USD;
+  const num = Number(priceInUSD);
+  if (isNaN(num)) return `${curr.symbol} 0.00`;
+  const converted = num * (curr.rate || 1.0);
+  return `${curr.symbol} ${converted.toLocaleString("en-US", {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
+  })}`;
 }
 
 export function convertPrice(priceInUSD, currencyCode = "USD") {
   const curr = CURRENCIES[currencyCode] || CURRENCIES.USD;
-  const num = Number(priceInUSD) || 0;
-  return num * (curr.rate || 1.0);
+  return (Number(priceInUSD) || 0) * (curr.rate || 1.0);
+}
+
+export function convertToUSD(amountInCurrency, currencyCode = "USD") {
+  const curr = CURRENCIES[currencyCode] || CURRENCIES.USD;
+  const rate = curr.rate || 1.0;
+  return (Number(amountInCurrency) || 0) / rate;
 }
 
 export function getCurrencySymbol(currencyCode = "USD") {
   return (CURRENCIES[currencyCode] || CURRENCIES.USD).symbol;
+}
+
+export function getCurrencyRate(currencyCode = "USD") {
+  return (CURRENCIES[currencyCode] || CURRENCIES.USD).rate || 1.0;
 }
 
 export function fmt(n, d = 2) {

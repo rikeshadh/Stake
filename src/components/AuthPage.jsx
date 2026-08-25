@@ -10,19 +10,11 @@ import {
   EyeOff,
   Sparkles,
   ArrowLeft,
+  Loader2,
 } from "lucide-react";
 import { Logo } from "./Charts";
-import { registerUser, loginUser } from "../api";
+import { registerUser, loginUser, setStoredAuthToken } from "../api";
 import "../styles/auth.css";
-
-const AMBIENT_RISING_BUBBLES = [
-  { ticker: "NVDA", price: "$137.86", chg: "+2.8%", up: true, path: "path-1", left: "10%", delay: "0s", duration: "14s" },
-  { ticker: "AAPL", price: "$228.45", chg: "+1.4%", up: true, path: "path-2", left: "32%", delay: "3s", duration: "16s" },
-  { ticker: "TSLA", price: "$248.50", chg: "-2.1%", up: false, path: "path-3", left: "64%", delay: "1.5s", duration: "15s" },
-  { ticker: "MSFT", price: "$430.20", chg: "+0.9%", up: true, path: "path-4", left: "22%", delay: "6s", duration: "18s" },
-  { ticker: "AMD", price: "$158.30", chg: "+2.6%", up: true, path: "path-1", left: "78%", delay: "4s", duration: "15s" },
-  { ticker: "PLTR", price: "$42.60", chg: "+5.1%", up: true, path: "path-2", left: "48%", delay: "7s", duration: "17s" },
-];
 
 export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLanding }) {
   const [mode, setMode] = useState(initialMode); // "login" | "signup"
@@ -39,6 +31,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
   const [touched, setTouched] = useState({});
 
   // Helper validators
@@ -49,6 +42,13 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
   const isPasswordValid = password.length >= 6;
   const isNameValid = fullName.trim().length >= 2;
   const doPasswordsMatch = mode === "login" || password === confirmPassword;
+
+  const triggerShake = () => {
+    setIsShaking(true);
+    setTimeout(() => {
+      setIsShaking(false);
+    }, 500);
+  };
 
   // Password strength calculation
   const getPasswordStrength = (pass) => {
@@ -76,42 +76,50 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
 
     if (!usernameOrEmail.trim()) {
       setErrorMsg(mode === "signup" ? "Please enter your email address." : "Please enter your username or email address.");
+      triggerShake();
       return false;
     }
 
     if (mode === "signup" && !isEmailValid) {
       setErrorMsg("Please enter a valid email address (e.g. trader@domain.com).");
+      triggerShake();
       return false;
     }
 
     if (!password) {
       setErrorMsg("Please enter your password.");
+      triggerShake();
       return false;
     }
 
     if (password.length < 6) {
       setErrorMsg("Password must contain at least 6 characters.");
+      triggerShake();
       return false;
     }
 
     if (mode === "signup") {
       if (!fullName.trim() || fullName.trim().length < 2) {
         setErrorMsg("Please enter your full legal name.");
+        triggerShake();
         return false;
       }
 
       if (!username.trim() || username.trim().length < 3) {
         setErrorMsg("Please enter a username (at least 3 characters).");
+        triggerShake();
         return false;
       }
 
       if (password !== confirmPassword) {
         setErrorMsg("Passwords do not match.");
+        triggerShake();
         return false;
       }
 
       if (!agreeTerms) {
         setErrorMsg("Please agree to the Terms of Service and Risk Disclosures.");
+        triggerShake();
         return false;
       }
     }
@@ -136,19 +144,28 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
           username: username.trim(),
           name: fullName.trim(),
           password,
-          preferredProfile: "balanced",
+          strategy: "balanced",
         });
       } else {
         res = await loginUser(cleanIdentifier, password);
       }
 
       if (res && res.user) {
-        onLoginSuccess(res.user);
+        if (res.token) {
+          setStoredAuthToken(res.token);
+        }
+        try {
+          localStorage.setItem("stake_active_user", JSON.stringify(res.user));
+        } catch {
+          // ignore
+        }
+        onLoginSuccess(res.user, res.token);
       } else {
         throw new Error("Unable to log in. Please check your credentials.");
       }
     } catch (err) {
       setErrorMsg(err.message || "Invalid credentials. Please verify your details and try again.");
+      triggerShake();
     } finally {
       setLoading(false);
     }
@@ -156,18 +173,31 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
 
   const handleQuickDemoLogin = () => {
     const randomId = Math.floor(1000 + Math.random() * 9000);
-    const randomNames = ["Alex Rivera", "Jordan Vance", "Sam Kowalski", "Taylor Smith", "Morgan Dubois"];
-    const chosenName = randomNames[Math.floor(Math.random() * randomNames.length)];
-    onLoginSuccess({
-      email: `demo.trader${randomId}@stake.com`,
-      name: chosenName,
-      accountNumber: `STK-DEMO-${randomId}`,
-      cash: 50000,
+    const demoUser = {
+      email: `guest.trader${randomId}@stake.com`,
+      name: "Guest Trader",
+      accountNumber: `STK-GUEST-${randomId}`,
+      cash: 50000.0,
+      kycStatus: "VERIFIED",
+      isGuest: true,
+      isDemo: true,
+      watchlist: [],
+      agentEnabled: false,
+      agentStrategy: null,
       holdings: {
         NVDA: { shares: 15, costBasis: 2067.9, avgPrice: 137.86 },
         AAPL: { shares: 25, costBasis: 5711.25, avgPrice: 228.45 },
+        MSFT: { shares: 10, costBasis: 4302.0, avgPrice: 430.20 },
       },
-    });
+    };
+    const demoToken = `stk_guest_tok_${Date.now()}`;
+    setStoredAuthToken(demoToken);
+    try {
+      localStorage.setItem("stake_active_user", JSON.stringify(demoUser));
+    } catch {
+      // ignore
+    }
+    onLoginSuccess(demoUser, demoToken);
   };
 
   return (
@@ -176,64 +206,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
           LEFT HERO COLUMN: Image-Matched Atmospheric Dark Hero
          ========================================================= */}
       <div className="stake-auth-left">
-        {/* Background Upward Floating Stream */}
-        <div className="stake-auth-bubble-field">
-          {AMBIENT_RISING_BUBBLES.map((bubble, i) => (
-            <div
-              key={i}
-              className={`stake-rising-stock-bubble ${bubble.up ? "up" : "down"} ${bubble.path}`}
-              style={{
-                left: bubble.left,
-                animationDelay: bubble.delay,
-                animationDuration: bubble.duration,
-              }}
-            >
-              <span className="bubble-ticker-tag">{bubble.ticker}</span>
-              <span className="bubble-price-tag">{bubble.price}</span>
-              <span className={`bubble-chg-tag ${bubble.up ? "up" : "down"}`}>
-                {bubble.chg}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Floating Stock Badges around hero as in design */}
-        <div className="stake-hero-floating-pill green pill-pos-top-left">
-          <span>NVDA</span>
-          <span style={{ color: "#ffffff" }}>$137.86</span>
-          <span className="pill-chg">↗ +2.8%</span>
-        </div>
-
-        <div className="stake-hero-floating-pill green pill-pos-top-right">
-          <span>PLTR</span>
-          <span style={{ color: "#ffffff" }}>$42.60</span>
-          <span className="pill-chg">↗ +5.1%</span>
-        </div>
-
-        <div className="stake-hero-floating-pill green pill-pos-mid-left">
-          <span>AAPL</span>
-          <span style={{ color: "#ffffff" }}>$228.45</span>
-          <span className="pill-chg">↗ +1.4%</span>
-        </div>
-
-        <div className="stake-hero-floating-pill red pill-pos-mid-right">
-          <span>TSLA</span>
-          <span style={{ color: "#ffffff" }}>$248.50</span>
-          <span className="pill-chg">↘ -2.1%</span>
-        </div>
-
-        <div className="stake-hero-floating-pill green pill-pos-bot-right">
-          <span>MSFT</span>
-          <span style={{ color: "#ffffff" }}>$430.20</span>
-          <span className="pill-chg">↗ +0.9%</span>
-        </div>
-
-        <div className="stake-hero-floating-pill red pill-pos-bot-left">
-          <span>INTC</span>
-          <span style={{ color: "#ffffff" }}>$21.30</span>
-          <span className="pill-chg">↘ -3.4%</span>
-        </div>
-
         {/* Hero Centerpiece Content */}
         <div className="stake-auth-left-content">
           <div className="stake-hero-brand-block">
@@ -324,7 +296,11 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} noValidate>
+          <form
+            onSubmit={handleSubmit}
+            noValidate
+            className={`stake-auth-form ${isShaking ? "stake-form-shake" : ""}`}
+          >
             {/* Legal Full Name for Signup */}
             {mode === "signup" && (
               <div className="stake-form-group">
@@ -475,7 +451,10 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
               disabled={loading}
             >
               {loading ? (
-                <span>Authenticating...</span>
+                <>
+                  <Loader2 size={18} className="stake-btn-spinner" />
+                  <span>{mode === "signup" ? "Creating Account..." : "Signing in..."}</span>
+                </>
               ) : mode === "signup" ? (
                 <>
                   <span>Create Account</span>

@@ -16,6 +16,7 @@ import {
   Check,
   Trash2,
   BellRing,
+  ArrowLeft,
 } from "lucide-react";
 import { Logo } from "./Charts";
 
@@ -24,11 +25,13 @@ export function Navbar({
   setTab,
   agentEnabled,
   user,
+  isGuestMode = false,
   onOpenAuth,
   onOpenWallet,
   onOpenKyc,
   onOpenSettings,
   onLogout,
+  onExitGuest,
   kycStatus = "UNVERIFIED",
   notifications = [],
   onMarkAllRead,
@@ -39,6 +42,8 @@ export function Navbar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifFilter, setNotifFilter] = useState("ALL"); // ALL, AUTH_TRADE, GUEST_ALERT, AGENT
+
+  const isGuest = Boolean(isGuestMode || user?.isGuest || user?.isDemo);
 
   const dropdownRef = useRef(null);
   const notifDropdownRef = useRef(null);
@@ -431,29 +436,78 @@ export function Navbar({
                         <History size={14} className="text-emerald-600" /> Order History
                       </button>
 
+                      {isGuest && (
+                        <button
+                          id="profile-menu-landing-btn"
+                          type="button"
+                          onClick={() => {
+                            setMenuOpen(false);
+                            if (onExitGuest) onExitGuest();
+                            else if (onLogout) onLogout();
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer border-t border-slate-100 mt-1"
+                        >
+                          <ArrowLeft size={14} className="text-slate-500" /> Back to Landing Page
+                        </button>
+                      )}
+
                       <button
                         id="profile-menu-logout-btn"
                         type="button"
                         onClick={() => {
                           setMenuOpen(false);
-                          onLogout();
+                          if (isGuest) {
+                            if (onExitGuest) onExitGuest();
+                            else if (onLogout) onLogout();
+                          } else {
+                            onLogout();
+                          }
                         }}
                         className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-rose-600 bg-rose-50/60 hover:bg-rose-100/70 flex items-center gap-2.5 cursor-pointer mt-1"
                       >
-                        <LogOut size={14} /> Log Out
+                        <LogOut size={14} /> {isGuest ? "Exit Sandbox" : "Log Out"}
                       </button>
                     </div>
                   </div>
                 )}
               </div>
+              {isGuest && (
+                <button
+                  id="nav-guest-back-landing-btn"
+                  type="button"
+                  onClick={() => {
+                    if (onExitGuest) onExitGuest();
+                    else if (onLogout) onLogout();
+                  }}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 transition-all cursor-pointer"
+                  title="Return to Landing Page"
+                >
+                  <ArrowLeft size={13} />
+                  <span>Landing</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-2">
+              <button
+                id="nav-guest-sandbox-landing-btn"
+                type="button"
+                onClick={() => {
+                  if (onExitGuest) onExitGuest();
+                  else if (onLogout) onLogout();
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 transition-all cursor-pointer"
+                title="Return to Landing Page"
+              >
+                <ArrowLeft size={13} />
+                <span className="hidden sm:inline">Landing</span>
+              </button>
               <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 text-[11px] font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                 <span>Guest Sandbox</span>
               </div>
               <button
+                id="nav-unauth-login-btn"
                 type="button"
                 onClick={() => onOpenAuth && onOpenAuth("login")}
                 className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 cursor-pointer transition-all"
@@ -461,6 +515,7 @@ export function Navbar({
                 Log In
               </button>
               <button
+                id="nav-unauth-signup-btn"
                 type="button"
                 onClick={() => onOpenAuth && onOpenAuth("signup")}
                 className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-xs cursor-pointer transition-all"

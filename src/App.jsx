@@ -27,10 +27,9 @@ import {
   fetchKycStatus,
   fetchUserData,
   deleteAccount,
+  setStoredAuthToken,
+  clearAuthSession,
 } from "./api";
-import { WORLD_150_STOCKS } from "./stocksData";
-
-const INTERNATIONAL_STOCKS_META = WORLD_150_STOCKS;
 
 function generateInitialHistory(basePrice, count = 28) {
   const arr = [basePrice];
@@ -65,30 +64,13 @@ export default function App() {
 
   const [user, setUser] = useState(() => {
     try {
-      const saved =
-        localStorage.getItem(
-          "stake_active_user"
-        );
-
+      const saved = localStorage.getItem("stake_active_user");
       if (saved) {
-        const parsed =
-          JSON.parse(saved);
-
-        if (
-          parsed &&
-          parsed.email &&
-          !parsed.email
-            .toLowerCase()
-            .includes("rikesh")
-        ) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.email) {
           return parsed;
         }
       }
-
-      localStorage.removeItem(
-        "stake_active_user"
-      );
-
       return null;
     } catch {
       return null;
@@ -256,63 +238,18 @@ export default function App() {
     );
 
   const [agentStrategy, setAgentStrategy] =
-    useState("dip_buyer");
+    useState(() => user?.agentStrategy || null);
 
   const [agentMaxSpend, setAgentMaxSpend] =
-    useState(15000);
+    useState(() => user?.agentMaxSpend || 5000);
 
   // =========================================================
-  // Stocks Data & Simulation
+  // Stocks Data & Simulation - Fetched dynamically from /api/stocks
   // =========================================================
 
-  const [stockMetaList, setStockMetaList] =
-    useState(
-      INTERNATIONAL_STOCKS_META
-    );
+  const [stockMetaList, setStockMetaList] = useState([]);
 
-  const [stocks, setStocks] = useState(
-    () => {
-      const map = {};
-
-      INTERNATIONAL_STOCKS_META.forEach(
-        (s) => {
-          map[s.ticker] = {
-            price: s.price,
-
-            open:
-              s.price *
-              (1 -
-                (Math.random() *
-                  0.02 -
-                  0.01)),
-
-            high:
-              s.price * 1.025,
-
-            low:
-              s.price * 0.975,
-
-            history:
-              generateInitialHistory(
-                s.price,
-                28
-              ),
-
-            dayPoints:
-              generateInitialHistory(
-                s.price,
-                36
-              ),
-
-            change: 0,
-            pct: 0,
-          };
-        }
-      );
-
-      return map;
-    }
-  );
+  const [stocks, setStocks] = useState({});
 
   const [flash, setFlash] =
     useState({});
@@ -394,15 +331,46 @@ export default function App() {
           setStockMetaList(
             remoteStocks
           );
+
+          const map = {};
+          remoteStocks.forEach((s) => {
+            map[s.ticker] = {
+              price: s.price,
+              open: s.open || s.price,
+              high: s.high || s.price * 1.025,
+              low: s.low || s.price * 0.975,
+              previousClose: s.previousClose || s.price,
+              history: generateInitialHistory(s.price, 28),
+              dayPoints: generateInitialHistory(s.price, 36),
+              change: s.change || 0,
+              pct: s.changePercent || 0,
+            };
+          });
+
+          setStocks((prev) => ({ ...map, ...prev }));
         }
       } catch (err) {
         console.warn(
-          "Backend stocks load fallback to internal list",
+          "Backend stocks load error:",
           err
         );
       }
 
       if (user?.email) {
+        try {
+          const liveUser = await fetchUserData(user.email);
+          if (isMounted && liveUser) {
+            setUser((prev) => ({ ...(prev || {}), ...liveUser }));
+            if (liveUser.cash !== undefined) setCash(liveUser.cash);
+            if (liveUser.holdings) setHoldings(liveUser.holdings);
+            if (liveUser.watchlist) setWatchlist(liveUser.watchlist);
+            if (liveUser.orders) setOrders(liveUser.orders);
+            if (liveUser.agentEnabled !== undefined) setAgentEnabled(liveUser.agentEnabled);
+          }
+        } catch (err) {
+          console.warn("User data sync fallback:", err);
+        }
+
         try {
           const kycRes =
             await fetchKycStatus(
@@ -1462,8 +1430,8 @@ export default function App() {
   // Authentication
   // =========================================================
 
-  const handleLoginSuccess =
-    (authUser) => {
+  const handleLoginSuccess = useCallback(
+    (authUser, token) => {
       setUser(
         authUser
       );
@@ -1514,12 +1482,20 @@ export default function App() {
         null
       );
 
-      localStorage.setItem(
-        "stake_active_user",
-        JSON.stringify(
-          authUser
-        )
-      );
+      if (token) {
+        setStoredAuthToken(token);
+      }
+
+      try {
+        localStorage.setItem(
+          "stake_active_user",
+          JSON.stringify(
+            authUser
+          )
+        );
+      } catch {
+        // ignore
+      }
 
       setSelectedStock(null);
 
@@ -1537,62 +1513,27 @@ export default function App() {
           }!`
         );
       }
-    };
+    },
+    [showToast]
+  );
 
-  const handleLogout =
-    () => {
-      setUser(
-        null
-      );
-
-      setCash(
-        0
-      );
-
-      setHoldings(
-        {}
-      );
-
-      setWatchlist(
-        []
-      );
-
-      setAlerts(
-        []
-      );
-
-      setOrders(
-        []
-      );
-
-      setAgentEnabled(
-        false
-      );
-
-      setKycStatus(
-        "UNVERIFIED"
-      );
-
-      setKycData(
-        null
-      );
-
-      setAuthModal(
-        null
-      );
-
-      setTab(
-        "home"
-      );
-
-      localStorage.removeItem(
-        "stake_active_user"
-      );
-
-      showToast(
-        "Logged out successfully"
-      );
-    };
+  const handleLogout = () => {
+    setUser(null);
+    setGuestMode(false);
+    setSelectedStock(null);
+    setCash(0);
+    setHoldings({});
+    setWatchlist([]);
+    setAlerts([]);
+    setOrders([]);
+    setAgentEnabled(false);
+    setKycStatus("UNVERIFIED");
+    setKycData(null);
+    setAuthModal(null);
+    setTab("home");
+    clearAuthSession();
+    showToast("Logged out successfully");
+  };
 
   const handleDeleteAccount =
     async () => {
@@ -1654,14 +1595,40 @@ export default function App() {
         "home"
       );
 
-      localStorage.removeItem(
-        "stake_active_user"
-      );
+      clearAuthSession();
 
       showToast(
         "Your account has been permanently deleted."
       );
     };
+
+  const handleDemoGuestLogin = useCallback(() => {
+    const demoUser = {
+      email: "guest.trader@stake.com",
+      name: "Guest Trader",
+      accountNumber: "STK-GUEST-001",
+      cash: 50000.0,
+      kycStatus: "VERIFIED",
+      isGuest: true,
+      isDemo: true,
+      watchlist: [],
+      agentEnabled: false,
+      agentStrategy: null,
+      holdings: {
+        NVDA: { shares: 15, costBasis: 2067.9, avgPrice: 137.86 },
+        AAPL: { shares: 25, costBasis: 5711.25, avgPrice: 228.45 },
+        MSFT: { shares: 10, costBasis: 4302.0, avgPrice: 430.20 },
+      },
+    };
+    const demoToken = `stk_guest_${Date.now()}`;
+    setStoredAuthToken(demoToken);
+    try {
+      localStorage.setItem("stake_active_user", JSON.stringify(demoUser));
+    } catch {
+      // ignore
+    }
+    handleLoginSuccess(demoUser, demoToken);
+  }, [handleLoginSuccess]);
 
   // =========================================================
   // Unauthenticated / Auth Modal / Guest Routing
@@ -1684,7 +1651,7 @@ export default function App() {
           onOpenLogin={() => setAuthModal("login")}
           onOpenSignup={() => setAuthModal("signup")}
           onOpenAuth={(mode) => setAuthModal(mode)}
-          onEnterApp={() => setGuestMode(true)}
+          onEnterApp={handleDemoGuestLogin}
           stockMetaList={stockMetaList}
           stocks={stocks}
         />
@@ -1888,9 +1855,13 @@ export default function App() {
           setAuthModal(mode)
         }
 
-        onExitGuest={() =>
-          setGuestMode(false)
-        }
+        onExitGuest={() => {
+          clearAuthSession();
+          setUser(null);
+          setGuestMode(false);
+          setSelectedStock(null);
+          setTab("home");
+        }}
 
         kycStatus={
           kycStatus

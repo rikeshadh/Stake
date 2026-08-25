@@ -1,6 +1,8 @@
 {
   "name": "Stake",
-  "description": "Stake Global Autonomous Equities Terminal",
+  "description": "Stake Equities & International Stock Exchange Trading Platform",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
