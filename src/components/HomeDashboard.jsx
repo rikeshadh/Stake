@@ -403,38 +403,22 @@ export function HomeDashboard({
               {privacyMode ? "••••••••" : formatMoney(netWorth, currency)}
             </div>
 
-            {privacyMode ? (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  marginTop: 4,
-                  color: textSecondary,
-                  fontWeight: 500,
-                  fontSize: 13,
-                }}
-              >
-                <span>•••••••• Total Return</span>
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  marginTop: 4,
-                  color: totalReturn >= 0 ? "#059669" : "#ef4444",
-                  fontWeight: 600,
-                  fontSize: 13,
-                }}
-              >
-                {totalReturn >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                <span>
-                  {totalReturn >= 0 ? "+" : ""}{formatMoney(totalReturn, currency)} ({totalReturn >= 0 ? "+" : ""}{fmt(totalReturnPct)}%) Total Return
-                </span>
-              </div>
-            )}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginTop: 4,
+                color: totalReturn >= 0 ? "#059669" : "#ef4444",
+                fontWeight: 600,
+                fontSize: 13,
+              }}
+            >
+              {totalReturn >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+              <span>
+                {totalReturn >= 0 ? "+" : ""}{formatMoney(totalReturn, currency)} ({totalReturn >= 0 ? "+" : ""}{fmt(totalReturnPct)}%) Total Return
+              </span>
+            </div>
           </div>
 
           {/* Sub-Metrics & Wallet Portal */}

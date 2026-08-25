@@ -16,6 +16,7 @@ import { LiveIndicesFooter } from "./components/LiveIndicesFooter";
 import { AuthPage } from "./components/AuthPage";
 import { KycPage } from "./components/KycPage";
 import { SettingsModal } from "./components/SettingsModal";
+import { InteractiveTour } from "./components/InteractiveTour";
 import { fmtShares } from "./utils";
 import {
   syncUserState,
@@ -67,7 +68,7 @@ export default function App() {
       const saved = localStorage.getItem("stake_active_user");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.email) {
+        if (parsed && parsed.email && !parsed.email.startsWith("guest") && !parsed.isGuest && !parsed.isDemo) {
           return parsed;
         }
       }
@@ -131,6 +132,25 @@ export default function App() {
     quickAlertModalOpen,
     setQuickAlertModalOpen,
   ] = useState(false);
+
+  const [tourOpen, setTourOpen] = useState(false);
+
+  // Auto-trigger guided tutorial for first-time users or guest sandbox
+  useEffect(() => {
+    if (user) {
+      try {
+        const completed = localStorage.getItem("stake_tutorial_completed");
+        if (!completed) {
+          const timer = setTimeout(() => {
+            setTourOpen(true);
+          }, 700);
+          return () => clearTimeout(timer);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [user]);
 
   // =========================================================
   // Portfolio & Balances
@@ -1607,23 +1627,25 @@ export default function App() {
       email: "guest.trader@stake.com",
       name: "Guest Trader",
       accountNumber: "STK-GUEST-001",
-      cash: 50000.0,
+      cash: 100000.0,
       kycStatus: "VERIFIED",
       isGuest: true,
       isDemo: true,
       watchlist: [],
       agentEnabled: false,
       agentStrategy: null,
-      holdings: {
-        NVDA: { shares: 15, costBasis: 2067.9, avgPrice: 137.86 },
-        AAPL: { shares: 25, costBasis: 5711.25, avgPrice: 228.45 },
-        MSFT: { shares: 10, costBasis: 4302.0, avgPrice: 430.20 },
-      },
+      holdings: {},
+      orders: [],
+      alerts: [],
+      transactions: [
+        { type: "DEPOSIT", amount: 100000, gateway: "Instant Sandbox Collateral", timestamp: new Date().toISOString() }
+      ],
     };
     const demoToken = `stk_guest_${Date.now()}`;
     setStoredAuthToken(demoToken);
     try {
-      localStorage.setItem("stake_active_user", JSON.stringify(demoUser));
+      sessionStorage.setItem("stake_guest_session", JSON.stringify(demoUser));
+      localStorage.removeItem("stake_active_user");
     } catch {
       // ignore
     }
@@ -1879,6 +1901,12 @@ export default function App() {
 
         onOpenSettings={() =>
           setSettingsOpen(
+            true
+          )
+        }
+
+        onOpenTour={() =>
+          setTourOpen(
             true
           )
         }
@@ -2760,6 +2788,48 @@ export default function App() {
         kycStatus={
           kycStatus
         }
+
+        onOpenTour={() =>
+          setTourOpen(
+            true
+          )
+        }
+      />
+
+      {/* =====================================================
+          INTERACTIVE GUIDED TOUR
+         ===================================================== */}
+
+      <InteractiveTour
+        isOpen={
+          tourOpen
+        }
+
+        onClose={() =>
+          setTourOpen(
+            false
+          )
+        }
+
+        isGuest={
+          Boolean(
+            guestMode ||
+              user?.isGuest ||
+              user?.isDemo
+          )
+        }
+
+        onNavigateTab={(
+          targetTab
+        ) => {
+          setSelectedStock(
+            null
+          );
+
+          setTab(
+            targetTab
+          );
+        }}
       />
 
       {/* =====================================================

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   X,
   Globe,
@@ -8,9 +8,7 @@ import {
   Sliders,
   Trash2,
   AlertTriangle,
-  Loader2,
-  Database,
-  Server,
+  Sparkles, // <-- added for tour icon
 } from "lucide-react";
 import { CURRENCIES } from "../utils";
 
@@ -23,6 +21,7 @@ export function SettingsModal({
   setPrivacyMode,
   onOpenKyc,
   onDeleteAccount,
+  onOpenTour, // <-- new prop
   kycStatus = "UNVERIFIED",
   user,
 }) {
@@ -30,107 +29,7 @@ export function SettingsModal({
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // MongoDB Cluster Connection state
-  const [mongoUri, setMongoUri] = useState("");
-  const [dbStatus, setDbStatus] = useState({
-    connected: false,
-    mode: "In-Memory Dual-State Engine",
-    error: null,
-    loading: true,
-  });
-  const [connectingDb, setConnectingDb] = useState(false);
-  const [dbFeedback, setDbFeedback] = useState(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let isMounted = true;
-    async function checkDb() {
-      try {
-        const res = await fetch("/api/database/status");
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted) {
-            setDbStatus({
-              connected: Boolean(data.connected),
-              mode: data.mode || "In-Memory Dual-State Engine",
-              error: data.error,
-              loading: false,
-            });
-          }
-        }
-      } catch {
-        if (isMounted) {
-          setDbStatus((prev) => ({ ...prev, loading: false }));
-        }
-      }
-    }
-
-    checkDb();
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen]);
-
   if (!isOpen) return null;
-
-  const handleConnectMongo = async () => {
-    if (!mongoUri.trim()) {
-      setDbFeedback({ type: "error", message: "Please enter your MongoDB connection string." });
-      return;
-    }
-
-    if (!mongoUri.startsWith("mongodb://") && !mongoUri.startsWith("mongodb+srv://")) {
-      setDbFeedback({
-        type: "error",
-        message: "Invalid connection format. Must start with mongodb:// or mongodb+srv://",
-      });
-      return;
-    }
-
-    setConnectingDb(true);
-    setDbFeedback(null);
-
-    try {
-      const res = await fetch("/api/database/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uri: mongoUri.trim() }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setDbStatus({
-          connected: true,
-          mode: "MongoDB Atlas Cluster",
-          error: null,
-          loading: false,
-        });
-        setDbFeedback({
-          type: "success",
-          message: "Connected successfully to MongoDB Atlas Cluster! Your accounts and records are now persistently stored in your cluster.",
-        });
-        setMongoUri("");
-      } else {
-        setDbStatus((prev) => ({
-          ...prev,
-          connected: false,
-          error: data.message || "Failed to connect to cluster.",
-        }));
-        setDbFeedback({
-          type: "error",
-          message: data.message || "Could not connect to MongoDB cluster. Check username, password & IP whitelist (0.0.0.0/0).",
-        });
-      }
-    } catch (err) {
-      setDbFeedback({
-        type: "error",
-        message: err.message || "Connection request failed.",
-      });
-    } finally {
-      setConnectingDb(false);
-    }
-  };
 
   const handleDelete = async () => {
     if (deleteConfirmText.trim().toUpperCase() !== "DELETE") return;
@@ -168,16 +67,17 @@ export function SettingsModal({
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900 leading-tight">
-                  Terminal & Cluster Settings
+                  Settings
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Configure preferences, currency & MongoDB Atlas Cluster
+                  Configure preferences, currency, and account options
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              aria-label="Close settings"
             >
               <X size={18} />
             </button>
@@ -185,87 +85,28 @@ export function SettingsModal({
 
           {/* Modal Body */}
           <div className="p-6 overflow-y-auto space-y-6">
-            {/* MongoDB Atlas Cluster Connection Box */}
-            <div className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Database size={17} className="text-emerald-600" />
-                  <h4 className="text-sm font-bold text-slate-900">
-                    MongoDB Atlas Cluster
-                  </h4>
+            {/* ═══ NEW: Platform Walkthrough Section ═══ */}
+            <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-200 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                  <Sparkles size={15} className="text-indigo-600" />
+                  Platform Walkthrough
                 </div>
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                    dbStatus.connected
-                      ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                      : "bg-amber-100 text-amber-800 border border-amber-200"
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      dbStatus.connected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
-                    }`}
-                  />
-                  {dbStatus.connected ? "Cluster Connected" : "In-Memory Dual Mode"}
-                </span>
+                <p className="text-[11.5px] text-slate-500 mt-0.5">
+                  Learn how to trade, manage your portfolio, and use the AI agent in a guided interactive tour.
+                </p>
               </div>
-
-              <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                Connect your custom MongoDB Atlas cluster database for permanent user storage, trade audit logs, and account persistence.
-              </p>
-
-              {dbFeedback && (
-                <div
-                  className={`p-3 rounded-xl text-xs font-medium mb-3 flex items-start gap-2 ${
-                    dbFeedback.type === "success"
-                      ? "bg-emerald-100/70 text-emerald-800 border border-emerald-200"
-                      : "bg-rose-50 text-rose-700 border border-rose-200"
-                  }`}
-                >
-                  {dbFeedback.type === "success" ? (
-                    <Check size={15} className="mt-0.5 flex-shrink-0 text-emerald-600" />
-                  ) : (
-                    <AlertTriangle size={15} className="mt-0.5 flex-shrink-0 text-rose-600" />
-                  )}
-                  <span>{dbFeedback.message}</span>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    id="settings-mongodb-uri-input"
-                    type="password"
-                    placeholder="mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/stake_db"
-                    value={mongoUri}
-                    onChange={(e) => setMongoUri(e.target.value)}
-                    className="flex-1 px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 bg-white"
-                  />
-                  <button
-                    id="settings-connect-mongo-btn"
-                    type="button"
-                    onClick={handleConnectMongo}
-                    disabled={connectingDb}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
-                  >
-                    {connectingDb ? (
-                      <>
-                        <Loader2 size={13} className="animate-spin" />
-                        <span>Connecting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Server size={13} />
-                        <span>Connect Cluster</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                <div className="text-[11px] text-slate-500 flex items-center justify-between">
-                  <span>Tip: In MongoDB Atlas, allow IP Access: <code>0.0.0.0/0</code></span>
-                  <span>SSL/TLS Enabled</span>
-                </div>
-              </div>
+              <button
+                id="settings-start-tour-btn"
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onOpenTour) onOpenTour();
+                }}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs transition-colors"
+              >
+                Start Tour
+              </button>
             </div>
 
             {/* Currency Selection Section */}
@@ -290,10 +131,13 @@ export function SettingsModal({
                           ? "bg-emerald-50 border-emerald-500 text-emerald-800 font-bold"
                           : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                       }`}
+                      aria-pressed={isSelected}
                     >
                       <div className="text-xs">
                         <div className="font-bold">{code}</div>
-                        <div className="text-[11px] text-slate-400">{curr.symbol} {curr.name}</div>
+                        <div className="text-[11px] text-slate-400">
+                          {curr.symbol} {curr.name}
+                        </div>
                       </div>
                       {isSelected && <Check size={14} className="text-emerald-600" />}
                     </button>
@@ -318,6 +162,7 @@ export function SettingsModal({
                 checked={privacyMode}
                 onChange={(e) => setPrivacyMode(e.target.checked)}
                 className="w-5 h-5 accent-emerald-600 cursor-pointer"
+                aria-label="Toggle privacy mode"
               />
             </div>
 
@@ -329,7 +174,11 @@ export function SettingsModal({
                 </div>
                 <div className="text-[11.5px] text-slate-500 mt-0.5">
                   Status:{" "}
-                  <strong className={kycStatus === "VERIFIED" ? "text-emerald-600" : "text-rose-600"}>
+                  <strong
+                    className={
+                      kycStatus === "VERIFIED" ? "text-emerald-600" : "text-rose-600"
+                    }
+                  >
                     {kycStatus === "VERIFIED" ? "Verified" : "Pending Verification"}
                   </strong>
                 </div>
@@ -385,7 +234,7 @@ export function SettingsModal({
         </div>
       </div>
 
-      {/* Delete Account Pop-up Confirmation Modal */}
+      {/* Delete Account Confirmation Modal (unchanged) */}
       {showDeleteModal && (
         <div
           id="delete-account-modal-backdrop"
@@ -405,7 +254,8 @@ export function SettingsModal({
               Delete Trading Account?
             </h3>
             <p className="text-xs text-slate-500 text-center mt-2 leading-relaxed">
-              This action cannot be undone. All holdings, order history, cash balances, and cloud records for <strong>{user?.email || "your account"}</strong> will be permanently deleted.
+              This action cannot be undone. All holdings, order history, cash balances, and cloud records for{" "}
+              <strong>{user?.email || "your account"}</strong> will be permanently deleted.
             </p>
 
             <div className="my-5">
@@ -419,6 +269,7 @@ export function SettingsModal({
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
                 className="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-300 font-mono uppercase tracking-wider focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+                aria-label="Type DELETE to confirm"
               />
             </div>
 

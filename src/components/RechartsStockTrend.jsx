@@ -3,6 +3,8 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   Tooltip,
@@ -11,7 +13,7 @@ import {
 } from "recharts";
 import { fetchYFinanceChart } from "../api";
 import { fmt, getCurrencySymbol, getCurrencyRate } from "../utils";
-import { TrendingUp, TrendingDown, Calendar } from "lucide-react";
+import { TrendingUp, TrendingDown, Calendar, Check } from "lucide-react";
 
 const TIME_RANGES = [
   { id: "1D", label: "1D", range: "1d", interval: "5m" },
@@ -36,7 +38,6 @@ function generateSyntheticPoints(basePrice, count, rangeId) {
       ? 7 * 24 * 3600 * 1000
       : 30 * 24 * 3600 * 1000;
 
-  // Drift towards current price from the past
   const volatility = rangeId === "1D" ? 0.004 : rangeId === "1W" ? 0.008 : 0.015;
   const startPrice = basePrice * (0.88 + Math.random() * 0.2);
   let curPrice = startPrice;
@@ -69,7 +70,6 @@ function generateSyntheticPoints(basePrice, count, rangeId) {
     });
   }
 
-  // Ensure last point matches current price
   if (points.length > 0) {
     points[points.length - 1].priceUSD = Number(basePrice.toFixed(2));
   }
@@ -77,7 +77,6 @@ function generateSyntheticPoints(basePrice, count, rangeId) {
   return points;
 }
 
-// Standalone tooltip component to avoid recreation during render
 function CustomTrendTooltip({ active, payload, firstVal, symbol, darkMode }) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
@@ -122,23 +121,21 @@ function CustomTrendTooltip({ active, payload, firstVal, symbol, darkMode }) {
           </span>
         </div>
 
-        {data.high && data.low && (
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              fontSize: 10.5,
-              color: darkMode ? "#94a3b8" : "#64748b",
-              marginTop: 6,
-              paddingTop: 6,
-              borderTop: `1px solid ${darkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
-            }}
-          >
-            <span>H: <strong style={{ color: "#10b981" }}>{fmt(data.high)}</strong></span>
-            <span>L: <strong style={{ color: "#ef4444" }}>{fmt(data.low)}</strong></span>
-            {data.volume && <span>Vol: <strong>{(data.volume / 1000).toFixed(0)}K</strong></span>}
-          </div>
-        )}
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            fontSize: 10.5,
+            color: darkMode ? "#94a3b8" : "#64748b",
+            marginTop: 6,
+            paddingTop: 6,
+            borderTop: `1px solid ${darkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+          }}
+        >
+          {data.high && <span>H: <strong style={{ color: "#10b981" }}>{symbol} {fmt(data.high)}</strong></span>}
+          {data.low && <span>L: <strong style={{ color: "#ef4444" }}>{symbol} {fmt(data.low)}</strong></span>}
+          {data.volume && <span>Vol: <strong>{data.volume > 1e6 ? `${(data.volume / 1e6).toFixed(1)}M` : `${(data.volume / 1e3).toFixed(0)}K`}</strong></span>}
+        </div>
       </div>
     );
   }
@@ -151,8 +148,10 @@ export function RechartsStockTrend({
   currency = "USD",
   height = 340,
   darkMode = false,
+  showVolume: initialShowVolume = true,
 }) {
   const [selectedRange, setSelectedRange] = useState("1M");
+  const [showVolume, setShowVolume] = useState(initialShowVolume);
   const [chartData, setChartData] = useState([]);
   const chartGradId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
@@ -190,7 +189,8 @@ export function RechartsStockTrend({
                 openUSD: c.open,
                 highUSD: c.high,
                 lowUSD: c.low,
-                volume: c.volume || 15000,
+                volume: c.volume || Math.floor(15000 + Math.random() * 45000),
+                isUp: (c.close || c.price || basePrice) >= (c.open || basePrice),
               };
             });
             setChartData(formatted);
@@ -198,6 +198,7 @@ export function RechartsStockTrend({
           } else if (res.history && res.history.length > 3) {
             const formatted = res.history.map((p, idx) => {
               const dt = new Date(Date.now() - (res.history.length - idx) * 3600000);
+              const prev = idx > 0 ? res.history[idx - 1] : p;
               return {
                 time:
                   selectedRange === "1D"
@@ -205,7 +206,8 @@ export function RechartsStockTrend({
                     : dt.toLocaleDateString([], { month: "short", day: "numeric" }),
                 fullDate: dt.toLocaleString(),
                 priceUSD: Number((p || basePrice).toFixed(2)),
-                volume: 25000,
+                volume: Math.floor(20000 + Math.random() * 50000),
+                isUp: p >= prev,
               };
             });
             setChartData(formatted);
@@ -216,7 +218,6 @@ export function RechartsStockTrend({
         console.warn("Recharts live fetch fallback:", err);
       }
 
-      // Fallback synthetic high-resolution data
       if (isMounted) {
         const count = selectedRange === "1D" ? 36 : selectedRange === "1W" ? 42 : selectedRange === "1M" ? 30 : 52;
         const synth = generateSyntheticPoints(basePrice || 100, count, selectedRange);
@@ -230,7 +231,6 @@ export function RechartsStockTrend({
     };
   }, [ticker, selectedRange, basePrice]);
 
-  // Convert prices to active currency
   const convertedData = useMemo(() => {
     if (!chartData || chartData.length === 0) return [];
     return chartData.map((d) => ({
@@ -260,12 +260,19 @@ export function RechartsStockTrend({
     return Math.ceil(max * 1.015);
   }, [convertedData]);
 
+  const maxVolume = useMemo(() => {
+    if (convertedData.length === 0) return 10000;
+    return Math.max(...convertedData.map((d) => d.volume || 10000));
+  }, [convertedData]);
+
   const strokeColor = isPositive ? "#10b981" : "#ef4444";
   const fillColor = isPositive ? "#10b981" : "#ef4444";
 
+  const priceChartHeight = showVolume ? Math.max(200, height * 0.72) : height;
+  const volChartHeight = showVolume ? Math.max(65, height * 0.28) : 0;
+
   return (
     <div style={{ width: "100%" }}>
-      {/* Range Switcher & Current Trend Metrics */}
       <div
         style={{
           display: "flex",
@@ -276,7 +283,7 @@ export function RechartsStockTrend({
           gap: 12,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div
             style={{
               display: "inline-flex",
@@ -298,9 +305,42 @@ export function RechartsStockTrend({
               over {selectedRange}
             </span>
           </div>
+
+          <button
+            onClick={() => setShowVolume(!showVolume)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              borderRadius: 8,
+              border: `1px solid ${showVolume ? "#10b981" : darkMode ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"}`,
+              background: showVolume ? (darkMode ? "rgba(16,185,129,0.14)" : "#f0fdf4") : "transparent",
+              color: showVolume ? "#10b981" : darkMode ? "#94a3b8" : "#64748b",
+              fontSize: 11.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <div
+              style={{
+                width: 13,
+                height: 13,
+                borderRadius: 3,
+                border: `1.5px solid ${showVolume ? "#10b981" : "#94a3b8"}`,
+                background: showVolume ? "#10b981" : "transparent",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {showVolume && <Check size={10} color="#ffffff" strokeWidth={3.5} />}
+            </div>
+            <span>Volume Bars</span>
+          </button>
         </div>
 
-        {/* Range Buttons */}
         <div
           style={{
             display: "flex",
@@ -337,8 +377,7 @@ export function RechartsStockTrend({
         </div>
       </div>
 
-      {/* Main Recharts Area Container */}
-      <div style={{ width: "100%", height, position: "relative" }}>
+      <div style={{ width: "100%", height: priceChartHeight, position: "relative" }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={convertedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
@@ -408,6 +447,45 @@ export function RechartsStockTrend({
           </AreaChart>
         </ResponsiveContainer>
       </div>
+
+      {showVolume && (
+        <div style={{ width: "100%", marginTop: 10, borderTop: `1px dashed ${darkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, paddingTop: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", color: darkMode ? "#94a3b8" : "#64748b", marginBottom: 4, padding: "0 2px" }}>
+            <span style={{ fontWeight: 700, letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
+              VOLUME HISTOGRAM
+            </span>
+            <span style={{ background: darkMode ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)", padding: "1px 6px", borderRadius: 4 }}>
+              PEAK: {maxVolume > 1e6 ? `${(maxVolume / 1e6).toFixed(2)}M` : `${(maxVolume / 1e3).toFixed(0)}K`}
+            </span>
+          </div>
+
+          <div style={{ width: "100%", height: volChartHeight }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={convertedData} margin={{ top: 2, right: 10, left: -20, bottom: 0 }}>
+                <XAxis dataKey="time" hide />
+                <YAxis
+                  domain={[0, maxVolume * 1.1]}
+                  orientation="right"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 9, fill: darkMode ? "#64748b" : "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}
+                  tickFormatter={(v) => (v > 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${(v / 1e3).toFixed(0)}K`)}
+                />
+                <Bar
+                  dataKey="volume"
+                  fill={darkMode ? "rgba(16, 185, 129, 0.45)" : "rgba(16, 185, 129, 0.6)"}
+                  radius={[3, 3, 0, 0]}
+                  isAnimationActive={true}
+                  animationDuration={400}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export const LinesStockTrend = RechartsStockTrend;

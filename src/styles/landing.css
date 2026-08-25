@@ -45,61 +45,103 @@
   opacity: 0.6;
 }
 
-/* Floating Stock Cards in Hero - Snappy Dynamic Float & Smooth Entry */
+/* Floating Stock Cards in Hero - Image-matched bouncing in place */
 .stock-hero-card {
   position: absolute;
-  width: 154px;
-  background: rgba(14, 34, 25, 0.78);
+  width: 168px;
+  background: rgba(8, 24, 17, 0.88);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(0, 229, 153, 0.32);
   border-radius: 18px;
-  padding: 13px 16px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(0, 229, 153, 0.15);
+  padding: 15px 18px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(0, 229, 153, 0.14);
   z-index: 10;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
   user-select: none;
-  animation-fill-mode: both;
+  pointer-events: auto;
 }
 
 .stock-hero-card:hover {
-  transform: translateY(-4px) scale(1.04) !important;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65), 0 0 30px rgba(0, 229, 153, 0.3);
+  transform: translateY(-4px) scale(1.03) !important;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.65), 0 0 32px rgba(0, 229, 153, 0.28);
   border-color: #00e599;
 }
 
 .stock-hero-card.top-left {
-  top: 18%;
-  left: 6%;
-  transform: rotate(-3deg);
-  animation: cardEntry 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both, floatTopLeft 3.2s ease-in-out 0.6s infinite;
+  top: 14%;
+  left: 3.5%;
+  transform: rotate(-2.5deg);
+  animation: cardEntry 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both, bounceTopLeft 4.6s ease-in-out 0.7s infinite;
 }
 
 .stock-hero-card.top-right {
-  top: 16%;
-  right: 6%;
+  top: 13%;
+  right: 3.5%;
   transform: rotate(2.5deg);
-  animation: cardEntry 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both, floatTopRight 3.6s ease-in-out 0.7s infinite;
+  animation: cardEntry 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both, bounceTopRight 5.0s ease-in-out 0.8s infinite;
 }
 
 .stock-hero-card.bottom-left {
   bottom: 12%;
-  left: 8%;
-  transform: rotate(2deg);
-  animation: cardEntry 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both, floatBottomLeft 3.8s ease-in-out 0.8s infinite;
+  left: 4.5%;
+  transform: rotate(1.5deg);
+  animation: cardEntry 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both, bounceBottomLeft 4.4s ease-in-out 0.9s infinite;
 }
 
 .stock-hero-card.bottom-right {
   bottom: 10%;
-  right: 8%;
-  transform: rotate(-2.5deg);
-  animation: cardEntry 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both, floatBottomRight 3.4s ease-in-out 0.9s infinite;
+  right: 4.5%;
+  transform: rotate(-2deg);
+  animation: cardEntry 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both, bounceBottomRight 4.8s ease-in-out 1.0s infinite;
+}
+
+.stock-hero-card-ticker {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.stock-hero-card-price {
+  font-size: 23px;
+  font-weight: 900;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  margin: 3px 0 4px;
+  letter-spacing: -0.02em;
+}
+
+.stock-hero-card-chart {
+  width: 100%;
+  height: 24px;
+  display: block;
+  margin: 4px 0 6px;
+}
+
+.stock-hero-card-change {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stock-hero-card-change.up {
+  color: #00e599;
+}
+
+.stock-hero-card-change.down {
+  color: #ef4444;
 }
 
 @keyframes cardEntry {
   from {
     opacity: 0;
-    transform: translateY(24px) scale(0.92);
+    transform: translateY(20px) scale(0.94);
   }
   to {
     opacity: 1;
@@ -107,24 +149,24 @@
   }
 }
 
-@keyframes floatTopLeft {
-  0%, 100% { transform: translateY(0) rotate(-3deg); }
+@keyframes bounceTopLeft {
+  0%, 100% { transform: translateY(0) rotate(-2.5deg); }
   50% { transform: translateY(-14px) rotate(-1deg); }
 }
 
-@keyframes floatTopRight {
+@keyframes bounceTopRight {
   0%, 100% { transform: translateY(0) rotate(2.5deg); }
-  50% { transform: translateY(-16px) rotate(4.5deg); }
+  50% { transform: translateY(-15px) rotate(4deg); }
 }
 
-@keyframes floatBottomLeft {
-  0%, 100% { transform: translateY(0) rotate(2deg); }
-  50% { transform: translateY(-14px) rotate(0deg); }
+@keyframes bounceBottomLeft {
+  0%, 100% { transform: translateY(0) rotate(1.5deg); }
+  50% { transform: translateY(-13px) rotate(0.2deg); }
 }
 
-@keyframes floatBottomRight {
-  0%, 100% { transform: translateY(0) rotate(-2.5deg); }
-  50% { transform: translateY(-15px) rotate(-0.5deg); }
+@keyframes bounceBottomRight {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-14px) rotate(-0.5deg); }
 }
 
 @media (max-width: 1024px) {

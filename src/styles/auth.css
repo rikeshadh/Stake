@@ -98,7 +98,7 @@
 }
 
 /* ==========================================================================
-   RISING STOCK BUBBLES FIELD (Fast, randomized natural movement)
+   RISING STOCK BUBBLES FIELD (Smooth, Non-overlapping Rising Pills)
    ========================================================================== */
 .stake-auth-bubble-field {
   position: absolute;
@@ -108,170 +108,161 @@
   bottom: 0;
   overflow: hidden;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 
 .stake-rising-stock-bubble {
   position: absolute;
-  bottom: -60px;
+  bottom: -70px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(14, 38, 28, 0.78);
+  background: rgba(8, 28, 20, 0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(0, 229, 153, 0.35);
+  border: 1px solid rgba(0, 229, 153, 0.38);
   border-radius: 9999px;
-  padding: 7px 15px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 229, 153, 0.18);
+  padding: 6px 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 229, 153, 0.16);
   color: #ffffff;
   font-family: var(--font-mono);
-  animation-timing-function: ease-in-out;
+  animation-timing-function: linear;
   animation-iteration-count: infinite;
   white-space: nowrap;
   user-select: none;
 }
 
 .stake-rising-stock-bubble.down {
-  background: rgba(45, 18, 20, 0.78);
-  border: 1px solid rgba(248, 113, 113, 0.38);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), 0 0 16px rgba(239, 68, 68, 0.18);
+  background: rgba(38, 14, 17, 0.88);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(239, 68, 68, 0.16);
 }
 
-.stake-rising-stock-bubble.path-1 {
-  animation-name: bubbleFloat1;
-}
-.stake-rising-stock-bubble.path-2 {
-  animation-name: bubbleFloat2;
-}
-.stake-rising-stock-bubble.path-3 {
-  animation-name: bubbleFloat3;
-}
-.stake-rising-stock-bubble.path-4 {
-  animation-name: bubbleFloat4;
-}
-
-@keyframes bubbleFloat1 {
-  0% {
-    transform: translate(0, 0) scale(0.92);
-    opacity: 0;
-  }
-  10% {
-    opacity: 0.95;
-  }
-  35% {
-    transform: translate(24px, -35vh) scale(1.02);
-  }
-  65% {
-    transform: translate(-18px, -70vh) scale(0.98);
-    opacity: 0.95;
-  }
-  90% {
-    opacity: 0.85;
-  }
-  100% {
-    transform: translate(12px, -115vh) scale(1);
-    opacity: 0;
-  }
-}
-
-@keyframes bubbleFloat2 {
-  0% {
-    transform: translate(0, 0) scale(0.95);
-    opacity: 0;
-  }
-  12% {
-    opacity: 0.95;
-  }
-  40% {
-    transform: translate(-28px, -40vh) scale(0.98);
-  }
-  70% {
-    transform: translate(20px, -75vh) scale(1.04);
-    opacity: 0.95;
-  }
-  90% {
-    opacity: 0.8;
-  }
-  100% {
-    transform: translate(-10px, -115vh) scale(0.96);
-    opacity: 0;
-  }
-}
-
-@keyframes bubbleFloat3 {
-  0% {
-    transform: translate(0, 0) scale(1);
-    opacity: 0;
-  }
-  10% {
-    opacity: 0.9;
-  }
-  50% {
-    transform: translate(32px, -55vh) scale(1.05);
-    opacity: 0.95;
-  }
-  85% {
-    opacity: 0.85;
-  }
-  100% {
-    transform: translate(-24px, -115vh) scale(0.94);
-    opacity: 0;
-  }
-}
-
-@keyframes bubbleFloat4 {
-  0% {
-    transform: translate(0, 0) scale(0.9);
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.95;
-  }
-  45% {
-    transform: translate(-22px, -48vh) scale(1.02);
-  }
-  75% {
-    transform: translate(18px, -82vh) scale(0.97);
-    opacity: 0.9;
-  }
-  100% {
-    transform: translate(0px, -115vh) scale(1);
-    opacity: 0;
-  }
-}
-
-.bubble-ticker-tag {
-  font-size: 11.5px;
-  font-weight: 900;
+.bubble-ticker-price {
+  font-size: 12.5px;
+  font-weight: 800;
   color: #ffffff;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
+  font-family: var(--font-mono);
 }
 
-.bubble-price-tag {
+.bubble-badge {
   font-size: 11.5px;
   font-weight: 800;
-  color: #e2e8f0;
-}
-
-.bubble-chg-tag {
-  font-size: 11px;
-  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 2px 6px;
-  border-radius: 6px;
 }
 
-.bubble-chg-tag.up {
+.bubble-badge.up {
   color: #00e599;
-  background: rgba(0, 229, 153, 0.15);
+  background: rgba(0, 229, 153, 0.18);
 }
 
-.bubble-chg-tag.down {
+.bubble-badge.down {
   color: #f87171;
-  background: rgba(248, 113, 113, 0.15);
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* 4 distinct smooth non-overlapping vertical rising pathways */
+.stake-rising-stock-bubble.path-1 {
+  animation-name: bubbleRise1;
+}
+.stake-rising-stock-bubble.path-2 {
+  animation-name: bubbleRise2;
+}
+.stake-rising-stock-bubble.path-3 {
+  animation-name: bubbleRise3;
+}
+.stake-rising-stock-bubble.path-4 {
+  animation-name: bubbleRise4;
+}
+
+@keyframes bubbleRise1 {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translateY(-55vh) translateX(4px);
+    opacity: 0.95;
+  }
+  90% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-120vh) translateX(-3px);
+    opacity: 0;
+  }
+}
+
+@keyframes bubbleRise2 {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translateY(-55vh) translateX(-4px);
+    opacity: 0.95;
+  }
+  90% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-120vh) translateX(3px);
+    opacity: 0;
+  }
+}
+
+@keyframes bubbleRise3 {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translateY(-55vh) translateX(4px);
+    opacity: 0.95;
+  }
+  90% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-120vh) translateX(-3px);
+    opacity: 0;
+  }
+}
+
+@keyframes bubbleRise4 {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translateY(-55vh) translateX(-4px);
+    opacity: 0.95;
+  }
+  90% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-120vh) translateX(3px);
+    opacity: 0;
+  }
 }
 
 /* Foreground Typography on Left Column - Image Matching Hero */

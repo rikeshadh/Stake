@@ -17,7 +17,7 @@ import { registerUser, loginUser, setStoredAuthToken } from "../api";
 import "../styles/auth.css";
 
 export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLanding }) {
-  const [mode, setMode] = useState(initialMode); // "login" | "signup"
+  const [mode, setMode] = useState(initialMode);
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +25,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
   const [fullName, setFullName] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
 
-  // Field validation & interaction states
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -34,7 +33,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
   const [isShaking, setIsShaking] = useState(false);
   const [touched, setTouched] = useState({});
 
-  // Helper validators
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   const isInputValid = usernameOrEmail.trim().length >= 2;
   const isEmailValid = emailRegex.test(usernameOrEmail.trim());
@@ -45,12 +43,9 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
 
   const triggerShake = () => {
     setIsShaking(true);
-    setTimeout(() => {
-      setIsShaking(false);
-    }, 500);
+    setTimeout(() => setIsShaking(false), 500);
   };
 
-  // Password strength calculation
   const getPasswordStrength = (pass) => {
     if (!pass) return { score: 0, text: "None", color: "#64748b" };
     let score = 0;
@@ -58,7 +53,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
     if (pass.length >= 10) score += 1;
     if (/[0-9]/.test(pass)) score += 1;
     if (/[^A-Za-z0-9]/.test(pass)) score += 1;
-
     if (score <= 1) return { score: 1, text: "Weak", color: "#ef4444" };
     if (score === 2 || score === 3) return { score: 2, text: "Medium", color: "#f59e0b" };
     return { score: 3, text: "Strong", color: "#10b981" };
@@ -70,71 +64,59 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  // Form Validation with clean messages
   const validateForm = () => {
     setErrorMsg("");
-
     if (!usernameOrEmail.trim()) {
       setErrorMsg(mode === "signup" ? "Please enter your email address." : "Please enter your username or email address.");
       triggerShake();
       return false;
     }
-
     if (mode === "signup" && !isEmailValid) {
       setErrorMsg("Please enter a valid email address (e.g. trader@domain.com).");
       triggerShake();
       return false;
     }
-
     if (!password) {
       setErrorMsg("Please enter your password.");
       triggerShake();
       return false;
     }
-
     if (password.length < 6) {
       setErrorMsg("Password must contain at least 6 characters.");
       triggerShake();
       return false;
     }
-
     if (mode === "signup") {
       if (!fullName.trim() || fullName.trim().length < 2) {
         setErrorMsg("Please enter your full legal name.");
         triggerShake();
         return false;
       }
-
       if (!username.trim() || username.trim().length < 3) {
         setErrorMsg("Please enter a username (at least 3 characters).");
         triggerShake();
         return false;
       }
-
       if (password !== confirmPassword) {
         setErrorMsg("Passwords do not match.");
         triggerShake();
         return false;
       }
-
       if (!agreeTerms) {
         setErrorMsg("Please agree to the Terms of Service and Risk Disclosures.");
         triggerShake();
         return false;
       }
     }
-
     return true;
   };
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     if (!validateForm()) return;
-
     setLoading(true);
     setErrorMsg("");
     setSuccessMsg("");
-
     try {
       const cleanIdentifier = usernameOrEmail.toLowerCase().trim();
       let res;
@@ -149,16 +131,9 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
       } else {
         res = await loginUser(cleanIdentifier, password);
       }
-
       if (res && res.user) {
-        if (res.token) {
-          setStoredAuthToken(res.token);
-        }
-        try {
-          localStorage.setItem("stake_active_user", JSON.stringify(res.user));
-        } catch {
-          // ignore
-        }
+        if (res.token) setStoredAuthToken(res.token);
+        try { localStorage.setItem("stake_active_user", JSON.stringify(res.user)); } catch {}
         onLoginSuccess(res.user, res.token);
       } else {
         throw new Error("Unable to log in. Please check your credentials.");
@@ -177,72 +152,120 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
       email: `guest.trader${randomId}@stake.com`,
       name: "Guest Trader",
       accountNumber: `STK-GUEST-${randomId}`,
-      cash: 50000.0,
+      cash: 100000.0,
       kycStatus: "VERIFIED",
       isGuest: true,
       isDemo: true,
       watchlist: [],
+      orders: [],
+      alerts: [],
+      transactions: [{ type: "DEPOSIT", amount: 100000, gateway: "Instant Sandbox Collateral", timestamp: new Date().toISOString() }],
       agentEnabled: false,
       agentStrategy: null,
-      holdings: {
-        NVDA: { shares: 15, costBasis: 2067.9, avgPrice: 137.86 },
-        AAPL: { shares: 25, costBasis: 5711.25, avgPrice: 228.45 },
-        MSFT: { shares: 10, costBasis: 4302.0, avgPrice: 430.20 },
-      },
+      holdings: {},
     };
     const demoToken = `stk_guest_tok_${Date.now()}`;
     setStoredAuthToken(demoToken);
     try {
-      localStorage.setItem("stake_active_user", JSON.stringify(demoUser));
-    } catch {
-      // ignore
-    }
+      sessionStorage.setItem("stake_guest_session", JSON.stringify(demoUser));
+      localStorage.removeItem("stake_active_user");
+    } catch {}
     onLoginSuccess(demoUser, demoToken);
   };
 
+  // =====================================================================
+  // UPDATED BUBBLES: 4 total, curved paths around text, 30–35s duration
+  // =====================================================================
+  const RISING_BUBBLES = [
+    {
+      ticker: "NVDA",
+      price: "$137.86",
+      chg: "↗ +2.8%",
+      isUp: true,
+      left: "8%",
+      duration: "32s",
+      delay: "0s",
+      path: "path-1"
+    },
+    {
+      ticker: "AAPL",
+      price: "$228.45",
+      chg: "↗ +1.4%",
+      isUp: true,
+      left: "30%",
+      duration: "34s",
+      delay: "-4s",
+      path: "path-2"
+    },
+    {
+      ticker: "TSLA",
+      price: "$248.50",
+      chg: "↘ -2.1%",
+      isUp: false,
+      left: "55%",
+      duration: "31s",
+      delay: "-8s",
+      path: "path-3"
+    },
+    {
+      ticker: "PLTR",
+      price: "$42.60",
+      chg: "↗ +5.1%",
+      isUp: true,
+      left: "78%",
+      duration: "35s",
+      delay: "-2s",
+      path: "path-4"
+    },
+  ];
+
   return (
     <div className="stake-auth-layout">
-      {/* =========================================================
-          LEFT HERO COLUMN: Image-Matched Atmospheric Dark Hero
-         ========================================================= */}
+      {/* LEFT HERO */}
       <div className="stake-auth-left">
-        {/* Hero Centerpiece Content */}
+        <div className="stake-auth-bubble-field">
+          {RISING_BUBBLES.map((b, idx) => (
+            <div
+              key={`${b.ticker}-${idx}`}
+              className={`stake-rising-stock-bubble ${b.isUp ? "up" : "down"} ${b.path}`}
+              style={{
+                left: b.left,
+                animationDuration: b.duration,
+                animationDelay: b.delay,
+              }}
+            >
+              <span className="bubble-ticker-price">{b.ticker} {b.price}</span>
+              <span className={`bubble-badge ${b.isUp ? "up" : "down"}`}>{b.chg}</span>
+            </div>
+          ))}
+        </div>
+
         <div className="stake-auth-left-content">
           <div className="stake-hero-brand-block">
             <Logo size={32} textSize={24} dark={true} textColor="#ffffff" />
             <div className="stake-hero-badge-tag">STAKE GLOBAL EXCHANGE</div>
           </div>
-
           <h1 className="stake-auth-headline-display">
             Invest smarter.<br />Grow your wealth.
           </h1>
-
           <p className="stake-auth-lead-display">
             Institutional-grade fractional equities, zero commissions, real-time Level 2 market data, and autonomous algorithmic execution.
           </p>
         </div>
       </div>
 
-      {/* =========================================================
-          RIGHT AUTH COLUMN: Clean Form with Demo Below Google
-         ========================================================= */}
+      {/* RIGHT AUTH FORM */}
       <div className="stake-auth-right">
         <div className="stake-auth-form-wrapper">
-          {/* Top Bar: Back Button */}
           <div className="stake-auth-top-bar">
             {onBackToLanding && (
-              <button
-                type="button"
-                className="stake-back-landing-btn"
-                onClick={onBackToLanding}
-              >
+              <button type="button" className="stake-back-landing-btn" onClick={onBackToLanding}>
                 <ArrowLeft size={16} />
                 <span>Back</span>
               </button>
             )}
           </div>
 
-          {/* Title & Desc */}
           <div style={{ marginBottom: 20 }}>
             <h2 className="stake-auth-title">
               {mode === "signup" ? "Create your account." : "Welcome back."}
@@ -254,37 +277,27 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
             </p>
           </div>
 
-          {/* Segmented Mode Switcher */}
           <div className="stake-mode-pill-box">
             <button
               type="button"
               className={`stake-mode-pill-btn ${mode === "login" ? "active" : ""}`}
-              onClick={() => {
-                setMode("login");
-                setErrorMsg("");
-              }}
+              onClick={() => { setMode("login"); setErrorMsg(""); }}
             >
               Log In
             </button>
             <button
               type="button"
               className={`stake-mode-pill-btn ${mode === "signup" ? "active" : ""}`}
-              onClick={() => {
-                setMode("signup");
-                setErrorMsg("");
-              }}
+              onClick={() => { setMode("signup"); setErrorMsg(""); }}
             >
               Sign Up
             </button>
           </div>
 
-          {/* Inline Error & Success Banners */}
           {errorMsg && (
             <div className="stake-error-banner">
               <AlertCircle size={16} style={{ flexShrink: 0, color: "#ef4444" }} />
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#991b1b" }}>
-                {errorMsg}
-              </div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#991b1b" }}>{errorMsg}</div>
             </div>
           )}
 
@@ -295,13 +308,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
             </div>
           )}
 
-          {/* Form */}
-          <form
-            onSubmit={handleSubmit}
-            noValidate
-            className={`stake-auth-form ${isShaking ? "stake-form-shake" : ""}`}
-          >
-            {/* Legal Full Name for Signup */}
+          <form onSubmit={handleSubmit} noValidate className={`stake-auth-form ${isShaking ? "stake-form-shake" : ""}`}>
             {mode === "signup" && (
               <div className="stake-form-group">
                 <label className="stake-label">Full Legal Name</label>
@@ -319,7 +326,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
               </div>
             )}
 
-            {/* Username for Signup */}
             {mode === "signup" && (
               <div className="stake-form-group">
                 <label className="stake-label">Username</label>
@@ -337,7 +343,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
               </div>
             )}
 
-            {/* Username or Email */}
             <div className="stake-form-group">
               <label className="stake-label">
                 {mode === "signup" ? "Email Address" : "Username or Email"}
@@ -355,7 +360,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
               </div>
             </div>
 
-            {/* Password */}
             <div className="stake-form-group">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <label className="stake-label" style={{ marginBottom: 0 }}>Password</label>
@@ -369,7 +373,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
                   </button>
                 )}
               </div>
-
               <div className="stake-input-wrapper">
                 <Lock size={16} className="stake-input-icon" />
                 <input
@@ -380,16 +383,10 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
                   onChange={(e) => setPassword(e.target.value)}
                   onBlur={() => handleBlur("password")}
                 />
-                <button
-                  type="button"
-                  className="stake-eye-btn"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
+                <button type="button" className="stake-eye-btn" onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-
-              {/* Password Strength for Signup */}
               {mode === "signup" && password.length > 0 && (
                 <div style={{ marginTop: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
@@ -405,7 +402,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
               )}
             </div>
 
-            {/* Confirm Password for Signup */}
             {mode === "signup" && (
               <div className="stake-form-group">
                 <label className="stake-label">Confirm Password</label>
@@ -419,37 +415,23 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     onBlur={() => handleBlur("confirmPassword")}
                   />
-                  <button
-                    type="button"
-                    className="stake-eye-btn"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
+                  <button type="button" className="stake-eye-btn" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                     {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Terms Checkbox for Signup */}
             {mode === "signup" && (
               <label className="stake-checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={agreeTerms}
-                  onChange={(e) => setAgreeTerms(e.target.checked)}
-                />
+                <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} />
                 <span>
                   I agree to the <strong>Terms of Service</strong>, <strong>Privacy Policy</strong>, and <strong>Risk Disclosures</strong>.
                 </span>
               </label>
             )}
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              className="stake-submit-btn"
-              disabled={loading}
-            >
+            <button type="submit" className="stake-submit-btn" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 size={18} className="stake-btn-spinner" />
@@ -469,7 +451,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
             </button>
           </form>
 
-          {/* Social Logins */}
           <div className="stake-divider">OR CONTINUE WITH</div>
 
           <div className="stake-social-grid">
@@ -515,7 +496,6 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
             </button>
           </div>
 
-          {/* Quick Demo Access positioned directly below Google/Apple */}
           <div className="stake-demo-bottom-action">
             <button
               type="button"

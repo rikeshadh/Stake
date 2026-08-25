@@ -28,7 +28,6 @@ const HIGHLIGHT_STOCKS = [
 ];
 
 export function LandingPage({
-  onEnterApp,
   onOpenLogin,
   onOpenSignup,
   onOpenAuth,
@@ -48,8 +47,9 @@ export function LandingPage({
   };
 
   const handleEnter = () => {
-    if (onEnterApp) onEnterApp();
-    else if (onOpenAuth) onOpenAuth("login");
+    if (onOpenSignup) onOpenSignup();
+    else if (onOpenAuth) onOpenAuth("signup");
+    else if (onOpenLogin) onOpenLogin();
   };
 
   const faqs = [
@@ -89,8 +89,12 @@ export function LandingPage({
             zIndex: 20,
           }}
         >
-          {/* Logo */}
-          <div style={{ cursor: "pointer" }} onClick={handleEnter}>
+          {/* Logo - Scrolls cleanly to top */}
+          <div
+            style={{ cursor: "pointer" }}
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            title="Stake Global Equities"
+          >
             <Logo size={34} textSize={22} dark={true} />
           </div>
 
@@ -136,6 +140,51 @@ export function LandingPage({
             </button>
           </div>
         </header>
+
+        {/* Floating Bouncing Stock Cards (4 Corners - Bouncing in place) */}
+        <div className="stock-hero-card top-left">
+          <div className="stock-hero-card-ticker">COIN</div>
+          <div className="stock-hero-card-price">$276.46</div>
+          <svg className="stock-hero-card-chart" viewBox="0 0 100 24" fill="none">
+            <path d="M 2 20 Q 30 18, 55 12 T 98 4" stroke="#00e599" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+          <div className="stock-hero-card-change up">
+            <span>▲ +4.2%</span>
+          </div>
+        </div>
+
+        <div className="stock-hero-card top-right">
+          <div className="stock-hero-card-ticker">TSLA</div>
+          <div className="stock-hero-card-price">$248.50</div>
+          <svg className="stock-hero-card-chart" viewBox="0 0 100 24" fill="none">
+            <path d="M 2 6 Q 35 8, 60 16 T 98 20" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+          <div className="stock-hero-card-change down">
+            <span>▼ -1.4%</span>
+          </div>
+        </div>
+
+        <div className="stock-hero-card bottom-left">
+          <div className="stock-hero-card-ticker">NVDA</div>
+          <div className="stock-hero-card-price">$137.86</div>
+          <svg className="stock-hero-card-chart" viewBox="0 0 100 24" fill="none">
+            <path d="M 2 19 Q 35 17, 65 10 T 98 3" stroke="#00e599" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+          <div className="stock-hero-card-change up">
+            <span>▲ +2.1%</span>
+          </div>
+        </div>
+
+        <div className="stock-hero-card bottom-right">
+          <div className="stock-hero-card-ticker">AAPL</div>
+          <div className="stock-hero-card-price">$185.92</div>
+          <svg className="stock-hero-card-chart" viewBox="0 0 100 24" fill="none">
+            <path d="M 2 18 Q 30 16, 60 11 T 98 5" stroke="#00e599" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+          <div className="stock-hero-card-change up">
+            <span>▲ +1.1%</span>
+          </div>
+        </div>
 
         {/* Hero Centerpiece */}
         <div className="stake-hero-center" style={{ margin: "40px auto 30px" }}>
@@ -624,7 +673,9 @@ export function LandingPage({
                 borderBottom: "1px solid rgba(255,255,255,0.08)",
               }}
             >
-              <Logo size={28} textSize={20} dark={true} />
+              <div style={{ cursor: "pointer" }} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} title="Stake Global Equities">
+                <Logo size={28} textSize={20} dark={true} />
+              </div>
 
               <div style={{ display: "flex", gap: 24, fontSize: 13.5, fontWeight: 600, color: "#cbd5e1", flexWrap: "wrap" }}>
                 <span style={{ cursor: "pointer" }} onClick={() => setIsFaqOpen(true)}>FAQ</span>
@@ -767,3 +818,5 @@ export function LandingPage({
     </div>
   );
 }
+
+export const IndexPage = LandingPage;

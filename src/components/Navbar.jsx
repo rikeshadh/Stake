@@ -41,14 +41,13 @@ export function Navbar({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifFilter, setNotifFilter] = useState("ALL"); // ALL, AUTH_TRADE, GUEST_ALERT, AGENT
+  const [notifFilter, setNotifFilter] = useState("ALL");
 
   const isGuest = Boolean(isGuestMode || user?.isGuest || user?.isDemo);
 
   const dropdownRef = useRef(null);
   const notifDropdownRef = useRef(null);
 
-  // Close menus when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -106,7 +105,6 @@ export function Navbar({
   return (
     <header className="sticky top-0 z-50 bg-white/98 backdrop-blur-lg border-b border-slate-200 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        {/* Brand Logo & Desktop Navigation */}
         <div className="flex items-center gap-6">
           <div
             id="nav-brand-logo"
@@ -115,8 +113,6 @@ export function Navbar({
           >
             <Logo size={28} textSize={18} dark={false} />
           </div>
-
-          {/* Desktop Navigation Tabs */}
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((t) => {
               const Icon = t.icon;
@@ -149,11 +145,8 @@ export function Navbar({
           </nav>
         </div>
 
-        {/* Right Section: Notification Button + User Profile */}
         <div className="flex items-center gap-2.5">
-          {/* =========================================================
-              NOTIFICATION BUTTON & CENTER POPOVER
-             ========================================================= */}
+          {/* Notification Button & Popover */}
           <div ref={notifDropdownRef} className="relative">
             <button
               id="nav-notification-btn"
@@ -178,14 +171,12 @@ export function Navbar({
               )}
             </button>
 
-            {/* Notification Popover Dropdown */}
             {notifOpen && (
               <div
                 id="nav-notification-popover"
                 className="absolute right-0 sm:right-0 top-12 w-[calc(100vw-32px)] max-w-[400px] sm:w-[400px] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-4 font-sans text-slate-900 animate-in fade-in zoom-in-95 duration-100"
                 style={{ right: "min(0px, max(-120px, calc(100vw - 380px)))" }}
               >
-                {/* Header */}
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
@@ -200,7 +191,6 @@ export function Navbar({
                       </p>
                     </div>
                   </div>
-
                   <div className="flex items-center gap-1.5">
                     {unreadCount > 0 && (
                       <button
@@ -225,7 +215,6 @@ export function Navbar({
                   </div>
                 </div>
 
-                {/* Filter Categories */}
                 <div className="flex items-center gap-1 mb-2.5 pb-2 border-b border-slate-100 overflow-x-auto">
                   {[
                     { id: "ALL", label: "All" },
@@ -248,7 +237,6 @@ export function Navbar({
                   ))}
                 </div>
 
-                {/* Notification List */}
                 <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
                   {filteredNotifs.length === 0 ? (
                     <div className="py-8 text-center text-slate-400">
@@ -273,7 +261,6 @@ export function Navbar({
                               : "bg-emerald-50/40 border-emerald-100 text-slate-900 font-medium"
                           }`}
                         >
-                          {/* Notification Type Icon */}
                           <div
                             className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
                               isTrade
@@ -297,8 +284,6 @@ export function Navbar({
                               <Bot size={14} />
                             )}
                           </div>
-
-                          {/* Content */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-1">
                               <h4 className="text-xs font-bold text-slate-900 truncate">
@@ -337,9 +322,7 @@ export function Navbar({
             )}
           </div>
 
-          {/* =========================================================
-              USER PROFILE (AUTHENTICATED) OR GUEST ACTIONS
-             ========================================================= */}
+          {/* User Profile or Guest Actions */}
           {user ? (
             <div className="flex items-center gap-2">
               <div ref={dropdownRef} className="relative">
@@ -363,7 +346,6 @@ export function Navbar({
                     id="nav-user-dropdown"
                     className="absolute right-0 top-12 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-3 text-left animate-in fade-in zoom-in-95 duration-100"
                   >
-                    {/* Account info */}
                     <div className="pb-3 border-b border-slate-100 mb-2">
                       <div className="text-xs font-bold text-slate-900 truncate">
                         {user?.name || "Active Trader"}
@@ -386,7 +368,7 @@ export function Navbar({
                         }}
                         className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
                       >
-                        <Wallet size={14} className="text-emerald-600" /> Collateral Wallet
+                        <Wallet size={14} className="text-emerald-600" /> Wallet
                       </button>
 
                       <button
@@ -423,6 +405,8 @@ export function Navbar({
                       >
                         <Sliders size={14} className="text-emerald-600" /> Settings & Cluster
                       </button>
+
+                      {/* Tour button is now inside Settings modal */}
 
                       <button
                         id="profile-menu-history-btn"
@@ -479,11 +463,11 @@ export function Navbar({
                     if (onExitGuest) onExitGuest();
                     else if (onLogout) onLogout();
                   }}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 transition-all cursor-pointer"
-                  title="Return to Landing Page"
+                  className="inline-flex items-center justify-center p-2 rounded-xl text-slate-600 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-all cursor-pointer"
+                  title="Exit Sandbox & Return to Landing"
+                  aria-label="Exit Sandbox"
                 >
-                  <ArrowLeft size={13} />
-                  <span>Landing</span>
+                  <LogOut size={16} />
                 </button>
               )}
             </div>
@@ -496,11 +480,11 @@ export function Navbar({
                   if (onExitGuest) onExitGuest();
                   else if (onLogout) onLogout();
                 }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 transition-all cursor-pointer"
-                title="Return to Landing Page"
+                className="inline-flex items-center justify-center p-2 rounded-xl text-slate-600 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-all cursor-pointer"
+                title="Exit to Landing"
+                aria-label="Exit to Landing"
               >
-                <ArrowLeft size={13} />
-                <span className="hidden sm:inline">Landing</span>
+                <LogOut size={16} />
               </button>
               <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 text-[11px] font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
@@ -527,7 +511,7 @@ export function Navbar({
         </div>
       </div>
 
-      {/* Mobile Navigation Pills Bar (Responsive) */}
+      {/* Mobile Bottom Navigation */}
       <div className="md:hidden border-t border-slate-100 px-3 py-2 overflow-x-auto flex items-center gap-1.5 no-scrollbar bg-slate-50/80">
         {navItems.map((t) => {
           const Icon = t.icon;
@@ -561,6 +545,7 @@ export function Navbar({
   );
 }
 
+// Helper function
 function formatNotifTime(ts) {
   if (!ts) return "Just now";
   const diff = Date.now() - Number(ts);

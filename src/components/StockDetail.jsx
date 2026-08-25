@@ -5,7 +5,6 @@ import {
   TrendingUp,
   TrendingDown,
   BarChart2,
-  LineChart,
   ShieldCheck,
   Zap,
   Bell,
@@ -34,14 +33,14 @@ export function StockDetail({
   watchlist,
   onToggleWatch,
   onBack,
-  onOpenOrderDesk, // (mode: "BUY" | "SELL") => void
+  onOpenOrderDesk,
   dayChange,
   darkMode = false,
   onSaveAlert,
   currency = "USD",
 }) {
-  const [chartType, setChartType] = useState("recharts"); // "recharts" | "candlestick" | "line"
-  const [showVolume, setShowVolume] = useState(false);
+  const [chartType, setChartType] = useState("lines");
+  const [showVolume, setShowVolume] = useState(true);
   const [range, setRange] = useState("1M");
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [liveQuote, setLiveQuote] = useState(null);
@@ -277,12 +276,11 @@ export function StockDetail({
       >
         {/* Chart Header Controls */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
-          {/* Chart Type Toggle Group */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 4, background: darkMode ? "#1a2520" : "rgba(0,0,0,0.04)", padding: 3, borderRadius: 10 }}>
               <button
-                id="stock-chart-type-recharts"
-                onClick={() => setChartType("recharts")}
+                id="stock-chart-type-lines"
+                onClick={() => setChartType("lines")}
                 style={{
                   padding: "6px 14px",
                   borderRadius: 8,
@@ -290,15 +288,15 @@ export function StockDetail({
                   cursor: "pointer",
                   fontSize: 12.5,
                   fontWeight: 700,
-                  background: chartType === "recharts" ? "#006c49" : "transparent",
-                  color: chartType === "recharts" ? "#ffffff" : textSecondary,
+                  background: chartType === "lines" ? "#006c49" : "transparent",
+                  color: chartType === "lines" ? "#ffffff" : textSecondary,
                   transition: "all 0.15s ease",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
                 }}
               >
-                <TrendingUp size={14} /> Recharts Trend
+                <TrendingUp size={14} /> Lines
               </button>
 
               <button
@@ -321,31 +319,9 @@ export function StockDetail({
               >
                 <BarChart2 size={14} /> Candlesticks
               </button>
-
-              <button
-                id="stock-chart-type-line"
-                onClick={() => setChartType("line")}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: 8,
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  background: chartType === "line" ? "#006c49" : "transparent",
-                  color: chartType === "line" ? "#ffffff" : textSecondary,
-                  transition: "all 0.15s ease",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <LineChart size={14} /> Classic Line
-              </button>
             </div>
 
-            {/* Volume Toggle for Candlestick/Classic */}
-            {chartType !== "recharts" && (
+            {chartType === "candlestick" && (
               <button
                 onClick={() => setShowVolume(!showVolume)}
                 style={{
@@ -382,8 +358,7 @@ export function StockDetail({
             )}
           </div>
 
-          {/* Timeframe Selector for Candlestick / Classic mode */}
-          {chartType !== "recharts" && (
+          {chartType === "candlestick" && (
             <div style={{ display: "flex", gap: 4, background: darkMode ? "#1a2520" : "rgba(0,0,0,0.04)", padding: 3, borderRadius: 10 }}>
               {RANGES.map((r) => (
                 <button
@@ -408,9 +383,8 @@ export function StockDetail({
           )}
         </div>
 
-        {/* The Recharts Interactive Trend Line Component (Primary) or Candlestick Chart */}
         <div style={{ width: "100%", marginTop: 8 }}>
-          {chartType === "recharts" ? (
+          {chartType === "lines" ? (
             <RechartsStockTrend
               ticker={selected}
               basePrice={currentPrice}
@@ -418,14 +392,15 @@ export function StockDetail({
               liveQuote={liveQuote}
               liveHistory={liveHistory}
               liveCandles={liveCandles}
-              height={340}
+              height={350}
               darkMode={darkMode}
+              showVolume={showVolume}
             />
           ) : (
             <CandlestickChart
               history={chartDataHistory}
               candles={liveCandles}
-              height={320}
+              height={340}
               currency={currency}
               darkMode={darkMode}
               showVolume={showVolume}
