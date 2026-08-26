@@ -344,6 +344,7 @@ export function HomeDashboard({
       >
         {/* User Portfolio Card */}
         <div
+          id="main-portfolio-overview"
           style={{
             background: bgCard,
             borderRadius: 22,

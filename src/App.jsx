@@ -1451,7 +1451,7 @@ export default function App() {
   // =========================================================
 
   const handleLoginSuccess = useCallback(
-    (authUser, token) => {
+    (authUser, token, options = {}) => {
       setUser(
         authUser
       );
@@ -1532,6 +1532,12 @@ export default function App() {
             "Investor"
           }!`
         );
+      }
+
+      if (options.triggerTour || authUser.isDemo || authUser.isGuest) {
+        setTimeout(() => {
+          setTourOpen(true);
+        }, 500);
       }
     },
     [showToast]
@@ -1624,22 +1630,20 @@ export default function App() {
 
   const handleDemoGuestLogin = useCallback(() => {
     const demoUser = {
-      email: "guest.trader@stake.com",
-      name: "Guest Trader",
-      accountNumber: "STK-GUEST-001",
-      cash: 100000.0,
+      email: "guestTrader67@stake.com",
+      name: "Demo Account",
+      accountNumber: "Demo-67",
+      cash: 0.0,
       kycStatus: "VERIFIED",
       isGuest: true,
       isDemo: true,
       watchlist: [],
       agentEnabled: false,
-      agentStrategy: null,
+      agentStrategy: "dip_buyer",
       holdings: {},
       orders: [],
       alerts: [],
-      transactions: [
-        { type: "DEPOSIT", amount: 100000, gateway: "Instant Sandbox Collateral", timestamp: new Date().toISOString() }
-      ],
+      transactions: [],
     };
     const demoToken = `stk_guest_${Date.now()}`;
     setStoredAuthToken(demoToken);
@@ -1649,7 +1653,7 @@ export default function App() {
     } catch {
       // ignore
     }
-    handleLoginSuccess(demoUser, demoToken);
+    handleLoginSuccess(demoUser, demoToken, { triggerTour: true });
   }, [handleLoginSuccess]);
 
   // =========================================================
@@ -2193,53 +2197,21 @@ export default function App() {
             {/* Market */}
             {tab === "market" && (
               <MarketGrid
-                stocks={
-                  stocks
-                }
-
-                stockMetaList={
-                  stockMetaList
-                }
-
-                watchlist={
-                  watchlist
-                }
-
-                onToggleWatch={
-                  toggleWatchlist
-                }
-
-                onSelectStock={(
-                  ticker
-                ) =>
-                  setSelectedStock(
-                    ticker
-                  )
-                }
-
-                onOpenOrderDesk={(
-                  mode
-                ) => {
-                  setOrderDeskMode(
-                    mode
-                  );
-
-                  setOrderDeskOpen(
-                    true
-                  );
+                stocks={stocks}
+                stockMetaList={stockMetaList}
+                watchlist={watchlist}
+                onToggleWatch={toggleWatchlist}
+                onSelectStock={(ticker) => setSelectedStock(ticker)}
+                onOpenOrderDesk={(mode) => {
+                  setOrderDeskMode(mode);
+                  setOrderDeskOpen(true);
                 }}
-
-                dayChange={
-                  dayChange
-                }
-
-                flash={
-                  flash
-                }
-
-                currency={
-                  currency
-                }
+                onExecuteTrade={executeTrade}
+                cashBalance={cash}
+                holdings={holdings}
+                dayChange={dayChange}
+                flash={flash}
+                currency={currency}
               />
             )}
 
@@ -2771,6 +2743,15 @@ export default function App() {
           handleDeleteAccount
         }
 
+        onOpenTour={() => {
+          setSettingsOpen(
+            false
+          );
+          setTourOpen(
+            true
+          );
+        }}
+
         onOpenKyc={() => {
           setSettingsOpen(
             false
@@ -2787,12 +2768,6 @@ export default function App() {
 
         kycStatus={
           kycStatus
-        }
-
-        onOpenTour={() =>
-          setTourOpen(
-            true
-          )
         }
       />
 

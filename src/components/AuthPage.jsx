@@ -133,7 +133,11 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
       }
       if (res && res.user) {
         if (res.token) setStoredAuthToken(res.token);
-        try { localStorage.setItem("stake_active_user", JSON.stringify(res.user)); } catch {}
+        try {
+          localStorage.setItem("stake_active_user", JSON.stringify(res.user));
+        } catch {
+          // ignore storage error
+        }
         onLoginSuccess(res.user, res.token);
       } else {
         throw new Error("Unable to log in. Please check your credentials.");
@@ -147,21 +151,20 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
   };
 
   const handleQuickDemoLogin = () => {
-    const randomId = Math.floor(1000 + Math.random() * 9000);
     const demoUser = {
-      email: `guest.trader${randomId}@stake.com`,
-      name: "Guest Trader",
-      accountNumber: `STK-GUEST-${randomId}`,
-      cash: 100000.0,
+      email: "guestTrader67@stake.com",
+      name: "Demo Account",
+      accountNumber: "Demo-67",
+      cash: 0.0,
       kycStatus: "VERIFIED",
       isGuest: true,
       isDemo: true,
       watchlist: [],
       orders: [],
       alerts: [],
-      transactions: [{ type: "DEPOSIT", amount: 100000, gateway: "Instant Sandbox Collateral", timestamp: new Date().toISOString() }],
+      transactions: [],
       agentEnabled: false,
-      agentStrategy: null,
+      agentStrategy: "dip_buyer",
       holdings: {},
     };
     const demoToken = `stk_guest_tok_${Date.now()}`;
@@ -169,8 +172,10 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
     try {
       sessionStorage.setItem("stake_guest_session", JSON.stringify(demoUser));
       localStorage.removeItem("stake_active_user");
-    } catch {}
-    onLoginSuccess(demoUser, demoToken);
+    } catch {
+      // ignore storage error
+    }
+    onLoginSuccess(demoUser, demoToken, { triggerTour: true });
   };
 
   // =====================================================================

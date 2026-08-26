@@ -21,7 +21,7 @@ export function SettingsModal({
   setPrivacyMode,
   onOpenKyc,
   onDeleteAccount,
-  onOpenTour, // <-- new prop
+  onOpenTour,
   kycStatus = "UNVERIFIED",
   user,
 }) {

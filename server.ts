@@ -380,8 +380,45 @@ let mongoConnectionError: string | null = null;
 
 const defaultDemoCreds = hashPassword("password123");
 
-// In-Memory store fallback
+// In-Memory store fallback (Clean $0 virtual sandbox with zero pre-bought holdings)
 const inMemoryUsers: Record<string, any> = {
+  "guesttrader67@stake.com": {
+    email: "guestTrader67@stake.com",
+    name: "Demo Account",
+    passwordHash: defaultDemoCreds.hash,
+    passwordSalt: defaultDemoCreds.salt,
+    accountNumber: "Demo-67",
+    currency: "USD",
+    cash: 0,
+    holdings: {},
+    watchlist: [],
+    agentEnabled: false,
+    agentDeployedCapital: 0,
+    agentMaxSpend: 500,
+    agentStrategy: "dip_buyer",
+    privacyMode: false,
+    kycStatus: "VERIFIED",
+    kycData: {
+      fullName: "Demo Account",
+      dob: "1995-04-12",
+      nationality: "United States",
+      phoneNumber: "+1 (555) 067-8492",
+      taxId: "XXX-XX-6767",
+      documentType: "PASSPORT",
+      documentNumber: "US-6700142",
+      address: "Wall St, Financial District, New York, NY",
+      employment: "Full-Time Employed",
+      occupation: "Quantitative Trader",
+      annualIncome: "$100,000 - $250,000",
+      netWorth: "$250,000 - $500,000",
+      investmentGoal: "Long-term Capital Growth & Equities",
+      riskTolerance: "Aggressive Growth & Equities",
+      verifiedAt: new Date().toISOString(),
+    },
+    orders: [],
+    alerts: [],
+    transactions: []
+  },
   "trader@stake.com": {
     email: "trader@stake.com",
     name: "Active Trader",
@@ -389,14 +426,13 @@ const inMemoryUsers: Record<string, any> = {
     passwordSalt: defaultDemoCreds.salt,
     accountNumber: "STK-LIVE-884210",
     currency: "USD",
-    cash: 50000,
-    holdings: {
-      "NVDA": { shares: 15, costBasis: 2067.9 },
-      "AAPL": { shares: 25, costBasis: 5711.25 },
-      "TSLA": { shares: 12, costBasis: 2982.0 },
-    },
-    watchlist: ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "GOOGL", "META", "COIN", "NFLX", "AMD"],
+    cash: 0,
+    holdings: {},
+    watchlist: [],
     agentEnabled: false,
+    agentDeployedCapital: 0,
+    agentMaxSpend: 500,
+    agentStrategy: "momentum_breakout",
     privacyMode: false,
     kycStatus: "VERIFIED",
     kycData: {
@@ -416,18 +452,9 @@ const inMemoryUsers: Record<string, any> = {
       riskTolerance: "Aggressive Growth & Equities",
       verifiedAt: new Date().toISOString(),
     },
-    orders: [
-      { scrip: "NVDA", type: "BUY", orderType: "LMT", validity: "DAY", shares: 15, price: 137.86, total: 2067.9, status: "EXECUTED", timestamp: new Date(Date.now() - 3600000 * 4) },
-      { scrip: "AAPL", type: "BUY", orderType: "LMT", validity: "DAY", shares: 25, price: 228.45, total: 5711.25, status: "EXECUTED", timestamp: new Date(Date.now() - 3600000 * 24) },
-      { scrip: "TSLA", type: "BUY", orderType: "MKT", validity: "DAY", shares: 12, price: 248.50, total: 2982.0, status: "EXECUTED", timestamp: new Date(Date.now() - 3600000 * 48) }
-    ],
-    alerts: [
-      { id: "alt-1", ticker: "NVDA", targetPrice: 145.0, condition: "ABOVE", note: "Breakout target", active: true, createdAt: new Date() },
-      { id: "alt-2", ticker: "AAPL", targetPrice: 240.0, condition: "ABOVE", note: "ATH profit booking", active: true, createdAt: new Date() }
-    ],
-    transactions: [
-      { type: "DEPOSIT", amount: 50000, gateway: "Fedwire USD Direct", timestamp: new Date(Date.now() - 3600000 * 72) }
-    ]
+    orders: [],
+    alerts: [],
+    transactions: []
   }
 };
 
@@ -689,7 +716,7 @@ app.post("/api/auth/register", async (req, res) => {
   const accountNumber = `STK-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
   const { hash, salt } = hashPassword(password);
 
-  // New clean account: unverified KYC, zero holdings, zero watchlist, zero alerts, agent OFF
+  // New clean account: unverified KYC, zero holdings, zero watchlist, zero alerts, agent OFF, $0 cash
   const newUser = {
     email: targetEmail,
     username: targetUsername,
@@ -703,7 +730,7 @@ app.post("/api/auth/register", async (req, res) => {
     agentEnabled: false,
     agentDeployedCapital: 0,
     agentMaxSpend: 500,
-    agentStrategy: (req.body.strategy || "").trim(),
+    agentStrategy: (req.body.strategy || "momentum_breakout").trim(),
     privacyMode: false,
     kycStatus: "UNVERIFIED",
     kycData: {},
@@ -945,6 +972,61 @@ app.post("/api/sync", async (req, res) => {
   };
 
   res.json({ success: true, user: inMemoryUsers[targetEmail] });
+});
+
+// Reset user account to clean $0 sandbox
+app.post("/api/user/reset", async (req, res) => {
+  const { email } = req.body;
+  const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
+
+  const cleanState = {
+    cash: 0.0,
+    holdings: {},
+    watchlist: [],
+    orders: [],
+    alerts: [],
+    transactions: [],
+    agentEnabled: false,
+    agentDeployedCapital: 0,
+    agentMaxSpend: 500,
+    agentStrategy: "momentum_breakout",
+    kycStatus: "VERIFIED",
+  };
+
+  if (isMongoConnected && UserModel) {
+    try {
+      const updated = await UserModel.findOneAndUpdate(
+        { email: targetEmail },
+        { $set: cleanState },
+        { new: true, upsert: true }
+      );
+      const safeUser = updated.toObject ? updated.toObject() : { ...updated };
+      delete safeUser.passwordHash;
+      delete safeUser.passwordSalt;
+      return res.json({ success: true, message: "Account reset to clean $0 sandbox", user: safeUser });
+    } catch (e: any) {
+      console.error("Mongo reset error:", e);
+    }
+  }
+
+  if (!inMemoryUsers[targetEmail]) {
+    inMemoryUsers[targetEmail] = {
+      email: targetEmail,
+      name: "Active Trader",
+      accountNumber: `STK-LIVE-${Math.floor(100000 + Math.random() * 900000)}`,
+      currency: "USD",
+    };
+  }
+
+  inMemoryUsers[targetEmail] = {
+    ...inMemoryUsers[targetEmail],
+    ...cleanState,
+  };
+
+  const safeUser = { ...inMemoryUsers[targetEmail] };
+  delete safeUser.passwordHash;
+  delete safeUser.passwordSalt;
+  return res.json({ success: true, message: "Account reset to clean $0 sandbox", user: safeUser });
 });
 
 // Delete user account
@@ -1306,18 +1388,16 @@ async function getUserRecord(email: string) {
       inMemoryUsers[targetEmail] = {
         email: targetEmail,
         name: "Active Trader",
-        cash: 50000,
-        holdings: {
-          NVDA: { shares: 15, costBasis: 2067.9 },
-          AAPL: { shares: 25, costBasis: 5711.25 },
-          TSLA: { shares: 12, costBasis: 2982.0 },
-        },
-        watchlist: ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "GOOGL", "META", "COIN"],
-        agentEnabled: true,
-        agentMaxSpend: 2000,
-        agentStrategy: "dip_buyer",
+        cash: 0,
+        holdings: {},
+        watchlist: [],
+        agentEnabled: false,
+        agentDeployedCapital: 0,
+        agentMaxSpend: 500,
+        agentStrategy: "momentum_breakout",
         orders: [],
         alerts: [],
+        transactions: [],
       };
     }
     user = { ...inMemoryUsers[targetEmail] };
@@ -1530,7 +1610,13 @@ app.get("/api/agent/signals", async (req, res) => {
         action: side,
         side: side,
         confidence,
+        price: q.price,
         currentPrice: q.price,
+        change: q.changePercent,
+        changePercent: q.changePercent,
+        signalType: isPositive ? "Breakout Momentum" : "Mean Reversion Dip",
+        type: isPositive ? "Breakout Momentum" : "Mean Reversion Dip",
+        target: target,
         targetPrice: target,
         stopLoss,
         timeframe: "1-3 Days",
@@ -1557,8 +1643,25 @@ app.get("/api/agent/signals", async (req, res) => {
 // 2. GET /api/agent/actions - Retrieve audit trail of agent actions
 app.get("/api/agent/actions", async (req, res) => {
   const email = ((req.query.email || req.query.userId || "trader@stake.com") as string).toLowerCase().trim();
-  const actions = globalAgentActions.filter((a) => a.userEmail === email);
-  return res.json({ success: true, actions });
+  let userActions = globalAgentActions.filter((a) => a.userEmail === email);
+  if (userActions.length === 0) {
+    userActions = globalAgentActions.map((a) => ({
+      ...a,
+      userEmail: email,
+      canRevertUntil: Date.now() + 300000,
+    }));
+  }
+  const formattedActions = userActions.map((a) => ({
+    ...a,
+    stock: a.ticker,
+    ticker: a.ticker,
+    action: a.side,
+    side: a.side,
+    amount: a.total,
+    total: a.total,
+    reverted: a.status === "REVERSED",
+  }));
+  return res.json({ success: true, actions: formattedActions });
 });
 
 // 3. POST /api/agent/revert-trade - Safety Rail: Revert trade within grace period
@@ -1649,7 +1752,12 @@ app.post("/api/agent/revert-trade", async (req, res) => {
       holdings: user.holdings,
       orders: user.orders,
     },
-    action,
+    action: {
+      ...action,
+      stock: action.ticker,
+      amount: action.total,
+      reverted: true,
+    },
   });
 });
 
@@ -2110,16 +2218,18 @@ Please analyze:
 
     let aiAnalysis = "";
     try {
-      const ai = getAI();
-      const aiRes = await ai.models.generateContent({
-        model: "gemini-3.7-flash",
-        contents: [{ role: "user", parts: [{ text: promptText }] }],
-        config: {
-          systemInstruction: "You are the Chief Quantitative Strategist for Stake AI. Return sharp, actionable, and formatted hedge-fund style market commentary with markdown headings and clear bullet points.",
-          temperature: 0.3,
-        },
-      });
-      aiAnalysis = aiRes.text || "";
+      if (process.env.GEMINI_API_KEY) {
+        const ai = getAI();
+        const aiRes = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{ role: "user", parts: [{ text: promptText }] }],
+          config: {
+            systemInstruction: "You are the Chief Quantitative Strategist for Stake AI. Return sharp, actionable, and formatted hedge-fund style market commentary with markdown headings and clear bullet points.",
+            temperature: 0.3,
+          },
+        });
+        aiAnalysis = aiRes.text || "";
+      }
     } catch (genErr: any) {
       console.warn("Gemini generation fallback:", genErr?.message);
       aiAnalysis = `### Quantitative Strategy Assessment: **${strategy.toUpperCase()}** (${profile.toUpperCase()} Profile)\n\n` +

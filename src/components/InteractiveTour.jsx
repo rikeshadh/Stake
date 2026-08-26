@@ -1,100 +1,158 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Sparkles,
-  TrendingUp,
   Bot,
-  Globe,
-  BellRing,
+  Sliders,
+  BarChart2,
+  BrainCircuit,
   ChevronRight,
   ChevronLeft,
   X,
   CheckCircle2,
   Layers,
-  HelpCircle,
+  Minimize2,
+  Maximize2,
+  Wallet,
 } from "lucide-react";
 
 export function InteractiveTour({
   isOpen,
   onClose,
-  isGuest = false,
   onNavigateTab,
 }) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [targetRect, setTargetRect] = useState(null);
 
-  const steps = [
+  const steps = useMemo(() => [
     {
       id: "welcome",
-      title: isGuest ? "Welcome to Stake Guest Sandbox" : "Welcome to Stake Global Equities",
-      badge: isGuest ? "SANDBOX MODE" : "INSTITUTIONAL PLATFORM",
-      desc: isGuest
-        ? "You've entered the risk-free paper trading sandbox with $100,000 in virtual collateral. Practice execution, test automated AI strategies, and explore global markets before trading live."
-        : "Trade fractional US equities with zero commissions, institutional-grade analytics, and real-time streaming quotes from NYSE & NASDAQ.",
+      title: "Clean $0 Portfolio & Real-Time Desk",
+      badge: "PORTFOLIO DESK",
+      desc: "Your account initializes with a clean $0 cash balance, empty watchlist, and zero pre-bought stocks. Fund your wallet or connect collateral to start trading fractional US equities.",
       icon: Sparkles,
-      iconColor: "#00e599",
-      accentBg: "rgba(0, 229, 153, 0.12)",
-      targetFeature: "Market Feed & Live Overview",
+      iconColor: "#059669",
+      accentBg: "rgba(5, 150, 105, 0.12)",
+      targetId: "main-portfolio-overview",
       actionTab: "home",
+      tip: "Deposit funds via the Wallet button to begin building your custom portfolio.",
     },
     {
-      id: "markets",
-      title: "Interactive Charts & Level 2 Depth",
-      badge: "REAL-TIME DATA",
-      desc: "Click on any stock to view historical trend lines powered by Recharts, switch between Smooth Line and Candlestick modes, inspect Level 2 order book liquidity, and analyze volume distributions.",
-      icon: TrendingUp,
+      id: "quick_trade",
+      title: "1-Click Fractional Quick Trade Desk",
+      badge: "EQUITIES EXECUTION",
+      desc: "Browse 30+ live US stocks and execute instant Market & Limit orders. Supports fractional shares down to $1 with real-time NYSE/NASDAQ price streaming.",
+      icon: Layers,
       iconColor: "#0284c7",
       accentBg: "rgba(2, 132, 199, 0.12)",
-      targetFeature: "Markets & Chart Analytics",
+      targetId: "market-grid-container",
       actionTab: "market",
+      tip: "Click 'Quick Trade' on any stock card to open the streamlined order drawer.",
     },
     {
-      id: "orderdesk",
-      title: "Instant Order Desk & Fractional Trading",
-      badge: "ONE-CLICK EXECUTION",
-      desc: "Execute Market or Limit orders instantly. Buy fractional shares by entering exact dollar amounts or share quantities with customizable DAY or GTC time-in-force validity.",
-      icon: Layers,
-      iconColor: "#10b981",
-      accentBg: "rgba(16, 185, 129, 0.12)",
-      targetFeature: "Quick Trade Desk",
-      actionTab: "home",
-    },
-    {
-      id: "agent",
-      title: "Autonomous AI Quant Agent",
-      badge: "AGENTIC AI",
-      desc: "The autonomous agent runs algorithmic quant strategies like Momentum Breakout, VWAP Mean Reversion, and Growth Trend Following with strict stop-loss limits and automated capital allocation.",
+      id: "agent_strategies",
+      title: "Agentic AI Quant Strategy Engine",
+      badge: "QUANT ALGORITHMS",
+      desc: "Deploy automated quantitative strategies like Momentum Breakout, VWAP Mean Reversion, Dip Buyer DCA, and Growth Trend with configurable risk guardrails.",
       icon: Bot,
       iconColor: "#8b5cf6",
       accentBg: "rgba(139, 92, 246, 0.12)",
-      targetFeature: "Autonomous Trading Engine",
+      targetId: "agent-strategy-deploy-bar",
       actionTab: "agent",
+      tip: "Select a strategy and allocate capital to let AI execute automatically.",
     },
     {
-      id: "currency",
-      title: "Multi-Currency Collateral & Instant Wallet",
-      badge: "USD & NPR DUAL-CURRENCY",
-      desc: "Seamlessly convert your account display and collateral between US Dollars ($) and Nepalese Rupees (Rs). Manage instant deposits, collateral balances, and track live transaction receipts.",
-      icon: Globe,
+      id: "agent_benchmark",
+      title: "Performance Benchmark vs S&P 500",
+      badge: "ALPHA BENCHMARK",
+      desc: "Compare simulated strategy CAGR, Sharpe ratio, max drawdown, and historical win rates directly against the S&P 500 (SPY) benchmark.",
+      icon: BarChart2,
+      iconColor: "#059669",
+      accentBg: "rgba(5, 150, 105, 0.12)",
+      targetId: "agent-benchmark-card",
+      actionTab: "agent",
+      tip: "Toggle SPY comparison and switch between 1M, 3M, and 1Y timeframes.",
+    },
+    {
+      id: "agent_radar",
+      title: "Real-Time Signal Radar",
+      badge: "SIGNAL SCANNER",
+      desc: "Continuously scans order books and anomaly patterns to surface high-conviction trade setups with exact entry prices, confidence scores, and upside targets.",
+      icon: BrainCircuit,
       iconColor: "#f59e0b",
       accentBg: "rgba(245, 158, 11, 0.12)",
-      targetFeature: "Multi-Currency Wallet",
-      actionTab: "portfolio",
+      targetId: "agent-radar-card",
+      actionTab: "agent",
+      tip: "Live conviction scoring updates dynamically on each market tick.",
     },
     {
-      id: "alerts",
-      title: "Smart Watchlists & Breakout Alerts",
-      badge: "SMART MONITORING",
-      desc: "Add stocks to your custom watchlist and set automated price breakout alerts with notifications to capture high-probability trade setups the moment they trigger.",
-      icon: BellRing,
-      iconColor: "#06b6d4",
-      accentBg: "rgba(6, 182, 212, 0.12)",
-      targetFeature: "Watchlists & Alerts",
-      actionTab: "home",
+      id: "agent_execution",
+      title: "Autonomous Execution & Audit Trail",
+      badge: "EXECUTION AUDIT",
+      desc: "Every automated trade is logged with execution price, timestamp, and mathematical rationale. You can single-click 'Revert' any order to unwind a position immediately.",
+      icon: Sliders,
+      iconColor: "#10b981",
+      accentBg: "rgba(16, 185, 129, 0.12)",
+      targetId: "agent-audit-card",
+      actionTab: "agent",
+      tip: "Full execution rollback and capital guardrails keep you in complete control.",
     },
-  ];
+  ], []);
 
   const isFirst = currentStep === 0;
   const isLast = currentStep === steps.length - 1;
+  const step = steps[currentStep] || steps[0];
+  const Icon = step.icon;
+
+  // Handle target element highlighting and scrolling
+  const updateHighlight = useCallback(() => {
+    if (!isOpen || !step) return;
+
+    if (onNavigateTab && step.actionTab) {
+      onNavigateTab(step.actionTab);
+    }
+
+    const timer = setTimeout(() => {
+      const el = document.getElementById(step.targetId);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        setTargetRect({
+          top: rect.top + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width,
+          height: rect.height,
+        });
+
+        // Smooth scroll if element is outside comfortable viewing area
+        const inView =
+          rect.top >= 70 &&
+          rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) - 120;
+        if (!inView) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      } else {
+        setTargetRect(null);
+      }
+    }, 180);
+
+    return () => clearTimeout(timer);
+  }, [isOpen, step, onNavigateTab]);
+
+  useEffect(() => {
+    updateHighlight();
+  }, [currentStep, isOpen, updateHighlight]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onResize = () => updateHighlight();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onResize, { passive: true });
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onResize);
+    };
+  }, [isOpen, updateHighlight]);
 
   const handleSkip = useCallback(() => {
     try {
@@ -121,25 +179,16 @@ export function InteractiveTour({
     if (isLast) {
       handleComplete();
     } else {
-      const nextIdx = currentStep + 1;
-      setCurrentStep(nextIdx);
-      if (onNavigateTab && steps[nextIdx].actionTab) {
-        onNavigateTab(steps[nextIdx].actionTab);
-      }
+      setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
     }
-  }, [currentStep, isLast, handleComplete, onNavigateTab, steps]);
+  }, [isLast, handleComplete, steps.length]);
 
   const handlePrev = useCallback(() => {
     if (!isFirst) {
-      const prevIdx = currentStep - 1;
-      setCurrentStep(prevIdx);
-      if (onNavigateTab && steps[prevIdx].actionTab) {
-        onNavigateTab(steps[prevIdx].actionTab);
-      }
+      setCurrentStep((prev) => Math.max(prev - 1, 0));
     }
-  }, [currentStep, isFirst, onNavigateTab, steps]);
+  }, [isFirst]);
 
-  // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
@@ -157,98 +206,96 @@ export function InteractiveTour({
 
   if (!isOpen) return null;
 
-  const step = steps[currentStep];
-  const Icon = step.icon;
-
   return (
-    <AnimatePresence>
-      <div
-        id="stake-interactive-tour-overlay"
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 9999,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "20px",
-          background: "rgba(5, 14, 10, 0.78)",
-          backdropFilter: "blur(10px)",
-          WebkitBackdropFilter: "blur(10px)",
-        }}
-      >
+    <div
+      id="stake-interactive-walkthrough-hud"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 8000,
+        pointerEvents: "none",
+      }}
+    >
+      {/* 1. Subtle, Clean Focus Outline (No overlapping labels) */}
+      {targetRect && (
         <motion.div
-          key={currentStep}
-          initial={{ opacity: 0, scale: 0.95, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 12 }}
-          transition={{ duration: 0.22, ease: "easeOut" }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
           style={{
-            width: "100%",
-            maxWidth: 540,
-            background: "#ffffff",
+            position: "absolute",
+            top: Math.max(0, targetRect.top - 6),
+            left: Math.max(6, targetRect.left - 6),
+            width: targetRect.width + 12,
+            height: targetRect.height + 12,
             borderRadius: 24,
-            padding: "28px 30px",
-            boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(226, 232, 240, 0.8)",
-            position: "relative",
+            border: `2.5px solid ${step.iconColor}`,
+            boxShadow: `0 0 0 6px ${step.accentBg}, 0 12px 32px rgba(0,0,0,0.08)`,
+            pointerEvents: "none",
+            zIndex: 8001,
+            transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+        />
+      )}
+
+      {/* 2. Sleek Bottom Floating HUD Card */}
+      <AnimatePresence>
+        <motion.div
+          drag
+          dragConstraints={{ left: -250, right: 20, top: -350, bottom: 20 }}
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 24, scale: 0.96 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            width: "calc(100vw - 32px)",
+            maxWidth: 420,
+            background: "#ffffff",
+            borderRadius: 20,
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 20px 45px -10px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(226, 232, 240, 0.8)",
+            pointerEvents: "auto",
+            zIndex: 8002,
+            overflow: "hidden",
             textAlign: "left",
           }}
         >
-          {/* Close / Skip button */}
-          <button
-            id="tour-skip-x-btn"
-            type="button"
-            onClick={handleSkip}
+          {/* Header Strip with Controls */}
+          <div
             style={{
-              position: "absolute",
-              top: 20,
-              right: 20,
-              background: "#f1f5f9",
-              border: "none",
-              borderRadius: 12,
-              width: 34,
-              height: 34,
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              color: "#64748b",
-              transition: "all 0.15s ease",
+              justifyContent: "space-between",
+              padding: "12px 16px",
+              background: "#f8fafc",
+              borderBottom: "1px solid #f1f5f9",
             }}
-            title="Skip Walkthrough (Esc)"
           >
-            <X size={17} />
-          </button>
-
-          {/* Step Header */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
-            <div
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 18,
-                background: step.accentBg,
-                color: step.iconColor,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                boxShadow: `0 8px 20px ${step.accentBg}`,
-              }}
-            >
-              <Icon size={26} />
-            </div>
-            <div style={{ paddingRight: 32 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 8,
+                  background: step.accentBg,
+                  color: step.iconColor,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Icon size={15} />
+              </div>
+              <div>
                 <span
                   style={{
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: 800,
-                    letterSpacing: "0.06em",
                     color: step.iconColor,
-                    background: step.accentBg,
-                    padding: "3px 9px",
-                    borderRadius: 6,
+                    letterSpacing: "0.06em",
                     fontFamily: "'JetBrains Mono', monospace",
                   }}
                 >
@@ -256,184 +303,191 @@ export function InteractiveTour({
                 </span>
                 <span
                   style={{
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: 700,
                     color: "#94a3b8",
+                    marginLeft: 6,
                     fontFamily: "'JetBrains Mono', monospace",
                   }}
                 >
-                  STEP {currentStep + 1} OF {steps.length}
+                  {currentStep + 1} of {steps.length}
                 </span>
               </div>
-              <h2
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+              <button
+                type="button"
+                onClick={() => setIsMinimized(!isMinimized)}
                 style={{
-                  fontSize: 19,
+                  background: "transparent",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "4px 6px",
+                  color: "#64748b",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+                title={isMinimized ? "Expand Guide" : "Minimize Guide"}
+              >
+                {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
+              </button>
+
+              <button
+                id="tour-close-hud-btn"
+                type="button"
+                onClick={handleSkip}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  borderRadius: 6,
+                  width: 24,
+                  height: 24,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#94a3b8",
+                  cursor: "pointer",
+                }}
+                title="Close Walkthrough (Esc)"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Content Body */}
+          {!isMinimized && (
+            <div style={{ padding: "16px 18px" }}>
+              <h3
+                style={{
+                  fontSize: 15,
                   fontWeight: 800,
                   color: "#0f172a",
-                  margin: "6px 0 0",
+                  margin: "0 0 6px",
                   lineHeight: 1.3,
                   letterSpacing: "-0.01em",
                 }}
               >
                 {step.title}
-              </h2>
-            </div>
-          </div>
+              </h3>
 
-          {/* Step Body */}
-          <p
-            style={{
-              fontSize: 14.5,
-              lineHeight: 1.65,
-              color: "#475569",
-              margin: "0 0 24px",
-            }}
-          >
-            {step.desc}
-          </p>
-
-          {/* Interactive Feature Focus Badge */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "10px 14px",
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-              borderRadius: 12,
-              marginBottom: 22,
-            }}
-          >
-            <HelpCircle size={15} className="text-emerald-600" />
-            <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>
-              Feature: <strong style={{ color: "#0f172a" }}>{step.targetFeature}</strong>
-            </span>
-          </div>
-
-          {/* Step Progress Indicators */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              {steps.map((_, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    setCurrentStep(idx);
-                    if (onNavigateTab && steps[idx].actionTab) {
-                      onNavigateTab(steps[idx].actionTab);
-                    }
-                  }}
-                  style={{
-                    width: currentStep === idx ? 24 : 8,
-                    height: 8,
-                    borderRadius: 4,
-                    background: currentStep === idx ? "#059669" : "#e2e8f0",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    transition: "all 0.25s ease",
-                  }}
-                  title={`Go to step ${idx + 1}`}
-                />
-              ))}
-            </div>
-
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#64748b",
-                fontFamily: "'JetBrains Mono', monospace",
-              }}
-            >
-              {currentStep + 1} / {steps.length}
-            </span>
-          </div>
-
-          {/* Step Footer Actions with Next & Skip */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              paddingTop: 8,
-              borderTop: "1px solid #f1f5f9",
-            }}
-          >
-            <button
-              id="tour-skip-text-btn"
-              type="button"
-              onClick={handleSkip}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "#64748b",
-                fontSize: 13.5,
-                fontWeight: 700,
-                cursor: "pointer",
-                padding: "8px 12px",
-                borderRadius: 8,
-                transition: "color 0.15s ease",
-              }}
-            >
-              Skip Walkthrough
-            </button>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              {!isFirst && (
-                <button
-                  id="tour-prev-btn"
-                  type="button"
-                  onClick={handlePrev}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "10px 18px",
-                    borderRadius: 12,
-                    border: "1px solid #cbd5e1",
-                    background: "#ffffff",
-                    color: "#334155",
-                    fontSize: 13.5,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  <ChevronLeft size={16} /> Back
-                </button>
-              )}
-
-              <button
-                id="tour-next-btn"
-                type="button"
-                onClick={handleNext}
+              <p
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 7,
-                  padding: "10px 22px",
-                  borderRadius: 12,
-                  border: "none",
-                  background: "#059669",
-                  color: "#ffffff",
-                  fontSize: 13.5,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  boxShadow: "0 6px 18px rgba(5, 150, 105, 0.35)",
-                  transition: "all 0.15s ease",
+                  fontSize: 12.5,
+                  lineHeight: 1.55,
+                  color: "#475569",
+                  margin: "0 0 12px",
                 }}
               >
-                <span>{isLast ? "Start Trading" : "Next"}</span>
-                {isLast ? <CheckCircle2 size={17} /> : <ChevronRight size={17} />}
-              </button>
+                {step.desc}
+              </p>
+
+              {/* Practical Tip */}
+              {step.tip && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "7px 10px",
+                    background: step.accentBg,
+                    borderRadius: 9,
+                    marginBottom: 12,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "#334155",
+                  }}
+                >
+                  <Wallet size={12} style={{ color: step.iconColor, flexShrink: 0 }} />
+                  <span>{step.tip}</span>
+                </div>
+              )}
+
+              {/* Step Indicators & Actions */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingTop: 10,
+                  borderTop: "1px solid #f1f5f9",
+                }}
+              >
+                {/* Progress pills */}
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  {steps.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setCurrentStep(idx)}
+                      style={{
+                        width: currentStep === idx ? 16 : 5,
+                        height: 5,
+                        borderRadius: 3,
+                        background: currentStep === idx ? step.iconColor : "#cbd5e1",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      title={`Step ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+
+                {/* Navigation buttons */}
+                <div style={{ display: "flex", gap: 6 }}>
+                  {!isFirst && (
+                    <button
+                      type="button"
+                      onClick={handlePrev}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 3,
+                        padding: "5px 10px",
+                        borderRadius: 7,
+                        border: "1px solid #cbd5e1",
+                        background: "#ffffff",
+                        color: "#475569",
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <ChevronLeft size={13} /> Back
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "5px 14px",
+                      borderRadius: 7,
+                      border: "none",
+                      background: "#059669",
+                      color: "#ffffff",
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      boxShadow: "0 3px 8px rgba(5, 150, 105, 0.25)",
+                    }}
+                  >
+                    <span>{isLast ? "Done" : "Next"}</span>
+                    {isLast ? <CheckCircle2 size={13} /> : <ChevronRight size={13} />}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
-      </div>
-    </AnimatePresence>
+      </AnimatePresence>
+    </div>
   );
 }
-

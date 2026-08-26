@@ -79,6 +79,7 @@ export function MarketGrid({
 
   return (
     <motion.div
+      id="market-grid-container"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
