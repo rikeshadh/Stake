@@ -1,85 +1,788 @@
-import express from "express";
-import cors from "cors";
-import path from "path";
-import mongoose from "mongoose";
-import dotenv from "dotenv";
-import crypto from "crypto";
-import YahooFinance from "yahoo-finance2";
-import { createServer as createViteServer } from "vite";
-import {
-  processAgentChat,
-  globalAgentActions,
-  globalAgentMemory,
-  runStrategyBacktest,
-  AgentAction,
-  getAI,
-  hasGeminiKey,
-} from "./server/ai";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 
-dotenv.config();
+// server.ts
+var import_express = __toESM(require("express"), 1);
+var import_cors = __toESM(require("cors"), 1);
+var import_path = __toESM(require("path"), 1);
+var import_mongoose = __toESM(require("mongoose"), 1);
+var import_dotenv = __toESM(require("dotenv"), 1);
+var import_crypto = __toESM(require("crypto"), 1);
+var import_yahoo_finance2 = __toESM(require("yahoo-finance2"), 1);
+var import_vite = require("vite");
 
-const yahooFinance = new YahooFinance();
+// server/ai/geminiClient.ts
+var import_genai2 = require("@google/genai");
 
-// ===== UPDATED: Symbol normalization with aliases =====
-function normalizeYahooSymbol(symbol: string): string {
-  const s = (symbol || "").toUpperCase().trim();
+// server/ai/tools.ts
+var import_genai = require("@google/genai");
+var getPortfolioTool = {
+  name: "get_portfolio",
+  description: "Get the current user's complete portfolio: cash balance, holdings, total portfolio value, unrealized P&L, and asset allocation breakdown.",
+  parameters: {
+    type: import_genai.Type.OBJECT,
+    properties: {}
+  }
+};
+var getStockPriceTool = {
+  name: "get_stock_price",
+  description: "Fetch live real-time price, day change %, high/low, volume, P/E ratio, and market cap for a specific stock ticker.",
+  parameters: {
+    type: import_genai.Type.OBJECT,
+    properties: {
+      symbol: {
+        type: import_genai.Type.STRING,
+        description: "The stock ticker symbol (e.g. 'NVDA', 'AAPL', 'TSLA', 'COIN', 'MSFT')."
+      }
+    },
+    required: ["symbol"]
+  }
+};
+var getPriceHistoryTool = {
+  name: "get_price_history",
+  description: "Get historical price candlestick chart data, trend analysis, and recent performance for a given stock symbol.",
+  parameters: {
+    type: import_genai.Type.OBJECT,
+    properties: {
+      symbol: {
+        type: import_genai.Type.STRING,
+        description: "The stock ticker symbol (e.g. 'NVDA', 'TSLA')."
+      },
+      range: {
+        type: import_genai.Type.STRING,
+        description: "Time range: '1d', '5d', '1mo', '6mo', or '1y'. Defaults to '1mo'."
+      }
+    },
+    required: ["symbol"]
+  }
+};
+var placeOrderTool = {
+  name: "place_order",
+  description: "Execute a live BUY or SELL order for fractional or whole equities within user collateral balances.",
+  parameters: {
+    type: import_genai.Type.OBJECT,
+    properties: {
+      ticker: {
+        type: import_genai.Type.STRING,
+        description: "The stock ticker to trade (e.g. 'NVDA', 'AAPL', 'TSLA')."
+      },
+      side: {
+        type: import_genai.Type.STRING,
+        description: "Order side: 'BUY' or 'SELL'."
+      },
+      shares: {
+        type: import_genai.Type.NUMBER,
+        description: "The number of shares (can be fractional like 0.5, 2.5, 10)."
+      },
+      orderType: {
+        type: import_genai.Type.STRING,
+        description: "Order type: 'MKT' (market) or 'LMT' (limit). Defaults to 'MKT'."
+      },
+      price: {
+        type: import_genai.Type.NUMBER,
+        description: "Optional limit price. If omitted, current market price is used."
+      }
+    },
+    required: ["ticker", "side", "shares"]
+  }
+};
+var setAlertTool = {
+  name: "set_alert",
+  description: "Create an autonomous price target alert for a stock.",
+  parameters: {
+    type: import_genai.Type.OBJECT,
+    properties: {
+      ticker: {
+        type: import_genai.Type.STRING,
+        description: "The stock ticker symbol (e.g. 'NVDA')."
+      },
+      targetPrice: {
+        type: import_genai.Type.NUMBER,
+        description: "The target price trigger in USD."
+      },
+      condition: {
+        type: import_genai.Type.STRING,
+        description: "'ABOVE' if alerting when price rises to target, 'BELOW' if alerting on dip."
+      },
+      note: {
+        type: import_genai.Type.STRING,
+        description: "Short descriptive note or reason for the alert."
+      }
+    },
+    required: ["ticker", "targetPrice"]
+  }
+};
+var analyzeHoldingTool = {
+  name: "analyze_holding",
+  description: "Conduct quantitative and risk analysis on a portfolio asset or candidate stock (volatility, beta, drawdown, diversification score, recommendation).",
+  parameters: {
+    type: import_genai.Type.OBJECT,
+    properties: {
+      symbol: {
+        type: import_genai.Type.STRING,
+        description: "The stock ticker to analyze."
+      }
+    },
+    required: ["symbol"]
+  }
+};
+var allAgentTools = [
+  getPortfolioTool,
+  getStockPriceTool,
+  getPriceHistoryTool,
+  placeOrderTool,
+  setAlertTool,
+  analyzeHoldingTool
+];
 
-  const aliases: Record<string, string> = {
-    "BRK.B": "BRK-B",
-    "BF.B": "BF-B",
-    "SQ": "XYZ",
-    "MMC": "MRSH",
-  };
-
-  return aliases[s] || s;
+// server/ai/geminiClient.ts
+var GEMINI_MODEL = "gemini-2.5-flash";
+function hasGeminiKey() {
+  const key = (process.env.GEMINI_API_KEY || "").trim();
+  return key.length >= 20 && !/your[_-]?gemini|placeholder|here$/i.test(key);
 }
-// =====================================================
+var aiClient = null;
+function getAI() {
+  if (!aiClient) {
+    aiClient = new import_genai2.GoogleGenAI({
+      apiKey: (process.env.GEMINI_API_KEY || "").trim(),
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build"
+        }
+      }
+    });
+  }
+  return aiClient;
+}
+async function processAgentChat({
+  message,
+  history = [],
+  context
+}) {
+  const { user, stocksMap, executeOrderFn, createAlertFn, recentActions, agentMemory } = context;
+  const calculatePortfolio = () => {
+    const holdings = user.holdings || {};
+    let totalStockValue = 0;
+    const positions = [];
+    for (const [ticker, pos] of Object.entries(holdings)) {
+      const livePrice = stocksMap[ticker]?.price || 150;
+      const shares = pos.shares || 0;
+      const costBasis = pos.costBasis || shares * livePrice;
+      const curValue = shares * livePrice;
+      const pnl = curValue - costBasis;
+      const pnlPct = costBasis > 0 ? pnl / costBasis * 100 : 0;
+      totalStockValue += curValue;
+      positions.push({
+        ticker,
+        shares,
+        livePrice,
+        costBasis,
+        curValue,
+        unrealizedPnL: Number(pnl.toFixed(2)),
+        unrealizedPnLPct: Number(pnlPct.toFixed(2))
+      });
+    }
+    const cash = user.cash || 0;
+    const netWorth = cash + totalStockValue;
+    return {
+      cash,
+      totalStockValue: Number(totalStockValue.toFixed(2)),
+      netWorth: Number(netWorth.toFixed(2)),
+      holdingsCount: positions.length,
+      positions,
+      allocation: positions.map((p) => ({
+        ticker: p.ticker,
+        weight: netWorth > 0 ? Number((p.curValue / netWorth * 100).toFixed(1)) : 0
+      }))
+    };
+  };
+  const executeToolCall = async (name, args) => {
+    if (name === "get_portfolio") {
+      return calculatePortfolio();
+    }
+    if (name === "get_stock_price") {
+      const sym = (args.symbol || "").toUpperCase();
+      const stock = stocksMap[sym];
+      if (stock) {
+        return {
+          symbol: sym,
+          name: stock.name,
+          price: stock.price,
+          change: stock.change,
+          changePercent: stock.changePercent,
+          open: stock.open,
+          high: stock.high,
+          low: stock.low,
+          volume: stock.volume,
+          mcap: stock.mcap,
+          pe: stock.pe,
+          sector: stock.sector
+        };
+      }
+      return { symbol: sym, price: 150, changePercent: 1.2, note: "Estimated quote" };
+    }
+    if (name === "get_price_history") {
+      const sym = (args.symbol || "").toUpperCase();
+      const stock = stocksMap[sym] || { price: 150 };
+      const curPrice = stock.price || 150;
+      return {
+        symbol: sym,
+        currentPrice: curPrice,
+        range: args.range || "1mo",
+        supportLevel: Number((curPrice * 0.94).toFixed(2)),
+        resistanceLevel: Number((curPrice * 1.08).toFixed(2)),
+        trend: stock.changePercent >= 0 ? "BULLISH_CONTINUATION" : "PULLBACK_DIP",
+        summary: `${sym} is currently trading at $${curPrice} with a 30-day volatility rating of Medium-High.`
+      };
+    }
+    if (name === "place_order") {
+      const res = await executeOrderFn({
+        ticker: (args.ticker || "").toUpperCase(),
+        side: (args.side || "BUY").toUpperCase(),
+        shares: Number(args.shares),
+        price: args.price ? Number(args.price) : void 0,
+        orderType: args.orderType || "MKT",
+        reason: "Executed directly by natural language user command via Stake Gemini Agent"
+      });
+      return res;
+    }
+    if (name === "set_alert") {
+      const res = await createAlertFn({
+        ticker: (args.ticker || "").toUpperCase(),
+        targetPrice: Number(args.targetPrice),
+        condition: args.condition || "ABOVE",
+        note: args.note || `Alert for ${args.ticker}`
+      });
+      return res;
+    }
+    if (name === "analyze_holding") {
+      const sym = (args.symbol || "").toUpperCase();
+      const stock = stocksMap[sym] || { price: 150, changePercent: 1.5 };
+      const port = calculatePortfolio();
+      const pos = port.positions.find((p) => p.ticker === sym);
+      const isOwned = Boolean(pos);
+      return {
+        symbol: sym,
+        isOwned,
+        sharesOwned: pos ? pos.shares : 0,
+        currentValue: pos ? pos.curValue : 0,
+        portfolioWeightPct: pos && port.netWorth > 0 ? Number((pos.curValue / port.netWorth * 100).toFixed(1)) : 0,
+        volatilityScore: "Medium-High (Beta ~1.34)",
+        technicalRSI: stock.changePercent > 3 ? 68.4 : stock.changePercent < -2 ? 34.2 : 52,
+        analystRating: stock.changePercent >= 0 ? "BUY / ACCUMULATE" : "OPPORTUNISTIC DIP BUY",
+        quantCommentary: `${sym} exhibits strong institutional liquidity and tight bid-ask spreads. Portfolio concentration is healthy.`
+      };
+    }
+    return { error: `Tool ${name} not found` };
+  };
+  const systemInstruction = `You are the Stake Autonomous Intelligence Agent \u2014 a world-class institutional trading copilot, portfolio manager, and execution engine on the Stake Global Exchange.
+You have real tools to view live portfolios, inspect real-time prices & history, place fractional BUY/SELL orders, set alerts, and perform quantitative analysis.
 
-const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+Key Guidelines:
+1. Always utilize your tools when asked about stocks, portfolios, execution, volatility, diversification, or placing trades.
+2. When the user asks to "Buy 10 shares of NVDA" or "Sell 5 AAPL", call the place_order tool immediately to execute it, then explain the execution result clearly (price, total amount, remaining cash balance).
+3. If the user asks analytical questions ("What is my most volatile holding?", "How diversified am I?", "Should I buy the dip on TSLA?"), call get_portfolio and/or analyze_holding to reason with precise numbers.
+4. Keep your tone sharp, professional, quantitative, confident, and conversational like an elite Wall Street portfolio strategist.
+5. You can cite past agent memory decisions if relevant: ${JSON.stringify(agentMemory.slice(0, 5))}.
+`;
+  try {
+    if (!hasGeminiKey()) {
+      return handleLocalFallback(message, context);
+    }
+    const ai = getAI();
+    const tools = [{ functionDeclarations: allAgentTools }];
+    const contents = [];
+    if (history && history.length > 0) {
+      const recentHistory = history.slice(-6);
+      for (const h of recentHistory) {
+        contents.push({
+          role: h.sender === "user" ? "user" : "model",
+          parts: [{ text: h.text }]
+        });
+      }
+    }
+    contents.push({
+      role: "user",
+      parts: [{ text: message }]
+    });
+    let response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents,
+      config: {
+        systemInstruction,
+        tools,
+        temperature: 0.3
+      }
+    });
+    const executedToolLogs = [];
+    while (response.functionCalls && response.functionCalls.length > 0) {
+      const toolCalls = response.functionCalls;
+      const modelTurnContent = response.candidates?.[0]?.content;
+      contents.push(modelTurnContent);
+      const functionResponseParts = [];
+      for (const call of toolCalls) {
+        const toolResult = await executeToolCall(call.name, call.args);
+        executedToolLogs.push({ name: call.name, args: call.args, result: toolResult });
+        functionResponseParts.push({
+          functionResponse: {
+            name: call.name,
+            response: { output: toolResult }
+          }
+        });
+      }
+      contents.push({
+        role: "user",
+        parts: functionResponseParts
+      });
+      response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents,
+        config: {
+          systemInstruction,
+          tools,
+          temperature: 0.3
+        }
+      });
+    }
+    const replyText = response.text || "Execution completed. Market monitoring active.";
+    return {
+      success: true,
+      reply: replyText,
+      toolCalls: executedToolLogs,
+      executedActions: executedToolLogs.filter((t) => t.name === "place_order" || t.name === "set_alert")
+    };
+  } catch (err) {
+    console.error("Gemini Agent error:", err);
+    return handleLocalFallback(message, context);
+  }
+}
+function handleLocalFallback(message, context) {
+  const lower = message.toLowerCase();
+  const { user, stocksMap } = context;
+  if (lower.includes("portfolio") || lower.includes("balance") || lower.includes("worth") || lower.includes("holdings")) {
+    const cash = user.cash || 0;
+    let totalStock = 0;
+    const items = Object.entries(user.holdings || {}).map(([t, p]) => {
+      const price = stocksMap[t]?.price || 150;
+      const val = (p.shares || 0) * price;
+      totalStock += val;
+      return `${p.shares}x ${t} ($${val.toFixed(2)})`;
+    });
+    return {
+      success: true,
+      reply: `Your portfolio net worth is $${(cash + totalStock).toLocaleString("en-US", { minimumFractionDigits: 2 })} with $${cash.toLocaleString("en-US", { minimumFractionDigits: 2 })} available in cash collateral. Current positions: ${items.join(", ") || "No open stock positions"}.`,
+      toolCalls: [{ name: "get_portfolio", args: {} }]
+    };
+  }
+  if (lower.includes("volatile") || lower.includes("risk")) {
+    return {
+      success: true,
+      reply: "Based on 30-day implied volatility and intraday standard deviation, TSLA (Beta ~1.85) and COIN (Beta ~2.1) are currently your most volatile tracked equities.",
+      toolCalls: [{ name: "analyze_holding", args: { symbol: "TSLA" } }]
+    };
+  }
+  if (lower.includes("diversif")) {
+    return {
+      success: true,
+      reply: "Your portfolio has high concentration in mega-cap technology and semiconductors. To improve diversification, consider allocating across healthcare (LLY, UNH), index ETFs (SPY), or consumer staples (WMT, COST).",
+      toolCalls: [{ name: "get_portfolio", args: {} }]
+    };
+  }
+  return {
+    success: true,
+    reply: "I am actively monitoring Level 2 market depth and algorithmic order flow for your active strategy. How can I assist with your portfolio or orders today?",
+    toolCalls: []
+  };
+}
 
+// server/ai/autonomousEngine.ts
+var globalAgentActions = [
+  {
+    id: "act-101",
+    userEmail: "trader@stake.com",
+    ticker: "TSLA",
+    side: "BUY",
+    shares: 4.5,
+    price: 248.5,
+    total: 1118.25,
+    strategy: "dip_buyer",
+    reason: "TSLA pulled back -1.82% intraday below moving average. Executed fractional dip accumulation within $2,000 spend cap.",
+    timestamp: Date.now() - 36e5 * 2,
+    status: "EXECUTED",
+    canRevertUntil: Date.now() - 36e5 * 2 + 3e5
+  },
+  {
+    id: "act-102",
+    userEmail: "trader@stake.com",
+    ticker: "NVDA",
+    side: "BUY",
+    shares: 8,
+    price: 137.86,
+    total: 1102.88,
+    strategy: "momentum",
+    reason: "Surge in Level 2 bid volume (+18,000 shares on TOP 5 bids). Joined continuation breakout.",
+    timestamp: Date.now() - 36e5 * 18,
+    status: "SETTLED",
+    canRevertUntil: Date.now() - 36e5 * 18 + 3e5
+  },
+  {
+    id: "act-103",
+    userEmail: "trader@stake.com",
+    ticker: "AAPL",
+    side: "BUY",
+    shares: 5,
+    price: 228.45,
+    total: 1142.25,
+    strategy: "dca",
+    reason: "Scheduled periodic DCA lot executed across #1 watchlist equity.",
+    timestamp: Date.now() - 36e5 * 36,
+    status: "SETTLED",
+    canRevertUntil: Date.now() - 36e5 * 36 + 3e5
+  }
+];
+var globalAgentMemory = [
+  {
+    id: "mem-1",
+    userEmail: "trader@stake.com",
+    timestamp: Date.now() - 36e5 * 2,
+    text: "Detected heavy institutional limit buy walls on NVDA at $136.50. Risk profile upgraded to Bullish Accumulation.",
+    type: "SCAN"
+  },
+  {
+    id: "mem-2",
+    userEmail: "trader@stake.com",
+    timestamp: Date.now() - 36e5 * 12,
+    text: "Portfolio diversification score is 82/100 across Semiconductors, Consumer Tech, and Digital Assets. Max single-stock weight capped at 30%.",
+    type: "RISK_TRIGGER"
+  },
+  {
+    id: "mem-3",
+    userEmail: "trader@stake.com",
+    timestamp: Date.now() - 36e5 * 24,
+    text: "Market volatility index elevated (VIX +4.2%). Armed circuit breaker at 5% portfolio drawdown.",
+    type: "SAFETY_ALERT"
+  }
+];
+function runStrategyBacktest(strategy, ticker = "NVDA", days = 90, initialCapital = 1e4) {
+  const tickerPrices = {
+    NVDA: { start: 118, end: 137.86, volatility: 0.024, trend: 22e-4 },
+    AAPL: { start: 205, end: 228.45, volatility: 0.012, trend: 14e-4 },
+    TSLA: { start: 210, end: 248.5, volatility: 0.035, trend: 28e-4 },
+    MSFT: { start: 405, end: 430.2, volatility: 0.011, trend: 11e-4 },
+    AMZN: { start: 172, end: 186.4, volatility: 0.016, trend: 15e-4 },
+    COIN: { start: 220, end: 276.46, volatility: 0.045, trend: 35e-4 }
+  };
+  const meta = tickerPrices[ticker] || { start: 100, end: 120, volatility: 0.02, trend: 18e-4 };
+  let currentPrice = meta.start;
+  let capital = initialCapital;
+  let sharesHeld = 0;
+  let cash = initialCapital;
+  let peakCapital = initialCapital;
+  let maxDrawdown = 0;
+  let winningTrades = 0;
+  let losingTrades = 0;
+  const tradeLog = [];
+  const startDate = /* @__PURE__ */ new Date();
+  startDate.setDate(startDate.getDate() - days);
+  for (let i = 0; i < days; i++) {
+    const tradeDate = new Date(startDate);
+    tradeDate.setDate(tradeDate.getDate() + i);
+    const dateStr = tradeDate.toISOString().split("T")[0];
+    const randomShock = (Math.random() - 0.48) * meta.volatility;
+    const dailyReturn = meta.trend + randomShock;
+    const dayOpen = currentPrice;
+    currentPrice = Number(Math.max(10, currentPrice * (1 + dailyReturn)).toFixed(2));
+    const dayLow = Math.min(dayOpen, currentPrice) * 0.99;
+    let shouldBuy = false;
+    let shouldSell = false;
+    let reason = "";
+    if (strategy === "dip_buyer") {
+      const intradayDip = (dayLow - dayOpen) / dayOpen;
+      if (intradayDip < -0.012 && cash > 1e3) {
+        shouldBuy = true;
+        reason = `Intraday dip pullback ${(intradayDip * 100).toFixed(2)}% below open with RSI support`;
+      } else if (sharesHeld > 0 && currentPrice > (tradeLog[tradeLog.length - 1]?.price || dayOpen) * 1.05) {
+        shouldSell = true;
+        reason = `Take profit target +5.0% reached on accumulated position`;
+      }
+    } else if (strategy === "momentum") {
+      if (dailyReturn > 0.015 && cash > 1e3) {
+        shouldBuy = true;
+        reason = `Volume breakout confirmation with ${(dailyReturn * 100).toFixed(2)}% surge`;
+      } else if (sharesHeld > 0 && dailyReturn < -0.018) {
+        shouldSell = true;
+        reason = `Momentum stop loss triggered at -1.8% velocity reversion`;
+      }
+    } else {
+      if (i % 7 === 0 && cash > 500) {
+        shouldBuy = true;
+        reason = `Periodic weekly DCA tranche execution`;
+      }
+    }
+    if (shouldBuy && cash >= 500) {
+      const spend = Math.min(cash * 0.4, 2500);
+      const buyShares = Number((spend / currentPrice).toFixed(3));
+      if (buyShares > 0) {
+        cash -= spend;
+        sharesHeld += buyShares;
+        tradeLog.push({
+          date: dateStr,
+          type: "BUY",
+          price: currentPrice,
+          shares: buyShares,
+          amount: Number(spend.toFixed(2)),
+          reason
+        });
+      }
+    } else if (shouldSell && sharesHeld > 0) {
+      const sellShares = Number((sharesHeld * 0.75).toFixed(3));
+      const proceeds = sellShares * currentPrice;
+      const lastBuy = tradeLog.filter((t) => t.type === "BUY").pop();
+      const pnl = lastBuy ? (currentPrice - lastBuy.price) * sellShares : 0;
+      const pnlPct = lastBuy ? (currentPrice - lastBuy.price) / lastBuy.price * 100 : 0;
+      if (pnl > 0) winningTrades++;
+      else losingTrades++;
+      cash += proceeds;
+      sharesHeld -= sellShares;
+      tradeLog.push({
+        date: dateStr,
+        type: "SELL",
+        price: currentPrice,
+        shares: sellShares,
+        amount: Number(proceeds.toFixed(2)),
+        pnl: Number(pnl.toFixed(2)),
+        pnlPct: Number(pnlPct.toFixed(2)),
+        reason
+      });
+    }
+    const currentPortfolioValue = cash + sharesHeld * currentPrice;
+    if (currentPortfolioValue > peakCapital) peakCapital = currentPortfolioValue;
+    const currentDrawdown = (peakCapital - currentPortfolioValue) / peakCapital * 100;
+    if (currentDrawdown > maxDrawdown) maxDrawdown = currentDrawdown;
+  }
+  capital = Number((cash + sharesHeld * currentPrice).toFixed(2));
+  const totalReturnPct = Number(((capital - initialCapital) / initialCapital * 100).toFixed(2));
+  const benchmarkReturnPct = Number(((meta.end - meta.start) / meta.start * 100).toFixed(2));
+  const totalTrades = tradeLog.length;
+  const winRatePct = totalTrades > 0 ? Number((winningTrades / Math.max(1, winningTrades + losingTrades) * 100).toFixed(1)) : 75;
+  return {
+    strategy,
+    ticker,
+    timeframe: `${days} Days`,
+    initialCapital,
+    finalCapital: capital,
+    totalReturnPct,
+    benchmarkReturnPct,
+    winRatePct: Math.min(95, Math.max(55, winRatePct)),
+    totalTrades,
+    winningTrades,
+    losingTrades,
+    maxDrawdownPct: Number(maxDrawdown.toFixed(2)),
+    sharpeRatio: Number((totalReturnPct / Math.max(4, maxDrawdown * 1.5)).toFixed(2)),
+    tradeLog
+  };
+}
+
+// server.ts
+import_dotenv.default.config();
+var yahooFinance = new import_yahoo_finance2.default();
+function normalizeYahooSymbol(symbol) {
+  const s = (symbol || "").toUpperCase().trim();
+  if (s === "BRK.B") return "BRK-B";
+  if (s === "BF.B") return "BF-B";
+  return s;
+}
+var app = (0, import_express.default)();
+var PORT = Number(process.env.PORT) || 3e3;
 app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "*",
+  (0, import_cors.default)({
+    origin: process.env.FRONTEND_URL || "*"
   })
 );
-app.use(express.json());
-
-// Password Hash Helper Functions (AES / PBKDF2 with salt)
-function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
-  const s = salt || crypto.randomBytes(16).toString("hex");
-  const h = crypto.pbkdf2Sync(password, s, 1000, 64, "sha512").toString("hex");
+app.use(import_express.default.json());
+function hashPassword(password, salt) {
+  const s = salt || import_crypto.default.randomBytes(16).toString("hex");
+  const h = import_crypto.default.pbkdf2Sync(password, s, 1e3, 64, "sha512").toString("hex");
   return { hash: h, salt: s };
 }
-
-function verifyPassword(password: string, hash: string, salt: string): boolean {
-  const h = crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
+function verifyPassword(password, hash, salt) {
+  const h = import_crypto.default.pbkdf2Sync(password, salt, 1e3, 64, "sha512").toString("hex");
   return h === hash;
 }
-
-// Top International Equities Universe (Expanded catalog across all sectors)
-// ===== UPDATED: SQ → XYZ, MMC → MRSH, removed EA =====
-const INTERNATIONAL_TICKERS = [
-  "NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "BRK.B", "TSM", "LLY",
-  "AVGO", "JPM", "WMT", "V", "MA", "UNH", "XOM", "COST", "ORCL", "HD",
-  "PG", "JNJ", "BAC", "ASML", "NFLX", "CRM", "AMD", "ABBV", "CVX", "KO",
-  "PEP", "MRK", "QCOM", "LIN", "TM", "ADBE", "TMO", "WFC", "BABA", "ACN",
-  "MCD", "CSCO", "SAP", "NVO", "TXN", "NOW", "INTU", "IBM", "GE", "CAT",
-  "UBER", "AMAT", "DIS", "ISRG", "PM", "VZ", "AXP", "MS", "GS", "BKNG",
-  "CMG", "PLTR", "COIN", "ARM", "SPY", "QQQ", "INTC", "SBUX", "NKE", "ABNB",
-  "SMCI", "HOOD", "PYPL", "XYZ", "SHOP", "SNOW", "CRWD", "PANW", "FTNT", "MRNA",
-  "PFE", "BMY", "GILD", "AMGN", "VRTX", "REGN", "MDT", "SYK", "BSX", "ZTS",
-  "DE", "HON", "RTX", "LMT", "BA", "UNP", "UPS", "FDX", "MAR", "HLT",
-  "T", "CMCSA", "LOW", "TJX", "TGT", "MDLZ", "MO", "EL", "LULU", "SCHW",
-  "BLK", "SPGI", "MCO", "CB", "PGR", "MRSH", "AON", "CME", "ICE", "COP",
-  "EOG", "SLB", "NEE", "DUK", "SO", "AMT", "PLD", "EQIX", "SPG", "LRCX",
-  "KLAC", "MU", "ADI", "NXPI", "MRVL", "ON", "DELL", "HPQ", "WDC", "STX",
-  "RIVN", "LCID", "F", "GM", "SPOT", "RBLX", "TTWO", "APP", "DASH"
+var INTERNATIONAL_TICKERS = [
+  "NVDA",
+  "AAPL",
+  "MSFT",
+  "AMZN",
+  "GOOGL",
+  "META",
+  "TSLA",
+  "BRK.B",
+  "TSM",
+  "LLY",
+  "AVGO",
+  "JPM",
+  "WMT",
+  "V",
+  "MA",
+  "UNH",
+  "XOM",
+  "COST",
+  "ORCL",
+  "HD",
+  "PG",
+  "JNJ",
+  "BAC",
+  "ASML",
+  "NFLX",
+  "CRM",
+  "AMD",
+  "ABBV",
+  "CVX",
+  "KO",
+  "PEP",
+  "MRK",
+  "QCOM",
+  "LIN",
+  "TM",
+  "ADBE",
+  "TMO",
+  "WFC",
+  "BABA",
+  "ACN",
+  "MCD",
+  "CSCO",
+  "SAP",
+  "NVO",
+  "TXN",
+  "NOW",
+  "INTU",
+  "IBM",
+  "GE",
+  "CAT",
+  "UBER",
+  "AMAT",
+  "DIS",
+  "ISRG",
+  "PM",
+  "VZ",
+  "AXP",
+  "MS",
+  "GS",
+  "BKNG",
+  "CMG",
+  "PLTR",
+  "COIN",
+  "ARM",
+  "SPY",
+  "QQQ",
+  "INTC",
+  "SBUX",
+  "NKE",
+  "ABNB",
+  "SMCI",
+  "HOOD",
+  "PYPL",
+  "SQ",
+  "SHOP",
+  "SNOW",
+  "CRWD",
+  "PANW",
+  "FTNT",
+  "MRNA",
+  "PFE",
+  "BMY",
+  "GILD",
+  "AMGN",
+  "VRTX",
+  "REGN",
+  "MDT",
+  "SYK",
+  "BSX",
+  "ZTS",
+  "DE",
+  "HON",
+  "RTX",
+  "LMT",
+  "BA",
+  "UNP",
+  "UPS",
+  "FDX",
+  "MAR",
+  "HLT",
+  "T",
+  "CMCSA",
+  "LOW",
+  "TJX",
+  "TGT",
+  "MDLZ",
+  "MO",
+  "EL",
+  "LULU",
+  "SCHW",
+  "BLK",
+  "SPGI",
+  "MCO",
+  "CB",
+  "PGR",
+  "MMC",
+  "AON",
+  "CME",
+  "ICE",
+  "COP",
+  "EOG",
+  "SLB",
+  "NEE",
+  "DUK",
+  "SO",
+  "AMT",
+  "PLD",
+  "EQIX",
+  "SPG",
+  "LRCX",
+  "KLAC",
+  "MU",
+  "ADI",
+  "NXPI",
+  "MRVL",
+  "ON",
+  "DELL",
+  "HPQ",
+  "WDC",
+  "STX",
+  "RIVN",
+  "LCID",
+  "F",
+  "GM",
+  "SPOT",
+  "RBLX",
+  "EA",
+  "TTWO",
+  "APP",
+  "DASH"
 ];
-// =====================================================
-
-// ===== UPDATED: TICKER_META keys SQ→XYZ, MMC→MRSH, removed EA =====
-const TICKER_META: Record<string, { name: string; color: string; sector: string }> = {
+var TICKER_META = {
   NVDA: { name: "NVIDIA Corporation", color: "#10b981", sector: "Semiconductors & AI" },
   AAPL: { name: "Apple Inc.", color: "#0284c7", sector: "Consumer Electronics" },
   MSFT: { name: "Microsoft Corporation", color: "#06b6d4", sector: "Cloud & Software" },
@@ -153,7 +856,7 @@ const TICKER_META: Record<string, { name: string; color: string; sector: string 
   SMCI: { name: "Super Micro Computer", color: "#16a34a", sector: "Semiconductors & AI" },
   HOOD: { name: "Robinhood Markets", color: "#10b981", sector: "Fintech & Payments" },
   PYPL: { name: "PayPal Holdings", color: "#2563eb", sector: "Fintech & Payments" },
-  XYZ: { name: "Block Inc.", color: "#10b981", sector: "Fintech & Payments" },
+  SQ: { name: "Block Inc.", color: "#10b981", sector: "Fintech & Payments" },
   SHOP: { name: "Shopify Inc.", color: "#059669", sector: "Cloud & Software" },
   SNOW: { name: "Snowflake Inc.", color: "#0284c7", sector: "Cloud & Software" },
   CRWD: { name: "CrowdStrike Holdings", color: "#dc2626", sector: "Cloud & Software" },
@@ -187,7 +890,7 @@ const TICKER_META: Record<string, { name: string; color: string; sector: string 
   TGT: { name: "Target Corporation", color: "#dc2626", sector: "Consumer & Retail" },
   MDLZ: { name: "Mondelez International", color: "#7c3aed", sector: "Consumer & Retail" },
   MO: { name: "Altria Group", color: "#dc2626", sector: "Consumer & Retail" },
-  EL: { name: "The Estée Lauder Companies", color: "#1e293b", sector: "Consumer & Retail" },
+  EL: { name: "The Est\xE9e Lauder Companies", color: "#1e293b", sector: "Consumer & Retail" },
   LULU: { name: "Lululemon Athletica", color: "#dc2626", sector: "Consumer & Retail" },
   SCHW: { name: "Charles Schwab Corp", color: "#0284c7", sector: "Financials & Banking" },
   BLK: { name: "BlackRock Inc.", color: "#1e293b", sector: "Financials & Banking" },
@@ -195,7 +898,7 @@ const TICKER_META: Record<string, { name: string; color: string; sector: string 
   MCO: { name: "Moody's Corporation", color: "#0284c7", sector: "Financials & Banking" },
   CB: { name: "Chubb Limited", color: "#0284c7", sector: "Financials & Banking" },
   PGR: { name: "The Progressive Corp", color: "#0284c7", sector: "Financials & Banking" },
-  MRSH: { name: "Marsh McLennan", color: "#0284c7", sector: "Financials & Banking" },
+  MMC: { name: "Marsh McLennan", color: "#0284c7", sector: "Financials & Banking" },
   AON: { name: "Aon plc", color: "#dc2626", sector: "Financials & Banking" },
   CME: { name: "CME Group", color: "#0284c7", sector: "Financials & Banking" },
   ICE: { name: "Intercontinental Exchange", color: "#0284c7", sector: "Financials & Banking" },
@@ -226,62 +929,51 @@ const TICKER_META: Record<string, { name: string; color: string; sector: string 
   GM: { name: "General Motors", color: "#0284c7", sector: "Electric Vehicles" },
   SPOT: { name: "Spotify Technology", color: "#16a34a", sector: "Entertainment & Media" },
   RBLX: { name: "Roblox Corporation", color: "#dc2626", sector: "Entertainment & Media" },
-  // EA removed
+  EA: { name: "Electronic Arts", color: "#dc2626", sector: "Entertainment & Media" },
   TTWO: { name: "Take-Two Interactive", color: "#dc2626", sector: "Entertainment & Media" },
   APP: { name: "AppLovin Corporation", color: "#0284c7", sector: "Cloud & Software" },
   DASH: { name: "DoorDash Inc.", color: "#dc2626", sector: "Consumer & Retail" }
 };
-// ==========================================================
-
-// In-Memory Live Quote Cache (TTL: 20 seconds)
-const quoteCache: Map<string, { timestamp: number; data: any }> = new Map();
-const CACHE_TTL_MS = 20000;
-
-function formatMarketCap(cap?: number): string {
+var quoteCache = /* @__PURE__ */ new Map();
+var CACHE_TTL_MS = 2e4;
+function formatMarketCap(cap) {
   if (!cap || cap === 0) return "$ --";
   if (cap >= 1e12) return `$ ${(cap / 1e12).toFixed(2)} T`;
   if (cap >= 1e9) return `$ ${(cap / 1e9).toFixed(2)} B`;
   if (cap >= 1e6) return `$ ${(cap / 1e6).toFixed(2)} M`;
   return `$ ${cap.toLocaleString("en-US")}`;
 }
-
-function formatVolume(vol?: number): string {
+function formatVolume(vol) {
   if (!vol || vol === 0) return "0";
   if (vol >= 1e9) return `${(vol / 1e9).toFixed(2)} B`;
   if (vol >= 1e6) return `${(vol / 1e6).toFixed(2)} M`;
   if (vol >= 1e3) return `${(vol / 1e3).toFixed(1)} K`;
   return vol.toLocaleString("en-US");
 }
-
-async function fetchLiveQuoteFromAPI(symbol: string): Promise<any> {
+async function fetchLiveQuoteFromAPI(symbol) {
   const sym = symbol.toUpperCase();
   const cached = quoteCache.get(sym);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return cached.data;
   }
-
   const querySym = normalizeYahooSymbol(sym);
-
   try {
-    const q: any = await yahooFinance.quote(querySym);
+    const q = await yahooFinance.quote(querySym);
     if (!q) throw new Error(`Symbol ${sym} not found`);
-
     const meta = TICKER_META[sym] || {
       name: q.shortName || q.longName || sym,
       color: "#10b981",
-      sector: q.sector || "Equities",
+      sector: q.sector || "Equities"
     };
-
     const price = Number(Number(q.regularMarketPrice ?? q.currentPrice ?? 150).toFixed(2));
     const prevClose = Number(Number(q.regularMarketPreviousClose ?? price).toFixed(2));
     const open = Number(Number(q.regularMarketOpen ?? prevClose).toFixed(2));
     const high = Number(Number(q.regularMarketDayHigh ?? Math.max(price, open)).toFixed(2));
     const low = Number(Number(q.regularMarketDayLow ?? Math.min(price, open)).toFixed(2));
-    const change = Number(Number(q.regularMarketChange ?? (price - prevClose)).toFixed(2));
-    const changePercent = Number(Number(q.regularMarketChangePercent ?? ((change / (prevClose || 1)) * 100)).toFixed(2));
-    const volume = Number(q.regularMarketVolume ?? 15000000);
+    const change = Number(Number(q.regularMarketChange ?? price - prevClose).toFixed(2));
+    const changePercent = Number(Number(q.regularMarketChangePercent ?? change / (prevClose || 1) * 100).toFixed(2));
+    const volume = Number(q.regularMarketVolume ?? 15e6);
     const turnoverVal = price * volume;
-
     const data = {
       ticker: sym,
       symbol: sym,
@@ -298,36 +990,33 @@ async function fetchLiveQuoteFromAPI(symbol: string): Promise<any> {
       low52: Number(Number(q.fiftyTwoWeekLow ?? price * 0.75).toFixed(2)),
       color: meta.color,
       mcap: formatMarketCap(q.marketCap),
-      pe: q.trailingPE ? Number(q.trailingPE.toFixed(1)) : (q.forwardPE ? Number(q.forwardPE.toFixed(1)) : 28.5),
-      eps: q.epsTrailingTwelveMonths ? Number(q.epsTrailingTwelveMonths.toFixed(2)) : 3.50,
+      pe: q.trailingPE ? Number(q.trailingPE.toFixed(1)) : q.forwardPE ? Number(q.forwardPE.toFixed(1)) : 28.5,
+      eps: q.epsTrailingTwelveMonths ? Number(q.epsTrailingTwelveMonths.toFixed(2)) : 3.5,
       sector: meta.sector,
       volume,
       turnover: formatMarketCap(turnoverVal),
       bookValue: q.bookValue ? Number(q.bookValue.toFixed(2)) : Number((price * 0.25).toFixed(2)),
       listedShares: formatVolume(q.sharesOutstanding),
       currency: "$",
-      exchange: q.fullExchangeName || "NASDAQ / NYSE",
+      exchange: q.fullExchangeName || "NASDAQ / NYSE"
     };
-
     quoteCache.set(sym, { timestamp: Date.now(), data });
     return data;
-  } catch (err: any) {
+  } catch (err) {
     console.error(`Yahoo Finance failed for ${sym}:`, err.message);
     throw err;
   }
 }
-
-// MongoDB Schema Definitions
-const userSchema = new mongoose.Schema({
+var userSchema = new import_mongoose.default.Schema({
   email: { type: String, required: true, unique: true },
   username: { type: String },
   name: { type: String, required: true },
   passwordHash: { type: String },
   passwordSalt: { type: String },
-  accountNumber: { type: String, default: () => `STK-${Math.floor(1000000000 + Math.random() * 9000000000)}` },
+  accountNumber: { type: String, default: () => `STK-${Math.floor(1e9 + Math.random() * 9e9)}` },
   currency: { type: String, default: "USD" },
-  cash: { type: Number, default: 50000 },
-  holdings: { type: mongoose.Schema.Types.Mixed, default: {} },
+  cash: { type: Number, default: 5e4 },
+  holdings: { type: import_mongoose.default.Schema.Types.Mixed, default: {} },
   watchlist: { type: [String], default: [] },
   agentEnabled: { type: Boolean, default: false },
   agentDeployedCapital: { type: Number, default: 0 },
@@ -335,7 +1024,7 @@ const userSchema = new mongoose.Schema({
   agentStrategy: { type: String, default: "" },
   privacyMode: { type: Boolean, default: false },
   kycStatus: { type: String, enum: ["UNVERIFIED", "PENDING", "VERIFIED"], default: "UNVERIFIED" },
-  kycData: { type: mongoose.Schema.Types.Mixed, default: {} },
+  kycData: { type: import_mongoose.default.Schema.Types.Mixed, default: {} },
   orders: [{
     scrip: String,
     type: { type: String, enum: ["BUY", "SELL"] },
@@ -363,15 +1052,11 @@ const userSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now }
   }]
 }, { timestamps: true, minimize: false });
-
-let UserModel: mongoose.Model<any> | null = null;
-let isMongoConnected = false;
-let mongoConnectionError: string | null = null;
-
-const defaultDemoCreds = hashPassword("password123");
-
-// In-Memory store fallback (Clean $0 virtual sandbox with zero pre-bought holdings)
-const inMemoryUsers: Record<string, any> = {
+var UserModel = null;
+var isMongoConnected = false;
+var mongoConnectionError = null;
+var defaultDemoCreds = hashPassword("password123");
+var inMemoryUsers = {
   "guesttrader67@stake.com": {
     email: "guestTrader67@stake.com",
     name: "Demo Account",
@@ -403,7 +1088,7 @@ const inMemoryUsers: Record<string, any> = {
       netWorth: "$250,000 - $500,000",
       investmentGoal: "Long-term Capital Growth & Equities",
       riskTolerance: "Aggressive Growth & Equities",
-      verifiedAt: new Date().toISOString(),
+      verifiedAt: (/* @__PURE__ */ new Date()).toISOString()
     },
     orders: [],
     alerts: [],
@@ -440,88 +1125,78 @@ const inMemoryUsers: Record<string, any> = {
       netWorth: "$250,000 - $500,000",
       investmentGoal: "Long-term Capital Growth & Equities",
       riskTolerance: "Aggressive Growth & Equities",
-      verifiedAt: new Date().toISOString(),
+      verifiedAt: (/* @__PURE__ */ new Date()).toISOString()
     },
     orders: [],
     alerts: [],
     transactions: []
   }
 };
-
-async function connectDB(overrideUri?: string) {
+async function connectDB(overrideUri) {
   const mongoUri = overrideUri || process.env.MONGODB_URI;
-  
   if (!mongoUri) {
     console.log("MONGODB_URI not configured. Operating in high-performance dual-resilient mode.");
     isMongoConnected = false;
     mongoConnectionError = "MONGODB_URI environment variable not provided.";
     return false;
   }
-
   try {
-    mongoose.set("strictQuery", false);
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.disconnect();
+    import_mongoose.default.set("strictQuery", false);
+    if (import_mongoose.default.connection.readyState !== 0) {
+      await import_mongoose.default.disconnect();
     }
-    await mongoose.connect(mongoUri, {
+    await import_mongoose.default.connect(mongoUri, {
       family: 4,
-      serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 8000,
-      socketTimeoutMS: 45000,
-      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 1e4,
+      connectTimeoutMS: 8e3,
+      socketTimeoutMS: 45e3,
+      maxPoolSize: 10
     });
     isMongoConnected = true;
     mongoConnectionError = null;
-    UserModel = mongoose.models.User || mongoose.model("User", userSchema);
+    UserModel = import_mongoose.default.models.User || import_mongoose.default.model("User", userSchema);
     console.log("Connected successfully to MongoDB Atlas / Database");
     return true;
-  } catch (err: any) {
+  } catch (err) {
     mongoConnectionError = err.message;
     console.log("MongoDB connection attempt fallback:", err.message);
     isMongoConnected = false;
     return false;
   }
 }
-
 connectDB();
-
-// Register Mongoose connection event listeners for auto-recovery
-mongoose.connection.on("connected", () => {
+import_mongoose.default.connection.on("connected", () => {
   isMongoConnected = true;
   mongoConnectionError = null;
   console.log("Mongoose connection established.");
 });
-mongoose.connection.on("disconnected", () => {
+import_mongoose.default.connection.on("disconnected", () => {
   isMongoConnected = false;
   console.log("Mongoose connection disconnected. Utilizing in-memory store.");
 });
-mongoose.connection.on("error", (err) => {
+import_mongoose.default.connection.on("error", (err) => {
   isMongoConnected = false;
   mongoConnectionError = err?.message || "Unknown error";
   console.error("Mongoose connection error:", err);
 });
-
-// ==================== SYSTEM HEALTH & API DIAGNOSTICS ====================
-
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "healthy",
     uptimeSeconds: Math.floor(process.uptime()),
-    timestamp: new Date().toISOString(),
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
     database: {
       driver: "Mongoose / MongoDB Atlas",
       connected: isMongoConnected,
       mode: isMongoConnected ? "MongoDB Atlas / Cloud Instance (Active)" : "Resilient High-Speed Dual Mode (Active)",
-      error: mongoConnectionError,
+      error: mongoConnectionError
     },
     apis: {
       yahooFinanceMarketFeed: "OPERATIONAL",
       cachedSymbolsCount: quoteCache.size,
-      geminiAiEngine: hasGeminiKey() ? "ACTIVE" : "HEURISTIC_QUANT_ACTIVE",
-    },
+      geminiAiEngine: hasGeminiKey() ? "ACTIVE" : "HEURISTIC_QUANT_ACTIVE"
+    }
   });
 });
-
 app.get("/api/status", (_req, res) => {
   res.json({
     success: true,
@@ -529,26 +1204,23 @@ app.get("/api/status", (_req, res) => {
     version: "2.5.0",
     mongoConnected: isMongoConnected,
     mongoError: mongoConnectionError,
-    timestamp: Date.now(),
+    timestamp: Date.now()
   });
 });
-
 app.get("/api/database/status", (_req, res) => {
   res.json({
     success: true,
     connected: isMongoConnected,
     error: mongoConnectionError,
     uriConfigured: Boolean(process.env.MONGODB_URI),
-    mode: isMongoConnected ? "MongoDB Atlas Cluster" : "In-Memory Dual-State Engine",
+    mode: isMongoConnected ? "MongoDB Atlas Cluster" : "In-Memory Dual-State Engine"
   });
 });
-
 app.post("/api/database/connect", async (req, res) => {
   const { uri } = req.body;
-  if (!uri || typeof uri !== "string" || (!uri.startsWith("mongodb://") && !uri.startsWith("mongodb+srv://"))) {
+  if (!uri || typeof uri !== "string" || !uri.startsWith("mongodb://") && !uri.startsWith("mongodb+srv://")) {
     return res.status(400).json({ success: false, message: "Please provide a valid MongoDB connection string (mongodb:// or mongodb+srv://)" });
   }
-
   process.env.MONGODB_URI = uri.trim();
   const ok = await connectDB(uri.trim());
   if (ok) {
@@ -557,96 +1229,76 @@ app.post("/api/database/connect", async (req, res) => {
     return res.status(500).json({ success: false, message: `Could not connect: ${mongoConnectionError || "Invalid credentials or network timeout"}` });
   }
 });
-
-// ==================== INTERNATIONAL STOCK API ENDPOINTS ====================
-
-// 1. GET /api/stocks - List all international stocks pulled live via API
 app.get("/api/stocks", async (_req, res) => {
   try {
     const results = await Promise.allSettled(
       INTERNATIONAL_TICKERS.map((ticker) => fetchLiveQuoteFromAPI(ticker))
     );
-
-    const stocksList = results
-      .map((r) => (r.status === "fulfilled" ? r.value : null))
-      .filter(Boolean);
-
+    const stocksList = results.map((r) => r.status === "fulfilled" ? r.value : null).filter(Boolean);
     res.json({
       success: true,
       count: stocksList.length,
       timestamp: Date.now(),
-      stocks: stocksList,
+      stocks: stocksList
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error fetching international stocks list:", err);
     res.status(500).json({ success: false, message: err.message, stocks: [] });
   }
 });
-
-// 2. GET /api/stocks/:ticker - Get individual stock details & live Level 2 order depth
 app.get("/api/stocks/:ticker", async (req, res) => {
   const ticker = req.params.ticker.toUpperCase();
   try {
     const stock = await fetchLiveQuoteFromAPI(ticker);
-
     if (!stock) {
       return res.status(404).json({ success: false, message: `Stock ${ticker} not found` });
     }
-
-    // Generate real-time synthetic Level 2 Market Depth matching live market price
     const top5Buy = [
       { orders: 18, qty: 1450, price: Number((stock.price * 0.999).toFixed(2)) },
       { orders: 24, qty: 3200, price: Number((stock.price * 0.997).toFixed(2)) },
       { orders: 12, qty: 1850, price: Number((stock.price * 0.995).toFixed(2)) },
       { orders: 35, qty: 5400, price: Number((stock.price * 0.992).toFixed(2)) },
-      { orders: 40, qty: 8900, price: Number((stock.price * 0.989).toFixed(2)) },
+      { orders: 40, qty: 8900, price: Number((stock.price * 0.989).toFixed(2)) }
     ];
-
     const top5Sell = [
       { price: Number((stock.price * 1.001).toFixed(2)), qty: 1280, orders: 15 },
       { price: Number((stock.price * 1.003).toFixed(2)), qty: 2740, orders: 22 },
       { price: Number((stock.price * 1.005).toFixed(2)), qty: 4120, orders: 31 },
       { price: Number((stock.price * 1.008).toFixed(2)), qty: 6200, orders: 45 },
-      { price: Number((stock.price * 1.011).toFixed(2)), qty: 9800, orders: 58 },
+      { price: Number((stock.price * 1.011).toFixed(2)), qty: 9800, orders: 58 }
     ];
-
     res.json({
       success: true,
       stock: {
         ...stock,
-        circuitLimitHigh: Number((stock.price * 1.20).toFixed(2)),
-        circuitLimitLow: Number((stock.price * 0.80).toFixed(2)),
+        circuitLimitHigh: Number((stock.price * 1.2).toFixed(2)),
+        circuitLimitLow: Number((stock.price * 0.8).toFixed(2)),
         depth: {
           buy: top5Buy,
           sell: top5Sell,
           totalBuyQty: top5Buy.reduce((a, b) => a + b.qty, 0),
-          totalSellQty: top5Sell.reduce((a, b) => a + b.qty, 0),
-        },
-      },
+          totalSellQty: top5Sell.reduce((a, b) => a + b.qty, 0)
+        }
+      }
     });
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-// 3. GET /api/market/summary - Live Global Indices and Market Breadth
 app.get("/api/market/summary", async (_req, res) => {
   try {
-    let sp500Price = 5648.40;
-    let sp500Change = 24.80;
+    let sp500Price = 5648.4;
+    let sp500Change = 24.8;
     let sp500ChangePct = 0.44;
-
     try {
-      const q: any = await yahooFinance.quote("^GSPC");
+      const q = await yahooFinance.quote("^GSPC");
       if (q) {
-        sp500Price = Number((q.regularMarketPrice ?? 5648.40).toFixed(2));
-        sp500Change = Number((q.regularMarketChange ?? 24.80).toFixed(2));
+        sp500Price = Number((q.regularMarketPrice ?? 5648.4).toFixed(2));
+        sp500Change = Number((q.regularMarketChange ?? 24.8).toFixed(2));
         sp500ChangePct = Number((q.regularMarketChangePercent ?? 0.44).toFixed(2));
       }
     } catch (e) {
-      // quiet fallback
     }
-
     res.json({
       success: true,
       benchmark: {
@@ -656,42 +1308,38 @@ app.get("/api/market/summary", async (_req, res) => {
         changePercent: sp500ChangePct,
         isUp: sp500Change >= 0,
         turnover: "$ 48.25 B",
-        totalTrades: 4289000,
+        totalTrades: 4289e3,
         advances: 342,
         declines: 154,
-        unchanged: 8,
+        unchanged: 8
       },
       topMovers: [
         { ticker: "NVDA", change: 3.8, price: 137.86 },
-        { ticker: "TSLA", change: 2.9, price: 248.50 },
-        { ticker: "COIN", change: 4.2, price: 276.46 },
-      ],
+        { ticker: "TSLA", change: 2.9, price: 248.5 },
+        { ticker: "COIN", change: 4.2, price: 276.46 }
+      ]
     });
-  } catch (err: any) {
+  } catch (err) {
     res.json({
       success: true,
       benchmark: {
         name: "S&P 500 GLOBAL COMPOSITE",
-        value: 5648.40,
-        change: 24.80,
+        value: 5648.4,
+        change: 24.8,
         changePercent: 0.44,
         isUp: true,
         turnover: "$ 48.25 B",
-        totalTrades: 4289000,
+        totalTrades: 4289e3,
         advances: 342,
         declines: 154,
-        unchanged: 8,
+        unchanged: 8
       },
-      topMovers: [],
+      topMovers: []
     });
   }
 });
-
-// ==================== AUTH & USER ENDPOINTS ====================
-
 app.post("/api/auth/register", async (req, res) => {
   const { email, name, username, password } = req.body;
-
   if (!email || !email.includes("@")) {
     return res.status(400).json({ success: false, message: "Valid email address is required" });
   }
@@ -701,14 +1349,10 @@ app.post("/api/auth/register", async (req, res) => {
   if (!password || password.length < 6) {
     return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
   }
-
   const targetEmail = email.toLowerCase().trim();
   const targetUsername = (username || name || email.split("@")[0]).toLowerCase().trim().replace(/^@/, "");
-  const accountNumber = `STK-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+  const accountNumber = `STK-${Math.floor(1e9 + Math.random() * 9e9)}`;
   const { hash, salt } = hashPassword(password);
-
-  // New clean account: unverified KYC, zero holdings, zero watchlist, zero alerts, $0 cash.
-  // Stake AI is activated by default so the autonomous engine is live from day one.
   const VALID_STRATEGIES = ["dip_buyer", "momentum", "dca", "volatility_sentinel", "defensive_yield"];
   const requestedStrategy = String(req.body.strategy || "").trim();
   const newUser = {
@@ -732,7 +1376,6 @@ app.post("/api/auth/register", async (req, res) => {
     alerts: [],
     transactions: []
   };
-
   if (isMongoConnected && UserModel) {
     try {
       const existing = await UserModel.findOne({ email: targetEmail });
@@ -740,44 +1383,39 @@ app.post("/api/auth/register", async (req, res) => {
         return res.status(400).json({ success: false, message: "An account with this email already exists. Please log in." });
       }
       const created = await UserModel.create(newUser);
-      const safeUser = created.toObject();
-      delete (safeUser as any).passwordHash;
-      delete (safeUser as any).passwordSalt;
-      const token = `stk_auth_${crypto.randomBytes(24).toString("hex")}`;
-      return res.json({ success: true, token, user: safeUser });
-    } catch (e: any) {
+      const safeUser2 = created.toObject();
+      delete safeUser2.passwordHash;
+      delete safeUser2.passwordSalt;
+      const token2 = `stk_auth_${import_crypto.default.randomBytes(24).toString("hex")}`;
+      return res.json({ success: true, token: token2, user: safeUser2 });
+    } catch (e) {
       console.error("Register error:", e);
       return res.status(500).json({ success: false, message: e.message || "Failed to create user account" });
     }
   }
-
   if (inMemoryUsers[targetEmail]) {
     return res.status(400).json({ success: false, message: "An account with this email already exists. Please log in." });
   }
-
   inMemoryUsers[targetEmail] = newUser;
   const safeUser = { ...newUser };
-  delete (safeUser as any).passwordHash;
-  delete (safeUser as any).passwordSalt;
-  const token = `stk_auth_${crypto.randomBytes(24).toString("hex")}`;
+  delete safeUser.passwordHash;
+  delete safeUser.passwordSalt;
+  const token = `stk_auth_${import_crypto.default.randomBytes(24).toString("hex")}`;
   return res.json({ success: true, token, user: safeUser });
 });
-
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
   const targetIdentifier = (email || "").toLowerCase().trim();
-
   if (!targetIdentifier) {
     return res.status(400).json({ success: false, message: "Please provide your username or email address." });
   }
   if (!password) {
     return res.status(400).json({ success: false, message: "Please enter your password" });
   }
-
   if (isMongoConnected && UserModel) {
     try {
       const escaped = targetIdentifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const user = await UserModel.findOne({
+      const user2 = await UserModel.findOne({
         $or: [
           { email: targetIdentifier },
           { username: targetIdentifier.replace(/^@/, "") },
@@ -785,123 +1423,99 @@ app.post("/api/auth/login", async (req, res) => {
           { accountNumber: targetIdentifier.toUpperCase() }
         ]
       });
-
-      if (!user) {
+      if (!user2) {
         return res.status(401).json({
           success: false,
-          message: "No account found with this username or email. Please create an account to start.",
+          message: "No account found with this username or email. Please create an account to start."
         });
       }
-
-      if (user.passwordHash && user.passwordSalt) {
-        const isValid = verifyPassword(password, user.passwordHash, user.passwordSalt);
+      if (user2.passwordHash && user2.passwordSalt) {
+        const isValid = verifyPassword(password, user2.passwordHash, user2.passwordSalt);
         if (!isValid) {
           return res.status(401).json({ success: false, message: "Invalid password. Please check your credentials." });
         }
       }
-
-      const safeUser = user.toObject ? user.toObject() : { ...user };
-      delete (safeUser as any).passwordHash;
-      delete (safeUser as any).passwordSalt;
-      const token = `stk_auth_${crypto.randomBytes(24).toString("hex")}`;
-      return res.json({ success: true, token, user: safeUser });
-    } catch (e: any) {
+      const safeUser2 = user2.toObject ? user2.toObject() : { ...user2 };
+      delete safeUser2.passwordHash;
+      delete safeUser2.passwordSalt;
+      const token2 = `stk_auth_${import_crypto.default.randomBytes(24).toString("hex")}`;
+      return res.json({ success: true, token: token2, user: safeUser2 });
+    } catch (e) {
       console.error("Mongo login error:", e);
     }
   }
-
   const user = Object.values(inMemoryUsers).find(
-    (u) =>
-      u.email?.toLowerCase() === targetIdentifier ||
-      (u.username && u.username.toLowerCase() === targetIdentifier.replace(/^@/, "")) ||
-      (u.name && u.name.toLowerCase() === targetIdentifier) ||
-      (u.accountNumber && u.accountNumber.toLowerCase() === targetIdentifier)
+    (u) => u.email?.toLowerCase() === targetIdentifier || u.username && u.username.toLowerCase() === targetIdentifier.replace(/^@/, "") || u.name && u.name.toLowerCase() === targetIdentifier || u.accountNumber && u.accountNumber.toLowerCase() === targetIdentifier
   );
-
   if (!user) {
     return res.status(401).json({
       success: false,
-      message: "No account found with this username or email. Please create an account to start.",
+      message: "No account found with this username or email. Please create an account to start."
     });
   }
-
   if (user.passwordHash && user.passwordSalt) {
     const isValid = verifyPassword(password, user.passwordHash, user.passwordSalt);
     if (!isValid) {
       return res.status(401).json({ success: false, message: "Invalid password. Please check your credentials." });
     }
   }
-
   const safeUser = { ...user };
-  delete (safeUser as any).passwordHash;
-  delete (safeUser as any).passwordSalt;
-  const token = `stk_auth_${crypto.randomBytes(24).toString("hex")}`;
+  delete safeUser.passwordHash;
+  delete safeUser.passwordSalt;
+  const token = `stk_auth_${import_crypto.default.randomBytes(24).toString("hex")}`;
   return res.json({ success: true, token, user: safeUser });
 });
-
-// GET /api/auth/me - Verify stored token and retrieve current user session
 app.get("/api/auth/me", async (req, res) => {
   const authHeader = req.headers.authorization;
-  const emailParam = (req.query.email as string || "").toLowerCase().trim();
-  
+  const emailParam = (req.query.email || "").toLowerCase().trim();
   if (!authHeader && !emailParam) {
     return res.status(401).json({ success: false, message: "No authorization token provided" });
   }
-
   const user = await getUserRecord(emailParam || "trader@stake.com");
   if (!user) {
     return res.status(404).json({ success: false, message: "User not found" });
   }
-
   const safeUser = { ...user };
-  delete (safeUser as any).passwordHash;
-  delete (safeUser as any).passwordSalt;
+  delete safeUser.passwordHash;
+  delete safeUser.passwordSalt;
   return res.json({ success: true, user: safeUser });
 });
-
-// GET /api/user - Fetch latest state of user profile, cash, holdings, and orders
 app.get("/api/user", async (req, res) => {
-  const email = ((req.query.email as string) || "trader@stake.com").toLowerCase().trim();
+  const email = (req.query.email || "trader@stake.com").toLowerCase().trim();
   const user = await getUserRecord(email);
   return res.json({ success: true, user });
 });
-
-// KYC Verification Endpoints
 app.get("/api/kyc", async (req, res) => {
-  const email = ((req.query.email as string) || "trader@stake.com").toLowerCase().trim();
+  const email = (req.query.email || "trader@stake.com").toLowerCase().trim();
   if (isMongoConnected && UserModel) {
     try {
-      const user = await UserModel.findOne({ email });
+      const user2 = await UserModel.findOne({ email });
       return res.json({
         success: true,
-        kycStatus: user?.kycStatus || "UNVERIFIED",
-        kycData: user?.kycData || {},
+        kycStatus: user2?.kycStatus || "UNVERIFIED",
+        kycData: user2?.kycData || {}
       });
-    } catch (e: any) {
+    } catch (e) {
       console.error("KYC fetch error:", e);
     }
   }
-
   const user = inMemoryUsers[email];
   return res.json({
     success: true,
     kycStatus: user?.kycStatus || "UNVERIFIED",
-    kycData: user?.kycData || {},
+    kycData: user?.kycData || {}
   });
 });
-
 app.post("/api/kyc", async (req, res) => {
   const { email, kycData } = req.body;
   const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
-
   const verifiedRecord = {
     ...kycData,
     status: "VERIFIED",
-    verifiedAt: new Date().toISOString(),
+    verifiedAt: (/* @__PURE__ */ new Date()).toISOString(),
     complianceOfficer: "Automated FINRA KYC AI Engine",
-    riskScore: "LOW_RISK",
+    riskScore: "LOW_RISK"
   };
-
   if (isMongoConnected && UserModel) {
     try {
       const user = await UserModel.findOneAndUpdate(
@@ -910,29 +1524,25 @@ app.post("/api/kyc", async (req, res) => {
         { new: true, upsert: true }
       );
       return res.json({ success: true, kycStatus: "VERIFIED", kycData: verifiedRecord, user });
-    } catch (e: any) {
+    } catch (e) {
       console.error("KYC submit error:", e);
     }
   }
-
   if (!inMemoryUsers[targetEmail]) {
     inMemoryUsers[targetEmail] = { email: targetEmail, name: "Verified Investor" };
   }
   inMemoryUsers[targetEmail].kycStatus = "VERIFIED";
   inMemoryUsers[targetEmail].kycData = verifiedRecord;
-
   return res.json({
     success: true,
     kycStatus: "VERIFIED",
     kycData: verifiedRecord,
-    user: inMemoryUsers[targetEmail],
+    user: inMemoryUsers[targetEmail]
   });
 });
-
 app.post("/api/sync", async (req, res) => {
   const { email, name, accountNumber, currency, cash, holdings, watchlist, agentEnabled, privacyMode, kycStatus, kycData, orders, transactions } = req.body;
   const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
-
   if (isMongoConnected && UserModel) {
     try {
       const user = await UserModel.findOneAndUpdate(
@@ -941,11 +1551,10 @@ app.post("/api/sync", async (req, res) => {
         { new: true, upsert: true }
       );
       return res.json({ success: true, user });
-    } catch (e: any) {
+    } catch (e) {
       console.error("Mongo sync error:", e);
     }
   }
-
   inMemoryUsers[targetEmail] = {
     ...inMemoryUsers[targetEmail],
     name: name || inMemoryUsers[targetEmail]?.name,
@@ -961,17 +1570,13 @@ app.post("/api/sync", async (req, res) => {
     orders: orders || inMemoryUsers[targetEmail]?.orders || [],
     transactions: transactions || inMemoryUsers[targetEmail]?.transactions || []
   };
-
   res.json({ success: true, user: inMemoryUsers[targetEmail] });
 });
-
-// Reset user account to clean $0 sandbox
 app.post("/api/user/reset", async (req, res) => {
   const { email } = req.body;
   const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
-
   const cleanState = {
-    cash: 0.0,
+    cash: 0,
     holdings: {},
     watchlist: [],
     orders: [],
@@ -981,9 +1586,8 @@ app.post("/api/user/reset", async (req, res) => {
     agentDeployedCapital: 0,
     agentMaxSpend: 500,
     agentStrategy: "momentum_breakout",
-    kycStatus: "VERIFIED",
+    kycStatus: "VERIFIED"
   };
-
   if (isMongoConnected && UserModel) {
     try {
       const updated = await UserModel.findOneAndUpdate(
@@ -991,77 +1595,61 @@ app.post("/api/user/reset", async (req, res) => {
         { $set: cleanState },
         { new: true, upsert: true }
       );
-      const safeUser = updated.toObject ? updated.toObject() : { ...updated };
-      delete (safeUser as any).passwordHash;
-      delete (safeUser as any).passwordSalt;
-      return res.json({ success: true, message: "Account reset to clean $0 sandbox", user: safeUser });
-    } catch (e: any) {
+      const safeUser2 = updated.toObject ? updated.toObject() : { ...updated };
+      delete safeUser2.passwordHash;
+      delete safeUser2.passwordSalt;
+      return res.json({ success: true, message: "Account reset to clean $0 sandbox", user: safeUser2 });
+    } catch (e) {
       console.error("Mongo reset error:", e);
     }
   }
-
   if (!inMemoryUsers[targetEmail]) {
     inMemoryUsers[targetEmail] = {
       email: targetEmail,
       name: "Active Trader",
-      accountNumber: `STK-LIVE-${Math.floor(100000 + Math.random() * 900000)}`,
-      currency: "USD",
+      accountNumber: `STK-LIVE-${Math.floor(1e5 + Math.random() * 9e5)}`,
+      currency: "USD"
     };
   }
-
   inMemoryUsers[targetEmail] = {
     ...inMemoryUsers[targetEmail],
-    ...cleanState,
+    ...cleanState
   };
-
   const safeUser = { ...inMemoryUsers[targetEmail] };
-  delete (safeUser as any).passwordHash;
-  delete (safeUser as any).passwordSalt;
+  delete safeUser.passwordHash;
+  delete safeUser.passwordSalt;
   return res.json({ success: true, message: "Account reset to clean $0 sandbox", user: safeUser });
 });
-
-// Delete user account
 app.post("/api/user/delete", async (req, res) => {
   const { email } = req.body;
   const targetEmail = (email || "").toLowerCase().trim();
-
   if (!targetEmail) {
     return res.status(400).json({ success: false, message: "User email is required" });
   }
-
   if (isMongoConnected && UserModel) {
     try {
       await UserModel.deleteOne({ email: targetEmail });
-    } catch (e: any) {
+    } catch (e) {
       console.error("Error deleting user from Mongo:", e);
     }
   }
-
   if (inMemoryUsers[targetEmail]) {
     delete inMemoryUsers[targetEmail];
   }
-
   return res.json({ success: true, message: "User account deleted successfully" });
 });
-
-// ==================== YFINANCE & REAL-TIME STOCK API ====================
-
-// 4. GET /api/yfinance/quote/:symbol - Real-time quote using Yahoo Finance
-// ===== UPDATED: Normalize symbol before query =====
 app.get("/api/yfinance/quote/:symbol", async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
-  const yahooSymbol = normalizeYahooSymbol(symbol);
   try {
-    const q: any = await yahooFinance.quote(yahooSymbol);
+    const q = await yahooFinance.quote(symbol);
     if (!q) {
       return res.status(404).json({ success: false, message: `Symbol ${symbol} not found` });
     }
     const price = q.regularMarketPrice ?? q.currentPrice ?? 100;
     const prevClose = q.regularMarketPreviousClose ?? price;
     const open = q.regularMarketOpen ?? prevClose;
-    const change = q.regularMarketChange ?? (price - prevClose);
-    const changePercent = q.regularMarketChangePercent ?? ((change / prevClose) * 100);
-
+    const change = q.regularMarketChange ?? price - prevClose;
+    const changePercent = q.regularMarketChangePercent ?? change / prevClose * 100;
     return res.json({
       success: true,
       data: {
@@ -1074,46 +1662,39 @@ app.get("/api/yfinance/quote/:symbol", async (req, res) => {
         previousClose: prevClose,
         change: Number(change.toFixed(2)),
         changePercent: Number(changePercent.toFixed(2)),
-        volume: q.regularMarketVolume ?? 1000000,
+        volume: q.regularMarketVolume ?? 1e6,
         mcap: q.marketCap ? `$ ${(q.marketCap / 1e9).toFixed(2)}B` : "N/A",
-        pe: q.trailingPE ? Number(q.trailingPE.toFixed(1)) : (q.forwardPE ? Number(q.forwardPE.toFixed(1)) : 25.4),
+        pe: q.trailingPE ? Number(q.trailingPE.toFixed(1)) : q.forwardPE ? Number(q.forwardPE.toFixed(1)) : 25.4,
         eps: q.epsTrailingTwelveMonths ?? 2.5,
         high52: q.fiftyTwoWeekHigh ?? price * 1.2,
         low52: q.fiftyTwoWeekLow ?? price * 0.8,
         currency: "$",
-        exchange: q.fullExchangeName || "NASDAQ / NYSE",
+        exchange: q.fullExchangeName || "NASDAQ / NYSE"
       }
     });
-  } catch (err: any) {
+  } catch (err) {
     console.warn(`yfinance quote error for ${symbol}:`, err.message);
     try {
       const fallback = await fetchLiveQuoteFromAPI(symbol);
       if (fallback) {
         return res.json({
           success: true,
-          data: fallback,
+          data: fallback
         });
       }
     } catch (e) {
-      // ignore
     }
     return res.status(500).json({ success: false, message: err.message });
   }
 });
-// =========================================================
-
-// 5. GET /api/yfinance/chart/:symbol - Historical Candlesticks & Volume
-// ===== UPDATED: Normalize symbol before query =====
 app.get("/api/yfinance/chart/:symbol", async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
-  const yahooSymbol = normalizeYahooSymbol(symbol);
-  const rawRange = (req.query.range as string) || "all";
+  const rawRange = req.query.range || "all";
   const cleanRange = rawRange.toLowerCase().trim();
-  const interval = (req.query.interval as string) || (cleanRange === "1d" ? "5m" : cleanRange === "all" || cleanRange === "1y" ? "1wk" : "1d");
-
+  const interval = req.query.interval || (cleanRange === "1d" ? "5m" : cleanRange === "all" || cleanRange === "1y" ? "1wk" : "1d");
   try {
-    const now = new Date();
-    let startDate = new Date();
+    const now = /* @__PURE__ */ new Date();
+    let startDate = /* @__PURE__ */ new Date();
     if (cleanRange === "1d") startDate.setDate(now.getDate() - 2);
     else if (cleanRange === "5d" || cleanRange === "1w") startDate.setDate(now.getDate() - 7);
     else if (cleanRange === "1mo" || cleanRange === "1m") startDate.setMonth(now.getMonth() - 1);
@@ -1122,69 +1703,49 @@ app.get("/api/yfinance/chart/:symbol", async (req, res) => {
     else if (cleanRange === "1y") startDate.setFullYear(now.getFullYear() - 1);
     else if (cleanRange === "all" || cleanRange === "max" || cleanRange === "5y") startDate.setFullYear(now.getFullYear() - 5);
     else startDate.setFullYear(now.getFullYear() - 5);
-
-    const result: any = await yahooFinance.chart(yahooSymbol, {
+    const result = await yahooFinance.chart(symbol, {
       period1: startDate,
       period2: now,
-      interval: (interval as any) || "1d",
+      interval: interval || "1d"
     });
-
     if (result && result.quotes && result.quotes.length > 0) {
-      const candles = result.quotes
-        .filter((q: any) => q.close !== null && q.open !== null && q.high !== null && q.low !== null)
-        .map((q: any) => ({
-          date: q.date ? new Date(q.date).toISOString().split("T")[0] : "",
-          timestamp: q.date ? new Date(q.date).getTime() : Date.now(),
-          open: Number(Number(q.open).toFixed(2)),
-          high: Number(Number(q.high).toFixed(2)),
-          low: Number(Number(q.low).toFixed(2)),
-          close: Number(Number(q.close).toFixed(2)),
-          volume: Number(q.volume || 0),
-          isUp: q.close >= q.open,
-        }));
-
+      const candles = result.quotes.filter((q) => q.close !== null && q.open !== null && q.high !== null && q.low !== null).map((q) => ({
+        date: q.date ? new Date(q.date).toISOString().split("T")[0] : "",
+        timestamp: q.date ? new Date(q.date).getTime() : Date.now(),
+        open: Number(Number(q.open).toFixed(2)),
+        high: Number(Number(q.high).toFixed(2)),
+        low: Number(Number(q.low).toFixed(2)),
+        close: Number(Number(q.close).toFixed(2)),
+        volume: Number(q.volume || 0),
+        isUp: q.close >= q.open
+      }));
       return res.json({
         success: true,
         symbol,
         count: candles.length,
         candles,
-        history: candles.map((c: any) => c.close),
+        history: candles.map((c) => c.close)
       });
     }
-  } catch (err: any) {
+  } catch (err) {
     console.warn(`yfinance chart fallback for ${symbol}:`, err.message);
   }
-
-  // High-fidelity fallback historical data generator with realistic volume
   try {
     const baseStock = await fetchLiveQuoteFromAPI(symbol);
     const basePrice = baseStock.price || 150;
-    const numDays =
-      cleanRange === "1d"
-        ? 18
-        : cleanRange === "5d" || cleanRange === "1w"
-        ? 25
-        : cleanRange === "1mo" || cleanRange === "1m"
-        ? 30
-        : cleanRange === "3mo" || cleanRange === "3m"
-        ? 60
-        : cleanRange === "1y"
-        ? 120
-        : 180;
+    const numDays = cleanRange === "1d" ? 18 : cleanRange === "5d" || cleanRange === "1w" ? 25 : cleanRange === "1mo" || cleanRange === "1m" ? 30 : cleanRange === "3mo" || cleanRange === "3m" ? 60 : cleanRange === "1y" ? 120 : 180;
     const candles = [];
     let cur = basePrice * 0.85;
-
     for (let i = 0; i < numDays; i++) {
-      const d = new Date();
+      const d = /* @__PURE__ */ new Date();
       d.setDate(d.getDate() - (numDays - i));
       const delta = (Math.random() - 0.47) * (cur * 0.035);
       const open = Number(cur.toFixed(2));
       const close = Number(Math.max(5, cur + delta).toFixed(2));
       const high = Number((Math.max(open, close) + Math.random() * (cur * 0.02)).toFixed(2));
       const low = Number((Math.min(open, close) - Math.random() * (cur * 0.02)).toFixed(2));
-      const volume = Math.floor(baseStock.volume ? (baseStock.volume * (0.6 + Math.random() * 0.8)) : (2500000 + Math.random() * 8500000));
+      const volume = Math.floor(baseStock.volume ? baseStock.volume * (0.6 + Math.random() * 0.8) : 25e5 + Math.random() * 85e5);
       cur = close;
-
       candles.push({
         date: d.toISOString().split("T")[0],
         timestamp: d.getTime(),
@@ -1193,10 +1754,9 @@ app.get("/api/yfinance/chart/:symbol", async (req, res) => {
         low,
         close,
         volume,
-        isUp: close >= open,
+        isUp: close >= open
       });
     }
-
     if (candles.length > 0) {
       candles[candles.length - 1].close = baseStock.price;
       candles[candles.length - 1].open = baseStock.open;
@@ -1204,84 +1764,67 @@ app.get("/api/yfinance/chart/:symbol", async (req, res) => {
       candles[candles.length - 1].low = baseStock.low;
       candles[candles.length - 1].isUp = baseStock.price >= baseStock.open;
     }
-
     return res.json({
       success: true,
       symbol,
       count: candles.length,
       candles,
-      history: candles.map((c: any) => c.close),
+      history: candles.map((c) => c.close)
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Chart fallback failed:", err);
     return res.status(500).json({ success: false, message: "Unable to generate chart data" });
   }
 });
-// =========================================================
-
-// 6. GET /api/yfinance/search?q=... - Search symbols
 app.get("/api/yfinance/search", async (req, res) => {
-  const query = (req.query.q as string || "").trim();
+  const query = (req.query.q || "").trim();
   if (!query) {
     return res.json({ success: true, quotes: [] });
   }
-
   try {
-    const searchRes: any = await yahooFinance.search(query, { quotesCount: 8 });
-    const quotes = (searchRes?.quotes || []).map((q: any) => ({
+    const searchRes = await yahooFinance.search(query, { quotesCount: 8 });
+    const quotes = (searchRes?.quotes || []).map((q) => ({
       symbol: q.symbol,
       name: q.shortname || q.longname || q.symbol,
       exchange: q.exchange || "GLOBAL",
-      type: q.quoteType || "EQUITY",
+      type: q.quoteType || "EQUITY"
     }));
     return res.json({ success: true, quotes });
-  } catch (err: any) {
-    const localMatches = INTERNATIONAL_TICKERS
-      .filter((sym) => sym.includes(query.toUpperCase()) || (TICKER_META[sym]?.name || "").toLowerCase().includes(query.toLowerCase()))
-      .map((sym) => ({
-        symbol: sym,
-        name: TICKER_META[sym]?.name || sym,
-        exchange: "NASDAQ / NYSE",
-        type: "EQUITY",
-      }));
+  } catch (err) {
+    const localMatches = INTERNATIONAL_TICKERS.filter((sym) => sym.includes(query.toUpperCase()) || (TICKER_META[sym]?.name || "").toLowerCase().includes(query.toLowerCase())).map((sym) => ({
+      symbol: sym,
+      name: TICKER_META[sym]?.name || sym,
+      exchange: "NASDAQ / NYSE",
+      type: "EQUITY"
+    }));
     return res.json({ success: true, quotes: localMatches });
   }
 });
-
-// ==================== PRICE ALERTS ENDPOINTS ====================
-
-// 7. GET /api/alerts - Get user's active price alerts
 app.get("/api/alerts", async (req, res) => {
-  const email = ((req.query.email as string) || "trader@stake.com").toLowerCase().trim();
-
+  const email = (req.query.email || "trader@stake.com").toLowerCase().trim();
   if (isMongoConnected && UserModel) {
     try {
-      const user = await UserModel.findOne({ email });
-      return res.json({ success: true, alerts: user?.alerts || [] });
-    } catch (e: any) {
+      const user2 = await UserModel.findOne({ email });
+      return res.json({ success: true, alerts: user2?.alerts || [] });
+    } catch (e) {
       console.error("Alerts fetch error:", e);
     }
   }
-
   const user = inMemoryUsers[email];
   return res.json({ success: true, alerts: user?.alerts || [] });
 });
-
-// 8. POST /api/alerts - Create new price alert
 app.post("/api/alerts", async (req, res) => {
   const { email, ticker, targetPrice, condition = "ABOVE", note = "" } = req.body;
   const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
-
   const newAlert = {
-    id: `alt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    id: `alt-${Date.now()}-${Math.floor(Math.random() * 1e3)}`,
     ticker: ticker.toUpperCase(),
     targetPrice: Number(targetPrice),
     condition: condition.toUpperCase(),
     note: note || `Alert when ${ticker} hits target`,
     active: true,
-    createdAt: new Date(),
+    createdAt: /* @__PURE__ */ new Date()
   };
-
   if (isMongoConnected && UserModel) {
     try {
       const user = await UserModel.findOne({ email: targetEmail });
@@ -1290,11 +1833,10 @@ app.post("/api/alerts", async (req, res) => {
         await user.save();
         return res.json({ success: true, alert: newAlert, alerts: user.alerts });
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error("Alert create error:", e);
     }
   }
-
   if (!inMemoryUsers[targetEmail]) {
     inMemoryUsers[targetEmail] = { email: targetEmail, alerts: [] };
   }
@@ -1302,41 +1844,33 @@ app.post("/api/alerts", async (req, res) => {
     inMemoryUsers[targetEmail].alerts = [];
   }
   inMemoryUsers[targetEmail].alerts.unshift(newAlert);
-
   res.json({ success: true, alert: newAlert, alerts: inMemoryUsers[targetEmail].alerts });
 });
-
-// 9. DELETE /api/alerts/:id - Delete a price alert
 app.delete("/api/alerts/:id", async (req, res) => {
   const alertId = req.params.id;
-  const email = ((req.query.email as string) || "trader@stake.com").toLowerCase().trim();
-
+  const email = (req.query.email || "trader@stake.com").toLowerCase().trim();
   if (isMongoConnected && UserModel) {
     try {
       const user = await UserModel.findOne({ email });
       if (user) {
-        user.alerts = user.alerts.filter((a: any) => a.id !== alertId);
+        user.alerts = user.alerts.filter((a) => a.id !== alertId);
         await user.save();
         return res.json({ success: true, alerts: user.alerts });
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error("Alert delete error:", e);
     }
   }
-
   if (inMemoryUsers[email] && inMemoryUsers[email].alerts) {
-    inMemoryUsers[email].alerts = inMemoryUsers[email].alerts.filter((a: any) => a.id !== alertId);
+    inMemoryUsers[email].alerts = inMemoryUsers[email].alerts.filter((a) => a.id !== alertId);
     return res.json({ success: true, alerts: inMemoryUsers[email].alerts });
   }
-
   res.json({ success: true, alerts: [] });
 });
-
 app.post("/api/orders", async (req, res) => {
   const { email, scrip, type, orderType, validity, shares, price } = req.body;
   const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
   const total = Number(shares) * Number(price);
-
   const newOrder = {
     scrip,
     type,
@@ -1346,9 +1880,8 @@ app.post("/api/orders", async (req, res) => {
     price: Number(price),
     total,
     status: "EXECUTED",
-    timestamp: new Date()
+    timestamp: /* @__PURE__ */ new Date()
   };
-
   if (isMongoConnected && UserModel) {
     try {
       const user = await UserModel.findOne({ email: targetEmail });
@@ -1357,26 +1890,19 @@ app.post("/api/orders", async (req, res) => {
         await user.save();
         return res.json({ success: true, order: newOrder, orders: user.orders });
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error("Order error:", e);
     }
   }
-
   if (inMemoryUsers[targetEmail]) {
     inMemoryUsers[targetEmail].orders.unshift(newOrder);
     return res.json({ success: true, order: newOrder, orders: inMemoryUsers[targetEmail].orders });
   }
-
   res.json({ success: true, order: newOrder, orders: [newOrder] });
 });
-
-// ==================== AGENTIC TRADING INTELLIGENCE & GEMINI ENDPOINTS ====================
-
-// Helper to get or build user state
-async function getUserRecord(email: string) {
+async function getUserRecord(email) {
   const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
-  let user: any = null;
-
+  let user = null;
   if (isMongoConnected && UserModel) {
     try {
       const u = await UserModel.findOne({ email: targetEmail });
@@ -1384,7 +1910,6 @@ async function getUserRecord(email: string) {
         user = u.toObject ? u.toObject() : { ...u };
       }
     } catch (e) {
-      // fallback
     }
   }
   if (!user) {
@@ -1401,20 +1926,17 @@ async function getUserRecord(email: string) {
         agentStrategy: "dip_buyer",
         orders: [],
         alerts: [],
-        transactions: [],
+        transactions: []
       };
     }
     user = { ...inMemoryUsers[targetEmail] };
   }
-
   const safe = { ...user };
-  delete (safe as any).passwordHash;
-  delete (safe as any).passwordSalt;
+  delete safe.passwordHash;
+  delete safe.passwordSalt;
   return safe;
 }
-
-// Helper to persist user data to MongoDB
-async function persistUserToMongo(email: string, updates: any) {
+async function persistUserToMongo(email, updates) {
   if (!isMongoConnected || !UserModel) return;
   try {
     await UserModel.updateOne(
@@ -1426,33 +1948,24 @@ async function persistUserToMongo(email: string, updates: any) {
     console.error("Failed to persist user to MongoDB:", err);
   }
 }
-
-// 1. POST /api/agent/chat - Gemini function calling conversational endpoint
 app.post("/api/agent/chat", async (req, res) => {
   const { message, email, history = [] } = req.body;
   const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
-
   if (!message || !message.trim()) {
     return res.status(400).json({ success: false, message: "Chat message is required" });
   }
-
   try {
     const user = await getUserRecord(targetEmail);
-
-    // Build stocks map
-    const stocksMap: Record<string, any> = {};
+    const stocksMap = {};
     for (const sym of INTERNATIONAL_TICKERS.slice(0, 15)) {
       stocksMap[sym] = await fetchLiveQuoteFromAPI(sym);
     }
-
-    // Execute order callback for tool
-    const executeOrderFn = async ({ ticker, side, shares, price, orderType = "MKT", reason }: any) => {
+    const executeOrderFn = async ({ ticker, side, shares, price, orderType = "MKT", reason }) => {
       const sym = ticker.toUpperCase();
-      const liveStock = stocksMap[sym] || (await fetchLiveQuoteFromAPI(sym));
-      const tradePrice = price ? Number(price) : (liveStock?.price || 150.0);
+      const liveStock = stocksMap[sym] || await fetchLiveQuoteFromAPI(sym);
+      const tradePrice = price ? Number(price) : liveStock?.price || 150;
       const tradeTotal = Number((shares * tradePrice).toFixed(2));
       const isBuy = side === "BUY";
-
       if (isBuy) {
         if ((user.cash || 0) < tradeTotal) {
           return { success: false, error: `Insufficient cash collateral. Required ${tradeTotal}, available ${user.cash}` };
@@ -1462,7 +1975,7 @@ app.post("/api/agent/chat", async (req, res) => {
         const curHold = user.holdings[sym] || { shares: 0, costBasis: 0 };
         user.holdings[sym] = {
           shares: Number((curHold.shares + shares).toFixed(4)),
-          costBasis: Number((curHold.costBasis + tradeTotal).toFixed(2)),
+          costBasis: Number((curHold.costBasis + tradeTotal).toFixed(2))
         };
       } else {
         const curHold = user.holdings?.[sym]?.shares || 0;
@@ -1471,18 +1984,17 @@ app.post("/api/agent/chat", async (req, res) => {
         }
         user.cash += tradeTotal;
         const remain = curHold - shares;
-        if (remain <= 0.0001) {
+        if (remain <= 1e-4) {
           delete user.holdings[sym];
         } else {
           user.holdings[sym] = {
             shares: Number(remain.toFixed(4)),
-            costBasis: Number((user.holdings[sym].costBasis * (remain / curHold)).toFixed(2)),
+            costBasis: Number((user.holdings[sym].costBasis * (remain / curHold)).toFixed(2))
           };
         }
       }
-
       const newOrder = {
-        id: `STK-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: `STK-${Math.floor(1e3 + Math.random() * 9e3)}`,
         scrip: sym,
         ticker: sym,
         type: isBuy ? "BUY" : "SELL",
@@ -1493,15 +2005,12 @@ app.post("/api/agent/chat", async (req, res) => {
         price: tradePrice,
         total: tradeTotal,
         status: "EXECUTED",
-        timestamp: new Date(),
+        timestamp: /* @__PURE__ */ new Date()
       };
-
       if (!user.orders) user.orders = [];
       user.orders.unshift(newOrder);
-
-      // Log agent action
-      const actionRecord: AgentAction = {
-        id: `act-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      const actionRecord = {
+        id: `act-${Date.now()}-${Math.floor(Math.random() * 1e3)}`,
         userEmail: targetEmail,
         ticker: sym,
         side: isBuy ? "BUY" : "SELL",
@@ -1512,26 +2021,21 @@ app.post("/api/agent/chat", async (req, res) => {
         reason: reason || `User initiated natural language trade for ${shares} shares of ${sym}`,
         timestamp: Date.now(),
         status: "EXECUTED",
-        canRevertUntil: Date.now() + 300000,
+        canRevertUntil: Date.now() + 3e5
       };
       globalAgentActions.unshift(actionRecord);
-
-      // Memory log
       globalAgentMemory.unshift({
         id: `mem-${Date.now()}`,
         userEmail: targetEmail,
         timestamp: Date.now(),
         text: `Executed ${side} order: ${shares} shares of ${sym} at ${tradePrice} (${tradeTotal})`,
-        type: "EXECUTION",
+        type: "EXECUTION"
       });
-
-      // Persist to MongoDB
       await persistUserToMongo(targetEmail, {
         cash: user.cash,
         holdings: user.holdings,
-        orders: user.orders,
+        orders: user.orders
       });
-
       return {
         success: true,
         orderId: newOrder.id,
@@ -1540,12 +2044,10 @@ app.post("/api/agent/chat", async (req, res) => {
         shares,
         price: tradePrice,
         total: tradeTotal,
-        remainingCash: Number(user.cash.toFixed(2)),
+        remainingCash: Number(user.cash.toFixed(2))
       };
     };
-
-    // Alert callback for tool
-    const createAlertFn = async ({ ticker, targetPrice, condition = "ABOVE", note = "" }: any) => {
+    const createAlertFn = async ({ ticker, targetPrice, condition = "ABOVE", note = "" }) => {
       const sym = ticker.toUpperCase();
       const newAlert = {
         id: `alt-${Date.now()}`,
@@ -1554,14 +2056,13 @@ app.post("/api/agent/chat", async (req, res) => {
         condition,
         note,
         active: true,
-        createdAt: new Date(),
+        createdAt: /* @__PURE__ */ new Date()
       };
       if (!user.alerts) user.alerts = [];
       user.alerts.unshift(newAlert);
       await persistUserToMongo(targetEmail, { alerts: user.alerts });
       return { success: true, alert: newAlert };
     };
-
     const result = await processAgentChat({
       message,
       history,
@@ -1571,10 +2072,9 @@ app.post("/api/agent/chat", async (req, res) => {
         executeOrderFn,
         createAlertFn,
         recentActions: globalAgentActions.filter((a) => a.userEmail === targetEmail).slice(0, 10),
-        agentMemory: globalAgentMemory.filter((m) => m.userEmail === targetEmail).map((m) => m.text),
-      },
+        agentMemory: globalAgentMemory.filter((m) => m.userEmail === targetEmail).map((m) => m.text)
+      }
     });
-
     return res.json({
       success: true,
       reply: result.reply,
@@ -1582,30 +2082,24 @@ app.post("/api/agent/chat", async (req, res) => {
       userState: {
         cash: user.cash,
         holdings: user.holdings,
-        orders: user.orders?.slice(0, 10),
-      },
+        orders: user.orders?.slice(0, 10)
+      }
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Agent chat error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-// 1b. POST /api/agent/watchlist - Sync the AI radar watchlist so signals & scans follow it
 app.post("/api/agent/watchlist", async (req, res) => {
   const { email, userId, watchlist } = req.body;
-  const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
-
+  const targetEmail = (email || userId || "trader@stake.com").toLowerCase().trim();
   if (!Array.isArray(watchlist)) {
     return res.status(400).json({ success: false, message: "watchlist array is required" });
   }
-
   const clean = Array.from(
     new Set(watchlist.map((t) => String(t).toUpperCase().trim()).filter(Boolean))
   ).slice(0, 30);
-
   await persistUserToMongo(targetEmail, { watchlist: clean });
-
   if (inMemoryUsers[targetEmail]) {
     inMemoryUsers[targetEmail].watchlist = clean;
   } else if (!isMongoConnected) {
@@ -1621,33 +2115,25 @@ app.post("/api/agent/watchlist", async (req, res) => {
       agentStrategy: "dip_buyer",
       orders: [],
       alerts: [],
-      transactions: [],
+      transactions: []
     };
   }
-
   return res.json({ success: true, watchlist: clean });
 });
-
-// GET /api/agent/signals - Generate quantitative & AI Alpha trading radar signals
 app.get("/api/agent/signals", async (req, res) => {
-  const email = ((req.query.userId || req.query.email || "trader@stake.com") as string).toLowerCase().trim();
+  const email = (req.query.userId || req.query.email || "trader@stake.com").toLowerCase().trim();
   try {
     const user = await getUserRecord(email);
-    const watchlist = (user.watchlist && user.watchlist.length > 0)
-      ? user.watchlist
-      : ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "GOOGL", "META", "COIN", "AMD", "PLTR", "ARM", "SMCI"];
-
+    const watchlist = user.watchlist && user.watchlist.length > 0 ? user.watchlist : ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "GOOGL", "META", "COIN", "AMD", "PLTR", "ARM", "SMCI"];
     const targetTickers = watchlist.slice(0, 10);
-    const quotes = await Promise.all(targetTickers.map((sym: string) => fetchLiveQuoteFromAPI(sym)));
-
-    const signals = quotes.filter(Boolean).map((q: any, idx: number) => {
+    const quotes = await Promise.all(targetTickers.map((sym) => fetchLiveQuoteFromAPI(sym)));
+    const signals = quotes.filter(Boolean).map((q, idx) => {
       const isPositive = q.changePercent >= 0;
-      const rsi = Number((40 + ((idx * 7 + Math.abs(q.changePercent) * 8) % 45)).toFixed(1));
-      const confidence = Math.min(96, Math.max(68, Math.round(75 + (Math.abs(q.changePercent) * 4) + (idx % 3) * 3)));
-      const side = isPositive ? "BUY" : (q.changePercent < -2 ? "BUY" : "HOLD");
+      const rsi = Number((40 + (idx * 7 + Math.abs(q.changePercent) * 8) % 45).toFixed(1));
+      const confidence = Math.min(96, Math.max(68, Math.round(75 + Math.abs(q.changePercent) * 4 + idx % 3 * 3)));
+      const side = isPositive ? "BUY" : q.changePercent < -2 ? "BUY" : "HOLD";
       const target = side === "BUY" ? Number((q.price * 1.08).toFixed(2)) : Number((q.price * 0.95).toFixed(2));
       const stopLoss = Number((q.price * 0.96).toFixed(2));
-
       let reason = "";
       if (q.changePercent < -1.5) {
         reason = `Oversold dip detected (RSI ${rsi}). Institutional bid support confirmed at $${stopLoss}.`;
@@ -1656,7 +2142,6 @@ app.get("/api/agent/signals", async (req, res) => {
       } else {
         reason = `Mean-reversion consolidation near key 50-EMA support ($${q.open}). Risk-to-reward ratio 3.2:1.`;
       }
-
       return {
         id: `sig-${q.ticker}-${Date.now()}-${idx}`,
         ticker: q.ticker,
@@ -1664,7 +2149,7 @@ app.get("/api/agent/signals", async (req, res) => {
         companyName: q.name,
         name: q.name,
         action: side,
-        side: side,
+        side,
         confidence,
         price: q.price,
         currentPrice: q.price,
@@ -1672,33 +2157,30 @@ app.get("/api/agent/signals", async (req, res) => {
         changePercent: q.changePercent,
         signalType: isPositive ? "Breakout Momentum" : "Mean Reversion Dip",
         type: isPositive ? "Breakout Momentum" : "Mean Reversion Dip",
-        target: target,
+        target,
         targetPrice: target,
         stopLoss,
         timeframe: "1-3 Days",
         rsi,
-        volumeDelta: isPositive ? `+${(15 + idx * 8)}%` : `-${(10 + idx * 4)}%`,
+        volumeDelta: isPositive ? `+${15 + idx * 8}%` : `-${10 + idx * 4}%`,
         reason,
         strategy: q.changePercent < 0 ? "dip_buyer" : "momentum",
-        timestamp: new Date().toISOString(),
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
       };
     });
-
     return res.json({
       success: true,
       count: signals.length,
       signals,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Agent signals error:", err);
     res.json({ success: true, signals: [] });
   }
 });
-
-// 2. GET /api/agent/actions - Retrieve audit trail of agent actions (user-scoped)
 app.get("/api/agent/actions", async (req, res) => {
-  const email = ((req.query.email || req.query.userId || "trader@stake.com") as string).toLowerCase().trim();
+  const email = (req.query.email || req.query.userId || "trader@stake.com").toLowerCase().trim();
   const userActions = globalAgentActions.filter((a) => a.userEmail === email);
   const formattedActions = userActions.map((a) => ({
     ...a,
@@ -1708,38 +2190,30 @@ app.get("/api/agent/actions", async (req, res) => {
     side: a.side,
     amount: a.total,
     total: a.total,
-    reverted: a.status === "REVERSED",
+    reverted: a.status === "REVERSED"
   }));
   return res.json({ success: true, actions: formattedActions });
 });
-
-// 3. POST /api/agent/revert-trade - Safety Rail: Revert trade within grace period
 app.post("/api/agent/revert-trade", async (req, res) => {
   const { actionId, email, userId } = req.body;
-  const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
+  const targetEmail = (email || userId || "trader@stake.com").toLowerCase().trim();
   const action = globalAgentActions.find((a) => a.id === actionId);
-
   if (!action) {
     return res.status(404).json({ success: false, message: "Action not found" });
   }
-
   if (Date.now() > action.canRevertUntil) {
     return res.status(400).json({ success: false, message: "Grace period (5 mins) has expired for this execution" });
   }
-
   if (action.status === "REVERSED") {
     return res.status(400).json({ success: false, message: "Action is already reversed" });
   }
-
   const user = await getUserRecord(targetEmail);
-
-  // Reverse action
   if (action.side === "BUY") {
     user.cash = Number(((user.cash || 0) + action.total).toFixed(2));
     if (user.holdings && user.holdings[action.ticker]) {
       const cur = user.holdings[action.ticker].shares || 0;
       const remain = Math.max(0, cur - action.shares);
-      if (remain <= 0.0001) {
+      if (remain <= 1e-4) {
         delete user.holdings[action.ticker];
       } else {
         user.holdings[action.ticker].shares = Number(remain.toFixed(4));
@@ -1754,11 +2228,9 @@ app.post("/api/agent/revert-trade", async (req, res) => {
       user.holdings[action.ticker].shares = Number((user.holdings[action.ticker].shares + action.shares).toFixed(4));
     }
   }
-
   action.status = "REVERSED";
-
   const cancelOrder = {
-    id: `STK-REV-${Math.floor(1000 + Math.random() * 9000)}`,
+    id: `STK-REV-${Math.floor(1e3 + Math.random() * 9e3)}`,
     scrip: action.ticker,
     ticker: action.ticker,
     type: action.side === "BUY" ? "SELL" : "BUY",
@@ -1769,26 +2241,22 @@ app.post("/api/agent/revert-trade", async (req, res) => {
     price: action.price,
     total: action.total,
     status: "REVERSED",
-    timestamp: new Date(),
+    timestamp: /* @__PURE__ */ new Date()
   };
-
   if (!user.orders) user.orders = [];
   user.orders.unshift(cancelOrder);
-
   globalAgentMemory.unshift({
     id: `mem-${Date.now()}`,
     userEmail: targetEmail,
     timestamp: Date.now(),
     text: `User triggered safety rollback: Reverted ${action.side} on ${action.ticker} (${action.total})`,
-    type: "SAFETY_ALERT",
+    type: "SAFETY_ALERT"
   });
-
   await persistUserToMongo(targetEmail, {
     cash: user.cash,
     holdings: user.holdings,
-    orders: user.orders,
+    orders: user.orders
   });
-
   return res.json({
     success: true,
     status: "reverted",
@@ -1797,28 +2265,23 @@ app.post("/api/agent/revert-trade", async (req, res) => {
     userState: {
       cash: user.cash,
       holdings: user.holdings,
-      orders: user.orders,
+      orders: user.orders
     },
     action: {
       ...action,
       stock: action.ticker,
       amount: action.total,
-      reverted: true,
-    },
+      reverted: true
+    }
   });
 });
-
-// 4. GET /api/agent/memory - Explainability & Memory Logs
 app.get("/api/agent/memory", async (req, res) => {
-  const email = ((req.query.email || req.query.userId || "trader@stake.com") as string).toLowerCase().trim();
+  const email = (req.query.email || req.query.userId || "trader@stake.com").toLowerCase().trim();
   const memories = globalAgentMemory.filter((m) => m.userEmail === email || !m.userEmail || m.userEmail === "trader@stake.com");
   return res.json({ success: true, memory: memories });
 });
-
-// 5. POST /api/agent/backtest - Interactive Backtest Engine
 app.post("/api/agent/backtest", async (req, res) => {
-  const { strategy = "dip_buyer", ticker = "NVDA", timeframe = "3mo", initialCapital = 10000 } = req.body;
-
+  const { strategy = "dip_buyer", ticker = "NVDA", timeframe = "3mo", initialCapital = 1e4 } = req.body;
   let days = 90;
   if (timeframe === "1mo") days = 30;
   else if (timeframe === "3mo") days = 90;
@@ -1826,7 +2289,6 @@ app.post("/api/agent/backtest", async (req, res) => {
   else if (timeframe === "1y") days = 365;
   else if (timeframe === "all" || timeframe === "5y") days = 1825;
   else days = 90;
-
   try {
     await fetchLiveQuoteFromAPI(ticker);
     const result = runStrategyBacktest(
@@ -1836,58 +2298,45 @@ app.post("/api/agent/backtest", async (req, res) => {
       Number(initialCapital)
     );
     return res.json({ success: true, result });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Backtest error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-// 6. POST /api/agent/deploy-strategy - Deploy capital & activate Stake AI strategy
 app.post("/api/agent/deploy-strategy", async (req, res) => {
-  const { email, userId, strategy = "dip_buyer", deployedCapital = 5000, maxSpend = 500, riskLevel = "Moderate" } = req.body;
-  const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
-
+  const { email, userId, strategy = "dip_buyer", deployedCapital = 5e3, maxSpend = 500, riskLevel = "Moderate" } = req.body;
+  const targetEmail = (email || userId || "trader@stake.com").toLowerCase().trim();
   try {
     const user = await getUserRecord(targetEmail);
-    const amountToDeploy = Math.max(100, Number(deployedCapital) || 1000);
-
+    const amountToDeploy = Math.max(100, Number(deployedCapital) || 1e3);
     if ((user.cash || 0) < amountToDeploy) {
       if ((user.cash || 0) === 0) {
-        user.cash = 25000;
+        user.cash = 25e3;
       }
     }
-
-    const finalAllocated = Math.min(amountToDeploy, user.cash || 25000);
+    const finalAllocated = Math.min(amountToDeploy, user.cash || 25e3);
     user.agentEnabled = true;
     user.agentStrategy = strategy;
     user.agentDeployedCapital = finalAllocated;
     user.agentMaxSpend = Number(maxSpend) || 500;
-
     const memEntry = {
       id: `mem-${Date.now()}`,
       userEmail: targetEmail,
       timestamp: Date.now(),
       text: `Strategy Deployed: Activated [${strategy.toUpperCase()}] with $${finalAllocated.toLocaleString()} deployed capital (Max spend/trade: $${user.agentMaxSpend}).`,
-      type: "DEPLOYMENT" as const,
+      type: "DEPLOYMENT"
     };
     globalAgentMemory.unshift(memEntry);
-
-    const watchlist = (user.watchlist && user.watchlist.length > 0)
-      ? user.watchlist
-      : ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "COIN", "GOOGL", "META"];
-    const quotes = await Promise.all(watchlist.map((sym: string) => fetchLiveQuoteFromAPI(sym)));
+    const watchlist = user.watchlist && user.watchlist.length > 0 ? user.watchlist : ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "COIN", "GOOGL", "META"];
+    const quotes = await Promise.all(watchlist.map((sym) => fetchLiveQuoteFromAPI(sym)));
     const validQuotes = quotes.filter(Boolean);
-
-    let initialAction: any = null;
+    let initialAction = null;
     if (validQuotes.length > 0) {
-      let targetStock: any = null;
+      let targetStock = null;
       let reason = "";
-
       if (strategy === "dip_buyer") {
         const dipCandidates = validQuotes.filter((q) => q && q.changePercent < 0);
-        targetStock = dipCandidates.length > 0
-          ? dipCandidates.sort((a, b) => a.changePercent - b.changePercent)[0]
-          : validQuotes[0];
+        targetStock = dipCandidates.length > 0 ? dipCandidates.sort((a, b) => a.changePercent - b.changePercent)[0] : validQuotes[0];
         reason = `Initial lot allocated on ${targetStock.ticker} ($${targetStock.price}) following strategy activation.`;
       } else if (strategy === "momentum") {
         targetStock = validQuotes.sort((a, b) => (b?.changePercent || 0) - (a?.changePercent || 0))[0] || validQuotes[0];
@@ -1896,23 +2345,20 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
         targetStock = validQuotes[0];
         reason = `Value DCA systematic entry lot allocated on ${targetStock.ticker}.`;
       }
-
       if (targetStock && user.cash >= 100) {
         const lotSpend = Math.min(user.agentMaxSpend, Math.min(user.cash, finalAllocated * 0.25));
         const shares = Number((lotSpend / (targetStock.price || 150)).toFixed(3));
         const total = Number((shares * targetStock.price).toFixed(2));
-
         if (shares > 0 && user.cash >= total) {
           user.cash = Number((user.cash - total).toFixed(2));
           if (!user.holdings) user.holdings = {};
           const curH = user.holdings[targetStock.ticker] || { shares: 0, costBasis: 0 };
           user.holdings[targetStock.ticker] = {
             shares: Number((curH.shares + shares).toFixed(4)),
-            costBasis: Number((curH.costBasis + total).toFixed(2)),
+            costBasis: Number((curH.costBasis + total).toFixed(2))
           };
-
           const newOrder = {
-            id: `STK-DEP-${Math.floor(1000 + Math.random() * 9000)}`,
+            id: `STK-DEP-${Math.floor(1e3 + Math.random() * 9e3)}`,
             scrip: targetStock.ticker,
             ticker: targetStock.ticker,
             type: "BUY",
@@ -1923,30 +2369,28 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
             price: targetStock.price,
             total,
             status: "EXECUTED",
-            timestamp: new Date(),
+            timestamp: /* @__PURE__ */ new Date()
           };
           if (!user.orders) user.orders = [];
           user.orders.unshift(newOrder);
-
           initialAction = {
-            id: `act-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            id: `act-${Date.now()}-${Math.floor(Math.random() * 1e3)}`,
             userEmail: targetEmail,
             ticker: targetStock.ticker,
             side: "BUY",
             shares,
             price: targetStock.price,
             total,
-            strategy: strategy as any,
+            strategy,
             reason,
             timestamp: Date.now(),
             status: "EXECUTED",
-            canRevertUntil: Date.now() + 300000,
+            canRevertUntil: Date.now() + 3e5
           };
           globalAgentActions.unshift(initialAction);
         }
       }
     }
-
     await persistUserToMongo(targetEmail, {
       agentEnabled: user.agentEnabled,
       agentStrategy: user.agentStrategy,
@@ -1954,9 +2398,8 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
       agentMaxSpend: user.agentMaxSpend,
       cash: user.cash,
       holdings: user.holdings,
-      orders: user.orders,
+      orders: user.orders
     });
-
     if (inMemoryUsers[targetEmail]) {
       inMemoryUsers[targetEmail] = {
         ...inMemoryUsers[targetEmail],
@@ -1966,10 +2409,9 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
         agentMaxSpend: user.agentMaxSpend,
         cash: user.cash,
         holdings: user.holdings,
-        orders: user.orders,
+        orders: user.orders
       };
     }
-
     return res.json({
       success: true,
       message: `Stake AI Strategy [${strategy.toUpperCase()}] successfully deployed with $${finalAllocated.toLocaleString()} allocated.`,
@@ -1980,124 +2422,99 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
         agentEnabled: user.agentEnabled,
         agentStrategy: user.agentStrategy,
         agentDeployedCapital: user.agentDeployedCapital,
-        agentMaxSpend: user.agentMaxSpend,
+        agentMaxSpend: user.agentMaxSpend
       },
-      action: initialAction,
+      action: initialAction
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Deploy strategy error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-// 7. POST /api/agent/pause-strategy - Pause autonomous agent
 app.post("/api/agent/pause-strategy", async (req, res) => {
   const { email, userId } = req.body;
-  const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
+  const targetEmail = (email || userId || "trader@stake.com").toLowerCase().trim();
   try {
     const user = await getUserRecord(targetEmail);
     user.agentEnabled = false;
-
     globalAgentMemory.unshift({
       id: `mem-${Date.now()}`,
       userEmail: targetEmail,
       timestamp: Date.now(),
       text: `Strategy execution paused by user. Autonomous order placement suspended.`,
-      type: "SAFETY_ALERT",
+      type: "SAFETY_ALERT"
     });
-
     await persistUserToMongo(targetEmail, { agentEnabled: false });
-
     if (inMemoryUsers[targetEmail]) {
       inMemoryUsers[targetEmail].agentEnabled = false;
     }
-
     return res.json({ success: true, message: "Stake AI Agent paused.", agentEnabled: false });
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-// 8. POST /api/agent/resume-strategy - Resume autonomous agent
 app.post("/api/agent/resume-strategy", async (req, res) => {
   const { email, userId } = req.body;
-  const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
+  const targetEmail = (email || userId || "trader@stake.com").toLowerCase().trim();
   try {
     const user = await getUserRecord(targetEmail);
     user.agentEnabled = true;
-
     globalAgentMemory.unshift({
       id: `mem-${Date.now()}`,
       userEmail: targetEmail,
       timestamp: Date.now(),
       text: `Strategy execution resumed by user. Radar scans and autonomous trades active.`,
-      type: "DEPLOYMENT" as const,
+      type: "DEPLOYMENT"
     });
-
     await persistUserToMongo(targetEmail, { agentEnabled: true });
-
     if (inMemoryUsers[targetEmail]) {
       inMemoryUsers[targetEmail].agentEnabled = true;
     }
-
     return res.json({ success: true, message: "Stake AI Agent resumed.", agentEnabled: true });
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-// 9. POST /api/agent/adjust-capital - Adjust deployed capital
 app.post("/api/agent/adjust-capital", async (req, res) => {
   const { email, userId, deployedCapital, maxSpend } = req.body;
-  const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
+  const targetEmail = (email || userId || "trader@stake.com").toLowerCase().trim();
   try {
     const user = await getUserRecord(targetEmail);
-    if (deployedCapital !== undefined) {
+    if (deployedCapital !== void 0) {
       user.agentDeployedCapital = Math.max(0, Number(deployedCapital));
     }
-    if (maxSpend !== undefined) {
+    if (maxSpend !== void 0) {
       user.agentMaxSpend = Math.max(50, Number(maxSpend));
     }
-
     await persistUserToMongo(targetEmail, {
       agentDeployedCapital: user.agentDeployedCapital,
-      agentMaxSpend: user.agentMaxSpend,
+      agentMaxSpend: user.agentMaxSpend
     });
-
     if (inMemoryUsers[targetEmail]) {
       inMemoryUsers[targetEmail].agentDeployedCapital = user.agentDeployedCapital;
       inMemoryUsers[targetEmail].agentMaxSpend = user.agentMaxSpend;
     }
-
     return res.json({
       success: true,
       message: "Capital allocation updated.",
       agentDeployedCapital: user.agentDeployedCapital,
-      agentMaxSpend: user.agentMaxSpend,
+      agentMaxSpend: user.agentMaxSpend
     });
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-// 10. POST /api/agent/scan-and-execute - Trigger autonomous strategy execution loop
 app.post("/api/agent/scan-and-execute", async (req, res) => {
   const { email, userId, strategy, maxSpend } = req.body;
-  const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
+  const targetEmail = (email || userId || "trader@stake.com").toLowerCase().trim();
   const user = await getUserRecord(targetEmail);
-
   const activeStrategy = strategy || user.agentStrategy || "dip_buyer";
   const activeSpend = Number(maxSpend) || user.agentMaxSpend || 500;
-
-  const watchlist = (user.watchlist && user.watchlist.length > 0)
-    ? user.watchlist
-    : ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "COIN", "GOOGL", "META", "AMD", "PLTR"];
-  const quotes = await Promise.all(watchlist.map((sym: string) => fetchLiveQuoteFromAPI(sym)));
+  const watchlist = user.watchlist && user.watchlist.length > 0 ? user.watchlist : ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "COIN", "GOOGL", "META", "AMD", "PLTR"];
+  const quotes = await Promise.all(watchlist.map((sym) => fetchLiveQuoteFromAPI(sym)));
   const validQuotes = quotes.filter(Boolean);
-
-  let triggeredStock: any = null;
+  let triggeredStock = null;
   let triggerReason = "";
-
   if (activeStrategy === "dip_buyer") {
     const dipCandidates = validQuotes.filter((q) => q && q.changePercent < 0);
     if (dipCandidates.length > 0) {
@@ -2114,26 +2531,23 @@ app.post("/api/agent/scan-and-execute", async (req, res) => {
     triggeredStock = validQuotes[Math.floor(Math.random() * validQuotes.length)] || validQuotes[0];
     triggerReason = `Scheduled DCA periodic lot allocated across ${triggeredStock.ticker}.`;
   }
-
   if (triggeredStock) {
     if ((user.cash || 0) < 50) {
-      user.cash = 25000;
+      user.cash = 25e3;
     }
-    const targetSpend = Math.max(50, Math.min(activeSpend, Math.min(user.cash, 1000)));
+    const targetSpend = Math.max(50, Math.min(activeSpend, Math.min(user.cash, 1e3)));
     const sharesToBuy = Number((targetSpend / (triggeredStock.price || 150)).toFixed(3));
     const totalCost = Number((sharesToBuy * triggeredStock.price).toFixed(2));
-
     if (user.cash >= totalCost && sharesToBuy > 0) {
       user.cash = Number((user.cash - totalCost).toFixed(2));
       if (!user.holdings) user.holdings = {};
       const curH = user.holdings[triggeredStock.ticker] || { shares: 0, costBasis: 0 };
       user.holdings[triggeredStock.ticker] = {
         shares: Number((curH.shares + sharesToBuy).toFixed(4)),
-        costBasis: Number((curH.costBasis + totalCost).toFixed(2)),
+        costBasis: Number((curH.costBasis + totalCost).toFixed(2))
       };
-
       const newOrder = {
-        id: `STK-AUT-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: `STK-AUT-${Math.floor(1e3 + Math.random() * 9e3)}`,
         scrip: triggeredStock.ticker,
         ticker: triggeredStock.ticker,
         type: "BUY",
@@ -2144,49 +2558,42 @@ app.post("/api/agent/scan-and-execute", async (req, res) => {
         price: triggeredStock.price,
         total: totalCost,
         status: "EXECUTED",
-        timestamp: new Date(),
+        timestamp: /* @__PURE__ */ new Date()
       };
-
       if (!user.orders) user.orders = [];
       user.orders.unshift(newOrder);
-
-      const actionRecord: AgentAction = {
-        id: `act-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      const actionRecord = {
+        id: `act-${Date.now()}-${Math.floor(Math.random() * 1e3)}`,
         userEmail: targetEmail,
         ticker: triggeredStock.ticker,
         side: "BUY",
         shares: sharesToBuy,
         price: triggeredStock.price,
         total: totalCost,
-        strategy: activeStrategy as any,
+        strategy: activeStrategy,
         reason: triggerReason,
         timestamp: Date.now(),
         status: "EXECUTED",
-        canRevertUntil: Date.now() + 300000,
+        canRevertUntil: Date.now() + 3e5
       };
-
       globalAgentActions.unshift(actionRecord);
-
       globalAgentMemory.unshift({
         id: `mem-${Date.now()}`,
         userEmail: targetEmail,
         timestamp: Date.now(),
         text: `Autonomous Execution: [${activeStrategy.toUpperCase()}] purchased ${sharesToBuy}x ${triggeredStock.ticker} at $${triggeredStock.price} ($${totalCost})`,
-        type: "EXECUTION",
+        type: "EXECUTION"
       });
-
       await persistUserToMongo(targetEmail, {
         cash: user.cash,
         holdings: user.holdings,
-        orders: user.orders,
+        orders: user.orders
       });
-
       if (inMemoryUsers[targetEmail]) {
         inMemoryUsers[targetEmail].cash = user.cash;
         inMemoryUsers[targetEmail].holdings = user.holdings;
         inMemoryUsers[targetEmail].orders = user.orders;
       }
-
       return res.json({
         success: true,
         status: "executed",
@@ -2195,41 +2602,32 @@ app.post("/api/agent/scan-and-execute", async (req, res) => {
         userState: {
           cash: user.cash,
           holdings: user.holdings,
-          orders: user.orders,
-        },
+          orders: user.orders
+        }
       });
     }
   }
-
   return res.json({ success: true, status: "scanned", message: "Market radar scanned: Monitoring order flow." });
 });
-
-// 11. POST /api/agent/strategy-analysis - Gemini-powered Daily Quantitative Strategy & Benchmark Analysis
 app.post("/api/agent/strategy-analysis", async (req, res) => {
   const { strategy = "dip_buyer", profile = "balanced", timeframe = "1mo", email } = req.body;
-  const targetEmail = ((email || "trader@stake.com") as string).toLowerCase().trim();
-
+  const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
   try {
     const user = await getUserRecord(targetEmail);
-    const watchlist = (user.watchlist && user.watchlist.length > 0)
-      ? user.watchlist.slice(0, 6)
-      : ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN"];
-
-    const quotes = await Promise.all(watchlist.map((sym: string) => fetchLiveQuoteFromAPI(sym)));
+    const watchlist = user.watchlist && user.watchlist.length > 0 ? user.watchlist.slice(0, 6) : ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN"];
+    const quotes = await Promise.all(watchlist.map((sym) => fetchLiveQuoteFromAPI(sym)));
     const validQuotes = quotes.filter(Boolean);
-
     const portfolioSummary = {
       cash: user.cash || 0,
-      holdings: Object.entries(user.holdings || {}).map(([ticker, pos]: any) => ({
+      holdings: Object.entries(user.holdings || {}).map(([ticker, pos]) => ({
         ticker,
         shares: pos.shares,
-        costBasis: pos.costBasis,
+        costBasis: pos.costBasis
       })),
       strategy,
       profile,
-      deployedCapital: user.agentDeployedCapital || 5000,
+      deployedCapital: user.agentDeployedCapital || 5e3
     };
-
     const promptText = `Provide a concise, high-conviction quantitative institutional strategy analysis for the "${strategy}" algorithm (${profile.toUpperCase()} profile) deployed on Stake AI.
 Context:
 - Current Market Prices: ${validQuotes.map((q) => `${q.ticker}: $${q.price} (${q.changePercent >= 0 ? "+" : ""}${q.changePercent}%)`).join(", ")}
@@ -2242,7 +2640,6 @@ Please analyze:
 2. Alpha vs S&P 500 Benchmark (estimated basis points outperformance)
 3. Volatility & Maximum Drawdown risk mitigation
 4. Top 3 Recommended Tactical Actions for the autonomous agent.`;
-
     let aiAnalysis = "";
     if (hasGeminiKey()) {
       try {
@@ -2252,66 +2649,64 @@ Please analyze:
           contents: [{ role: "user", parts: [{ text: promptText }] }],
           config: {
             systemInstruction: "You are the Chief Quantitative Strategist for Stake AI. Return sharp, actionable, and formatted hedge-fund style market commentary with markdown headings and clear bullet points.",
-            temperature: 0.3,
-          },
+            temperature: 0.3
+          }
         });
         aiAnalysis = aiRes.text || "";
-      } catch (genErr: any) {
+      } catch (genErr) {
         console.warn("Gemini generation fallback:", genErr?.message);
       }
     }
     if (!aiAnalysis) {
-      aiAnalysis = `### Quantitative Strategy Assessment: **${strategy.toUpperCase()}** (${profile.toUpperCase()} Profile)\n\n` +
-        `**Regime Classification**: **High-Conviction Alpha Expansion** (Confidence: 87%)\n\n` +
-        `* **Benchmark Performance**: Outperforming S&P 500 by **+4.2% annualized Alpha** with a Sharpe Ratio of 2.35 vs SPY 1.42.\n` +
-        `* **Risk Management**: Volatility dampening controls active. Downside protection capped at -4.8% max historical drawdown.\n` +
-        `* **Tactical Execution Roadmap**:\n` +
-        `  1. **Accumulate Pullbacks**: High-liquidity tech leaders showing statistical divergence on 4h RSI support.\n` +
-        `  2. **Protect Capital**: Maintain trailing stop-loss buffers at 3.5% beneath local swing lows.\n` +
-        `  3. **Rebalance Liquidity**: Keep 25-30% dry powder in USD cash collateral for opportunistic dips.`;
-    }
+      aiAnalysis = `### Quantitative Strategy Assessment: **${strategy.toUpperCase()}** (${profile.toUpperCase()} Profile)
 
+**Regime Classification**: **High-Conviction Alpha Expansion** (Confidence: 87%)
+
+* **Benchmark Performance**: Outperforming S&P 500 by **+4.2% annualized Alpha** with a Sharpe Ratio of 2.35 vs SPY 1.42.
+* **Risk Management**: Volatility dampening controls active. Downside protection capped at -4.8% max historical drawdown.
+* **Tactical Execution Roadmap**:
+  1. **Accumulate Pullbacks**: High-liquidity tech leaders showing statistical divergence on 4h RSI support.
+  2. **Protect Capital**: Maintain trailing stop-loss buffers at 3.5% beneath local swing lows.
+  3. **Rebalance Liquidity**: Keep 25-30% dry powder in USD cash collateral for opportunistic dips.`;
+    }
     return res.json({
       success: true,
       strategy,
       profile,
       timeframe,
       analysis: aiAnalysis,
-      timestamp: new Date().toISOString(),
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
       metrics: {
         alphaVsSpy: strategy === "momentum" ? "+8.9%" : strategy === "dip_buyer" ? "+5.4%" : "+2.1%",
-        sharpeRatio: strategy === "momentum" ? 2.58 : strategy === "dip_buyer" ? 2.35 : 2.10,
+        sharpeRatio: strategy === "momentum" ? 2.58 : strategy === "dip_buyer" ? 2.35 : 2.1,
         spySharpe: 1.42,
         winRate: strategy === "dca" ? "85%" : strategy === "dip_buyer" ? "78%" : "71%",
         maxDrawdown: strategy === "dca" ? "-3.1%" : strategy === "dip_buyer" ? "-4.8%" : "-7.2%",
-        spyMaxDrawdown: "-12.4%",
-      },
+        spyMaxDrawdown: "-12.4%"
+      }
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Strategy analysis error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-// Start Server with Vite Middleware
 async function start() {
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    const vite = await (0, import_vite.createServer)({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: "spa"
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    const distPath = import_path.default.join(process.cwd(), "dist");
+    app.use(import_express.default.static(distPath));
     app.get("/{*splat}", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      res.sendFile(import_path.default.join(distPath, "index.html"));
     });
   }
-
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Stake Exchange running on http://0.0.0.0:${PORT}`);
   });
 }
-
 start();
+//# sourceMappingURL=server.cjs.map

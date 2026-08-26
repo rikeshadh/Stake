@@ -1,14 +1,22 @@
 import { GoogleGenAI } from "@google/genai";
 import { allAgentTools } from "./tools";
 
+// Model used for all Gemini calls
+export const GEMINI_MODEL = "gemini-2.5-flash";
+
+// True only when a real Gemini API key is configured (rejects placeholders)
+export function hasGeminiKey(): boolean {
+  const key = (process.env.GEMINI_API_KEY || "").trim();
+  return key.length >= 20 && !/your[_-]?gemini|placeholder|here$/i.test(key);
+}
+
 // Lazy-initialized Gemini client with telemetry header
 let aiClient: GoogleGenAI | null = null;
 
 export function getAI(): GoogleGenAI {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY || "AIzaSyDummyKeyForFallback";
     aiClient = new GoogleGenAI({
-      apiKey,
+      apiKey: (process.env.GEMINI_API_KEY || "").trim(),
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
@@ -182,6 +190,9 @@ Key Guidelines:
 `;
 
   try {
+    if (!hasGeminiKey()) {
+      return handleLocalFallback(message, context);
+    }
     const ai = getAI();
     const tools = [{ functionDeclarations: allAgentTools }];
 
@@ -207,7 +218,7 @@ Key Guidelines:
 
     // Step 1: Call Gemini
     let response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
+      model: GEMINI_MODEL,
       contents,
       config: {
         systemInstruction,
@@ -245,7 +256,7 @@ Key Guidelines:
 
       // Next turn with function output
       response = await ai.models.generateContent({
-        model: "gemini-3.7-flash",
+        model: GEMINI_MODEL,
         contents,
         config: {
           systemInstruction,

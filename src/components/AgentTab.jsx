@@ -20,6 +20,11 @@ import { STRATEGIES } from "../strategies";
 import { GeminiStrategySidebar } from "./GeminiStrategySidebar";
 
 // ----------------------------------------------------------------------
+// Constants
+// ----------------------------------------------------------------------
+const API_URL = import.meta.env.VITE_API_URL || "";
+
+// ----------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------
 function numberValue(v, fallback = 0) {
@@ -47,7 +52,9 @@ function formatRelativeTime(v) {
 }
 
 async function requestJSON(url, options = {}) {
-  const res = await fetch(url, options);
+  // Prepend API_URL to relative paths (e.g., "/api/...")
+  const fullUrl = url.startsWith("/") ? `${API_URL}${url}` : url;
+  const res = await fetch(fullUrl, options);
   const contentType = res.headers.get("content-type") || "";
   const raw = await res.text();
   if (!res.ok) throw new Error(`Request failed with status ${res.status}.`);

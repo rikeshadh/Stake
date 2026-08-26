@@ -1,9 +1,11 @@
 // API Client for Stake Platform
 // Communicates with backend REST endpoints for stocks, authentication, and execution
 
+const API_URL = import.meta.env.VITE_API_URL || "";
+
 export async function fetchStocks() {
   try {
-    const res = await fetch("/api/stocks");
+    const res = await fetch(`${API_URL}/api/stocks`);
     if (!res.ok) throw new Error("Failed to fetch stocks");
     const json = await res.json();
     return json.stocks || json.data || json;
@@ -15,7 +17,7 @@ export async function fetchStocks() {
 
 export async function fetchStockDetail(ticker) {
   try {
-    const res = await fetch(`/api/stocks/${ticker}`);
+    const res = await fetch(`${API_URL}/api/stocks/${ticker}`);
     if (!res.ok) throw new Error(`Failed to fetch stock ${ticker}`);
     const json = await res.json();
     return json.stock || json.data || json;
@@ -27,7 +29,7 @@ export async function fetchStockDetail(ticker) {
 
 export async function fetchMarketSummary() {
   try {
-    const res = await fetch("/api/market/summary");
+    const res = await fetch(`${API_URL}/api/market/summary`);
     if (!res.ok) throw new Error("Failed to fetch market summary");
     const json = await res.json();
     return json.benchmark || json;
@@ -39,7 +41,7 @@ export async function fetchMarketSummary() {
 
 export async function fetchYFinanceQuote(symbol) {
   try {
-    const res = await fetch(`/api/yfinance/quote/${symbol}`);
+    const res = await fetch(`${API_URL}/api/yfinance/quote/${symbol}`);
     if (!res.ok) throw new Error(`Failed to fetch quote for ${symbol}`);
     const json = await res.json();
     return json.data || json;
@@ -51,7 +53,7 @@ export async function fetchYFinanceQuote(symbol) {
 
 export async function fetchYFinanceChart(symbol, range = "1mo", interval = "1d") {
   try {
-    const res = await fetch(`/api/yfinance/chart/${symbol}?range=${range}&interval=${interval}`);
+    const res = await fetch(`${API_URL}/api/yfinance/chart/${symbol}?range=${range}&interval=${interval}`);
     if (!res.ok) throw new Error(`Failed to fetch chart for ${symbol}`);
     const json = await res.json();
     return json;
@@ -63,7 +65,7 @@ export async function fetchYFinanceChart(symbol, range = "1mo", interval = "1d")
 
 export async function searchYFinance(query) {
   try {
-    const res = await fetch(`/api/yfinance/search?q=${encodeURIComponent(query)}`);
+    const res = await fetch(`${API_URL}/api/yfinance/search?q=${encodeURIComponent(query)}`);
     if (!res.ok) throw new Error("Search failed");
     return await res.json();
   } catch (err) {
@@ -74,7 +76,7 @@ export async function searchYFinance(query) {
 
 export async function fetchAlerts(email) {
   try {
-    const res = await fetch(`/api/alerts?email=${encodeURIComponent(email || "user@stake.com")}`);
+    const res = await fetch(`${API_URL}/api/alerts?email=${encodeURIComponent(email || "user@stake.com")}`);
     if (!res.ok) throw new Error("Failed to fetch alerts");
     return await res.json();
   } catch (err) {
@@ -85,7 +87,7 @@ export async function fetchAlerts(email) {
 
 export async function createPriceAlert(alertData) {
   try {
-    const res = await fetch("/api/alerts", {
+    const res = await fetch(`${API_URL}/api/alerts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(alertData),
@@ -100,7 +102,7 @@ export async function createPriceAlert(alertData) {
 
 export async function deletePriceAlert(alertId, email) {
   try {
-    const res = await fetch(`/api/alerts/${alertId}?email=${encodeURIComponent(email || "user@stake.com")}`, {
+    const res = await fetch(`${API_URL}/api/alerts/${alertId}?email=${encodeURIComponent(email || "user@stake.com")}`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error("Failed to delete alert");
@@ -155,7 +157,7 @@ export async function verifyAuthToken(email) {
   try {
     const token = getStoredAuthToken();
     const query = email ? `?email=${encodeURIComponent(email)}` : "";
-    const res = await fetch(`/api/auth/me${query}`, {
+    const res = await fetch(`${API_URL}/api/auth/me${query}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) throw new Error("Session expired");
@@ -167,7 +169,7 @@ export async function verifyAuthToken(email) {
 }
 
 export async function registerUser({ email, name, username, password, strategy }) {
-  const res = await fetch("/api/auth/register", {
+  const res = await fetch(`${API_URL}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, name, username, password, strategy }),
@@ -190,7 +192,7 @@ export async function registerUser({ email, name, username, password, strategy }
 }
 
 export async function loginUser(email, password = "") {
-  const res = await fetch("/api/auth/login", {
+  const res = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: email || "", password }),
@@ -214,7 +216,7 @@ export async function loginUser(email, password = "") {
 
 export async function fetchKycStatus(email) {
   try {
-    const res = await fetch(`/api/kyc?email=${encodeURIComponent(email || "")}`);
+    const res = await fetch(`${API_URL}/api/kyc?email=${encodeURIComponent(email || "")}`);
     if (!res.ok) throw new Error("Failed to fetch KYC status");
     return await res.json();
   } catch (err) {
@@ -225,7 +227,7 @@ export async function fetchKycStatus(email) {
 
 export async function submitKycData(email, kycData) {
   try {
-    const res = await fetch("/api/kyc", {
+    const res = await fetch(`${API_URL}/api/kyc`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, kycData }),
@@ -240,7 +242,7 @@ export async function submitKycData(email, kycData) {
 
 export async function syncUserState(userData) {
   try {
-    const res = await fetch("/api/sync", {
+    const res = await fetch(`${API_URL}/api/sync`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(userData),
@@ -255,7 +257,7 @@ export async function syncUserState(userData) {
 
 export async function submitOrder(orderData) {
   try {
-    const res = await fetch("/api/orders", {
+    const res = await fetch(`${API_URL}/api/orders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(orderData),
@@ -271,7 +273,7 @@ export async function submitOrder(orderData) {
 export async function fetchUserData(email) {
   try {
     const targetEmail = (email || "user@stake.com").toLowerCase().trim();
-    const res = await fetch(`/api/user?email=${encodeURIComponent(targetEmail)}`);
+    const res = await fetch(`${API_URL}/api/user?email=${encodeURIComponent(targetEmail)}`);
     if (!res.ok) throw new Error("Failed to fetch user data");
     const json = await res.json();
     return json.user || json;
@@ -283,7 +285,7 @@ export async function fetchUserData(email) {
 
 export async function deployAgentStrategy({ email, strategy, deployedCapital, maxSpend, riskLevel }) {
   try {
-    const res = await fetch("/api/agent/deploy-strategy", {
+    const res = await fetch(`${API_URL}/api/agent/deploy-strategy`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, strategy, deployedCapital, maxSpend, riskLevel }),
@@ -301,7 +303,7 @@ export async function deployAgentStrategy({ email, strategy, deployedCapital, ma
 
 export async function pauseAgentStrategy(email) {
   try {
-    const res = await fetch("/api/agent/pause-strategy", {
+    const res = await fetch(`${API_URL}/api/agent/pause-strategy`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -315,7 +317,7 @@ export async function pauseAgentStrategy(email) {
 
 export async function resumeAgentStrategy(email) {
   try {
-    const res = await fetch("/api/agent/resume-strategy", {
+    const res = await fetch(`${API_URL}/api/agent/resume-strategy`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -329,7 +331,7 @@ export async function resumeAgentStrategy(email) {
 
 export async function adjustAgentCapital({ email, deployedCapital, maxSpend }) {
   try {
-    const res = await fetch("/api/agent/adjust-capital", {
+    const res = await fetch(`${API_URL}/api/agent/adjust-capital`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, deployedCapital, maxSpend }),
@@ -343,7 +345,7 @@ export async function adjustAgentCapital({ email, deployedCapital, maxSpend }) {
 
 export async function scanAndExecuteStrategy({ email, strategy, maxSpend }) {
   try {
-    const res = await fetch("/api/agent/scan-and-execute", {
+    const res = await fetch(`${API_URL}/api/agent/scan-and-execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, strategy, maxSpend }),
@@ -355,9 +357,58 @@ export async function scanAndExecuteStrategy({ email, strategy, maxSpend }) {
   }
 }
 
+export async function updateAgentWatchlist({ email, watchlist }) {
+  try {
+    const res = await fetch(`${API_URL}/api/agent/watchlist`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, watchlist }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn("AI watchlist sync fallback:", err.message);
+    return { success: false };
+  }
+}
+
+export async function sendAgentChat({ email, message, history = [] }) {
+  const res = await fetch(`${API_URL}/api/agent/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, message, history }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || "AI request failed.");
+  }
+  return data;
+}
+
+// ===== ADDED: Strategy Analysis =====
+export async function fetchStrategyAnalysis(symbol, timeframe = "1d") {
+  const response = await fetch(`${API_URL}/api/agent/strategy-analysis`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      symbol,
+      timeframe,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to fetch strategy analysis");
+  }
+
+  return response.json();
+}
+// ====================================
+
 export async function deleteAccount(email) {
   try {
-    const res = await fetch("/api/user/delete", {
+    const res = await fetch(`${API_URL}/api/user/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: (email || "").toLowerCase().trim() }),
@@ -369,7 +420,3 @@ export async function deleteAccount(email) {
     return { success: true };
   }
 }
-
-
-
-

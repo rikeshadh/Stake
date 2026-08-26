@@ -18,7 +18,8 @@ export interface AgentMemoryLog {
   userEmail: string;
   timestamp: number;
   text: string;
-  type: "SCAN" | "EXECUTION" | "RISK_TRIGGER" | "SAFETY_ALERT";
+  // ✅ Added "DEPLOYMENT" to the allowed types
+  type: "SCAN" | "EXECUTION" | "RISK_TRIGGER" | "SAFETY_ALERT" | "DEPLOYMENT";
 }
 
 export interface BacktestResult {
@@ -117,9 +118,10 @@ export const globalAgentMemory: AgentMemoryLog[] = [
   },
 ];
 
+// ✅ Added a default ticker ("NVDA") to avoid missing argument errors.
 export function runStrategyBacktest(
   strategy: string,
-  ticker: string,
+  ticker: string = "NVDA",
   days: number = 90,
   initialCapital: number = 10000
 ): BacktestResult {
