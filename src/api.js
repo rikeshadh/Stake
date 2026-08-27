@@ -1,7 +1,7 @@
 // API Client for Stake Platform
 // Communicates with backend REST endpoints for stocks, authentication, and execution
 
-const API_URL = import.meta.env.VITE_API_URL || "";
+const API_URL = "";
 
 export async function fetchStocks() {
   try {
