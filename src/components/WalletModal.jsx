@@ -314,39 +314,6 @@ export function WalletModal({
           </button>
         </div>
 
-        {/* Gateway Selection */}
-        <div style={{ marginBottom: 18 }}>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 800, color: textSecondary, marginBottom: 8 }}>
-            SELECT SETTLEMENT GATEWAY
-          </label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-            {[
-              { id: "ACH", name: "ACH Bank Transfer", fee: "0% Fee" },
-              { id: "Wire", name: "Fedwire / Wire", fee: "$0 Fee" },
-              { id: "Card", name: "Debit / Apple Pay", fee: "Instant" },
-            ].map((gw) => (
-              <div
-                key={gw.id}
-                onClick={() => setGateway(gw.id)}
-                style={{
-                  padding: "12px",
-                  borderRadius: 12,
-                  border: `1px solid ${gateway === gw.id ? theme.primary : borderCol}`,
-                  background: gateway === gw.id ? (darkMode ? "rgba(16,185,129,0.12)" : "#f8fafc") : inputBg,
-                  cursor: "pointer",
-                  textAlign: "center",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 800, color: gateway === gw.id ? theme.primary : textPrimary }}>
-                  {gw.name}
-                </div>
-                <div style={{ fontSize: 11, color: textSecondary, marginTop: 2 }}>{gw.fee}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Amount Input */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
