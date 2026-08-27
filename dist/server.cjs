@@ -342,11 +342,12 @@ Key Guidelines:
       contents.push(modelTurnContent);
       const functionResponseParts = [];
       for (const call of toolCalls) {
-        const toolResult = await executeToolCall(call.name, call.args);
+        const toolResult = await executeToolCall(call.name ?? "", call.args);
         executedToolLogs.push({ name: call.name, args: call.args, result: toolResult });
         functionResponseParts.push({
           functionResponse: {
-            name: call.name,
+            name: call.name ?? "",
+            // also coerce here
             response: { output: toolResult }
           }
         });
@@ -609,9 +610,13 @@ import_dotenv.default.config();
 var yahooFinance = new import_yahoo_finance2.default();
 function normalizeYahooSymbol(symbol) {
   const s = (symbol || "").toUpperCase().trim();
-  if (s === "BRK.B") return "BRK-B";
-  if (s === "BF.B") return "BF-B";
-  return s;
+  const aliases = {
+    "BRK.B": "BRK-B",
+    "BF.B": "BF-B",
+    "SQ": "XYZ",
+    "MMC": "MRSH"
+  };
+  return aliases[s] || s;
 }
 var app = (0, import_express.default)();
 var PORT = Number(process.env.PORT) || 3e3;
@@ -704,7 +709,7 @@ var INTERNATIONAL_TICKERS = [
   "SMCI",
   "HOOD",
   "PYPL",
-  "SQ",
+  "XYZ",
   "SHOP",
   "SNOW",
   "CRWD",
@@ -746,7 +751,7 @@ var INTERNATIONAL_TICKERS = [
   "MCO",
   "CB",
   "PGR",
-  "MMC",
+  "MRSH",
   "AON",
   "CME",
   "ICE",
@@ -777,7 +782,6 @@ var INTERNATIONAL_TICKERS = [
   "GM",
   "SPOT",
   "RBLX",
-  "EA",
   "TTWO",
   "APP",
   "DASH"
@@ -856,7 +860,7 @@ var TICKER_META = {
   SMCI: { name: "Super Micro Computer", color: "#16a34a", sector: "Semiconductors & AI" },
   HOOD: { name: "Robinhood Markets", color: "#10b981", sector: "Fintech & Payments" },
   PYPL: { name: "PayPal Holdings", color: "#2563eb", sector: "Fintech & Payments" },
-  SQ: { name: "Block Inc.", color: "#10b981", sector: "Fintech & Payments" },
+  XYZ: { name: "Block Inc.", color: "#10b981", sector: "Fintech & Payments" },
   SHOP: { name: "Shopify Inc.", color: "#059669", sector: "Cloud & Software" },
   SNOW: { name: "Snowflake Inc.", color: "#0284c7", sector: "Cloud & Software" },
   CRWD: { name: "CrowdStrike Holdings", color: "#dc2626", sector: "Cloud & Software" },
@@ -898,7 +902,7 @@ var TICKER_META = {
   MCO: { name: "Moody's Corporation", color: "#0284c7", sector: "Financials & Banking" },
   CB: { name: "Chubb Limited", color: "#0284c7", sector: "Financials & Banking" },
   PGR: { name: "The Progressive Corp", color: "#0284c7", sector: "Financials & Banking" },
-  MMC: { name: "Marsh McLennan", color: "#0284c7", sector: "Financials & Banking" },
+  MRSH: { name: "Marsh McLennan", color: "#0284c7", sector: "Financials & Banking" },
   AON: { name: "Aon plc", color: "#dc2626", sector: "Financials & Banking" },
   CME: { name: "CME Group", color: "#0284c7", sector: "Financials & Banking" },
   ICE: { name: "Intercontinental Exchange", color: "#0284c7", sector: "Financials & Banking" },
@@ -929,7 +933,7 @@ var TICKER_META = {
   GM: { name: "General Motors", color: "#0284c7", sector: "Electric Vehicles" },
   SPOT: { name: "Spotify Technology", color: "#16a34a", sector: "Entertainment & Media" },
   RBLX: { name: "Roblox Corporation", color: "#dc2626", sector: "Entertainment & Media" },
-  EA: { name: "Electronic Arts", color: "#dc2626", sector: "Entertainment & Media" },
+  // EA removed
   TTWO: { name: "Take-Two Interactive", color: "#dc2626", sector: "Entertainment & Media" },
   APP: { name: "AppLovin Corporation", color: "#0284c7", sector: "Cloud & Software" },
   DASH: { name: "DoorDash Inc.", color: "#dc2626", sector: "Consumer & Retail" }
@@ -1640,8 +1644,9 @@ app.post("/api/user/delete", async (req, res) => {
 });
 app.get("/api/yfinance/quote/:symbol", async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
+  const yahooSymbol = normalizeYahooSymbol(symbol);
   try {
-    const q = await yahooFinance.quote(symbol);
+    const q = await yahooFinance.quote(yahooSymbol);
     if (!q) {
       return res.status(404).json({ success: false, message: `Symbol ${symbol} not found` });
     }
@@ -1689,6 +1694,7 @@ app.get("/api/yfinance/quote/:symbol", async (req, res) => {
 });
 app.get("/api/yfinance/chart/:symbol", async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
+  const yahooSymbol = normalizeYahooSymbol(symbol);
   const rawRange = req.query.range || "all";
   const cleanRange = rawRange.toLowerCase().trim();
   const interval = req.query.interval || (cleanRange === "1d" ? "5m" : cleanRange === "all" || cleanRange === "1y" ? "1wk" : "1d");
@@ -1703,7 +1709,7 @@ app.get("/api/yfinance/chart/:symbol", async (req, res) => {
     else if (cleanRange === "1y") startDate.setFullYear(now.getFullYear() - 1);
     else if (cleanRange === "all" || cleanRange === "max" || cleanRange === "5y") startDate.setFullYear(now.getFullYear() - 5);
     else startDate.setFullYear(now.getFullYear() - 5);
-    const result = await yahooFinance.chart(symbol, {
+    const result = await yahooFinance.chart(yahooSymbol, {
       period1: startDate,
       period2: now,
       interval: interval || "1d"

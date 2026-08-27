@@ -5,7 +5,7 @@ import {
   RefreshCw, RotateCcw, Sparkles, Wallet, Zap, CheckCircle2,
   BarChart2, Shield, TrendingUp, Gauge, List,
   Download, Settings, X, Edit, ChevronRight, ArrowUpRight,
-  Plus, ExternalLink
+  Plus, ExternalLink, PlayCircle
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
@@ -20,13 +20,10 @@ import { STRATEGIES } from "../strategies";
 import { GeminiStrategySidebar } from "./GeminiStrategySidebar";
 
 // ----------------------------------------------------------------------
-// Constants
+// Constants & Helpers
 // ----------------------------------------------------------------------
 const API_URL = import.meta.env.VITE_API_URL || "";
 
-// ----------------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------------
 function numberValue(v, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -52,7 +49,6 @@ function formatRelativeTime(v) {
 }
 
 async function requestJSON(url, options = {}) {
-  // Prepend API_URL to relative paths (e.g., "/api/...")
   const fullUrl = url.startsWith("/") ? `${API_URL}${url}` : url;
   const res = await fetch(fullUrl, options);
   const contentType = res.headers.get("content-type") || "";
@@ -137,6 +133,17 @@ function useLocalStorage(key, initial) {
 }
 
 // ----------------------------------------------------------------------
+// Helper: determine if account is demo
+// ----------------------------------------------------------------------
+function isDemoAccount(user) {
+  if (!user) return true; // fallback to demo
+  if (user.isDemo === true) return true;
+  if (user.isDemo === false) return false;
+  const email = (user.email || "").toLowerCase();
+  return email.includes("demo") || email.includes("guest") || email.includes("test");
+}
+
+// ----------------------------------------------------------------------
 // Main Component
 // ----------------------------------------------------------------------
 export function AgentTab({
@@ -154,6 +161,36 @@ export function AgentTab({
   showToast,
   onOpenOrderDesk,
 }) {
+  // ----- Start screen state (session for demo, permanent for real) -----
+  const [hasStarted, setHasStarted] = useState(() => {
+    if (isDemoAccount(user)) {
+      // Demo: use sessionStorage so it persists across page navigation within the session
+      const stored = sessionStorage.getItem("stake_ai_started_demo");
+      return stored === "true";
+    } else {
+      // Real: use localStorage to remember permanently
+      const stored = localStorage.getItem("stake_ai_started_real");
+      return stored === "true";
+    }
+  });
+
+  const handleLaunch = useCallback(() => {
+    setHasStarted(true);
+    if (isDemoAccount(user)) {
+      try {
+        sessionStorage.setItem("stake_ai_started_demo", "true");
+      } catch {
+        // ignore
+      }
+    } else {
+      try {
+        localStorage.setItem("stake_ai_started_real", "true");
+      } catch {
+        // ignore
+      }
+    }
+  }, [user]);
+
   // ----- persistent settings -----
   const [riskParams, setRiskParams] = useLocalStorage("stake-ai-risk-params", {
     stopLoss: 4.5,
@@ -167,16 +204,14 @@ export function AgentTab({
 
   // ----- UI state -----
   const [strategyOverride, setStrategyOverride] = useState(null);
-  const selectedStrategyId = strategyOverride || agentStrategy || user?.agentStrategy || STRATEGIES[0]?.id || "dip_buyer";
+  const selectedStrategyId = strategyOverride || null;
   const setSelectedStrategyId = setStrategyOverride;
 
   const [compareBenchmark, setCompareBenchmark] = useState(true);
   const [benchmarkTimeframe, setBenchmarkTimeframe] = useState("3mo");
   const [isGeminiSidebarOpen, setIsGeminiSidebarOpen] = useState(false);
-  const [deployCapitalInput, setDeployCapitalInput] = useState(
-    user?.agentDeployedCapital || Math.min(cashBalance || 5000, 5000)
-  );
-  const [maxSpendInput, setMaxSpendInput] = useState(agentMaxSpend || user?.agentMaxSpend || 500);
+  const [deployCapitalInput, setDeployCapitalInput] = useState("");
+  const [maxSpendInput, setMaxSpendInput] = useState("");
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState(1000);
   const [scanLoading, setScanLoading] = useState(false);
@@ -190,9 +225,9 @@ export function AgentTab({
   const targetEmail = user?.email || "guestTrader67@stake.com";
   const { signals, actions, loading: dataLoading, refetch: refreshData, setActions } = useAgentData(targetEmail);
 
-  // ----- Computed Strategy (always defaults to dip_buyer or first strategy) -----
+  // ----- Computed Strategy -----
   const currentStrategy = useMemo(() => {
-    return STRATEGIES.find((s) => s.id === selectedStrategyId) || STRATEGIES[0];
+    return STRATEGIES.find((s) => s.id === selectedStrategyId) || null;
   }, [selectedStrategyId]);
 
   const availableCash = numberValue(cashBalance);
@@ -201,7 +236,6 @@ export function AgentTab({
     return Object.values(holdings || {}).filter((h) => (h?.shares || h || 0) > 0).length;
   }, [holdings]);
 
-  // Signals with safe defaults
   const strongSignals = useMemo(() => {
     if (signals.length > 0) {
       return signals
@@ -222,7 +256,6 @@ export function AgentTab({
           rsi: s.rsi,
         }));
     }
-    // Fallback mock signals from universe
     const mockSignals = [
       { ticker: "NVDA", price: 137.86, change: 2.42, side: "BUY", type: "Breakout Momentum", reason: "Volume breakout confirmed (+2.42%). Order flow shows strong institutional continuation.", confidence: 88, target: 148.50 },
       { ticker: "TSLA", price: 349.63, change: -1.84, side: "BUY", type: "Mean-Reversion Dip", reason: "Oversold RSI dip near key 50-EMA support. Risk-to-reward ratio 3.4:1.", confidence: 84, target: 375.00 },
@@ -239,11 +272,11 @@ export function AgentTab({
     }));
   }, [signals]);
 
-  // Benchmark chart data
   const benchmarkChartData = useMemo(() => {
+    if (!currentStrategy) return [];
     const points = benchmarkTimeframe === "1mo" ? 22 : benchmarkTimeframe === "3mo" ? 45 : 90;
     const baseSpy = benchmarkTimeframe === "1mo" ? 2.4 : benchmarkTimeframe === "3mo" ? 6.2 : 14.8;
-    const stratId = currentStrategy?.id || "dip_buyer";
+    const stratId = currentStrategy.id;
     const alpha = stratId === "momentum" ? 1.55 : stratId === "dip_buyer" ? 1.32 : stratId === "volatility_sentinel" ? 1.45 : 1.15;
     const data = [];
     for (let i = 0; i <= points; i++) {
@@ -263,12 +296,20 @@ export function AgentTab({
     return data;
   }, [benchmarkTimeframe, currentStrategy]);
 
-  // ---- Performance stats ----
   const performanceStats = useMemo(() => {
-    const winRate = parseFloat(currentStrategy?.winRate || "78") / 100;
-    const avgReturn = parseFloat(currentStrategy?.expectedReturn || "14.8") / 100;
-    const sharpe = parseFloat(currentStrategy?.sharpeRatio || "2.35");
-    const maxDD = parseFloat(currentStrategy?.maxDrawdown?.replace("%", "") || "4.8");
+    if (!currentStrategy) {
+      return {
+        cagr: "--",
+        sharpe: "--",
+        maxDrawdown: "--",
+        profitFactor: "--",
+        winRate: "--",
+      };
+    }
+    const winRate = parseFloat(currentStrategy.winRate || "78") / 100;
+    const avgReturn = parseFloat(currentStrategy.expectedReturn || "14.8") / 100;
+    const sharpe = parseFloat(currentStrategy.sharpeRatio || "2.35");
+    const maxDD = parseFloat(currentStrategy.maxDrawdown?.replace("%", "") || "4.8");
     const cagr = avgReturn * 1.2;
     const profitFactor = winRate * 1.5 + 0.5;
     return {
@@ -280,7 +321,6 @@ export function AgentTab({
     };
   }, [currentStrategy]);
 
-  // ---- AI sentiment ----
   const sentiment = useMemo(() => {
     const confidence = strongSignals[0]?.confidence || 82;
     const base = 66;
@@ -288,7 +328,6 @@ export function AgentTab({
     return { score, label: score > 80 ? "Bullish" : score > 60 ? "Neutral" : "Bearish" };
   }, [strongSignals]);
 
-  // ---- Risk score ----
   const riskScore = useMemo(() => {
     let score = 72;
     if (riskParams.maxDrawdown < 6) score -= 10;
@@ -300,12 +339,16 @@ export function AgentTab({
 
   // ---- Handlers ----
   const runScan = useCallback(async () => {
+    if (!currentStrategy) {
+      showToast?.("Please select a strategy first.");
+      return;
+    }
     setScanLoading(true);
     try {
       await scanAndExecuteStrategy({
         email: user?.email || "guestTrader67@stake.com",
         strategy: selectedStrategyId,
-        maxSpend: agentMaxSpend || maxSpendInput,
+        maxSpend: Number(maxSpendInput) || 500,
       });
       showToast?.("Radar scan completed. Signals updated.");
       refreshData();
@@ -315,7 +358,7 @@ export function AgentTab({
     } finally {
       setScanLoading(false);
     }
-  }, [user, selectedStrategyId, agentMaxSpend, maxSpendInput, showToast, refreshData, onRefreshUserData]);
+  }, [user, selectedStrategyId, maxSpendInput, showToast, refreshData, onRefreshUserData, currentStrategy]);
 
   const scanFunctionRef = useRef(runScan);
   useEffect(() => {
@@ -366,20 +409,25 @@ export function AgentTab({
       showToast?.("Select a strategy first.");
       return;
     }
+    const capital = Number(deployCapitalInput);
+    if (!capital || capital <= 0) {
+      showToast?.("Enter a valid capital amount.");
+      return;
+    }
     setDeployLoading(true);
     const email = user?.email || "guestTrader67@stake.com";
     try {
       await deployAgentStrategy({
         email,
         strategy: selectedStrategyId,
-        deployedCapital: Number(deployCapitalInput),
-        maxSpend: Number(maxSpendInput),
+        deployedCapital: capital,
+        maxSpend: Number(maxSpendInput) || 500,
         riskLevel: currentStrategy?.riskLevel,
       });
       onSelectStrategy?.(selectedStrategyId);
-      onChangeMaxSpend?.(Number(maxSpendInput));
+      onChangeMaxSpend?.(Number(maxSpendInput) || 500);
       onToggleAgent?.(true);
-      showToast?.(`Strategy ${currentStrategy?.name} deployed with $${fmt(deployCapitalInput)}.`);
+      showToast?.(`Strategy ${currentStrategy?.name} deployed with $${fmt(capital)}.`);
       refreshData();
       onRefreshUserData?.();
     } catch (err) {
@@ -401,7 +449,6 @@ export function AgentTab({
         body: JSON.stringify({ userId: email, email, actionId }),
       });
       showToast?.(data?.message || "Trade successfully reverted and funds refunded.");
-      // Optimistically update local actions
       setActions((prev) =>
         prev.map((a) => (a.id === actionId ? { ...a, reverted: true, status: "REVERSED" } : a))
       );
@@ -420,7 +467,7 @@ export function AgentTab({
     const newCapital = isAdd ? deployedCapital + delta : Math.max(0, deployedCapital - delta);
     const email = user?.email || "guestTrader67@stake.com";
     try {
-      await adjustAgentCapital({ email, deployedCapital: newCapital, maxSpend: agentMaxSpend });
+      await adjustAgentCapital({ email, deployedCapital: newCapital, maxSpend: Number(maxSpendInput) || 500 });
       showToast?.(isAdd ? `Added $${fmt(delta)} to agent allocation` : `Withdrew $${fmt(delta)}`);
       setShowAdjustModal(false);
       onRefreshUserData?.();
@@ -476,7 +523,71 @@ export function AgentTab({
     showToast?.(`Removed ${ticker} from Watchlist`);
   };
 
-  // ---- Light theme constants ----
+  // =========================================================
+  //   START SCREEN (improved)
+  // =========================================================
+  if (!hasStarted) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6 }}
+        className="min-h-[75vh] flex flex-col items-center justify-center px-4 text-center relative overflow-hidden"
+      >
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
+
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, type: "spring", stiffness: 300 }}
+          className="relative z-10"
+        >
+          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shadow-xl shadow-emerald-500/20 ring-4 ring-emerald-500/10">
+            <Bot size={44} className="text-emerald-600" />
+          </div>
+
+          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2 tracking-tight">
+            Autonomous AI Trading Engine
+          </h2>
+          <p className="text-sm sm:text-base text-slate-500 max-w-md mx-auto mb-6">
+            Deploy quantitative strategies, execute fractional orders, and monitor risk – all powered by real-time market data and AI.
+          </p>
+
+          <div className="flex flex-wrap justify-center gap-2 mb-8">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-slate-200/80 rounded-full text-xs font-semibold text-slate-700 shadow-xs">
+              <Zap size={14} className="text-amber-500" /> Live Signals
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-slate-200/80 rounded-full text-xs font-semibold text-slate-700 shadow-xs">
+              <BarChart2 size={14} className="text-emerald-500" /> Benchmarking
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-slate-200/80 rounded-full text-xs font-semibold text-slate-700 shadow-xs">
+              <Shield size={14} className="text-blue-500" /> Risk Guard
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-slate-200/80 rounded-full text-xs font-semibold text-slate-700 shadow-xs">
+              <DollarSign size={14} className="text-purple-500" /> Fractional Trades
+            </span>
+          </div>
+
+          <motion.button
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            onClick={handleLaunch}
+            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-extrabold rounded-2xl shadow-lg shadow-emerald-600/30 hover:shadow-xl hover:shadow-emerald-600/50 transition-all"
+          >
+            <PlayCircle size={20} />
+            Launch Dashboard
+          </motion.button>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // =========================================================
+  //   DASHBOARD (only shown after start)
+  // =========================================================
   const bgCard = "#ffffff";
   const borderCol = "#e2e8f0";
   const textPrimary = "#0f172a";
@@ -577,7 +688,6 @@ export function AgentTab({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          {/* Pause / Start Engine button */}
           <button
             id="agent-header-toggle-btn"
             onClick={handleTogglePause}
@@ -600,7 +710,6 @@ export function AgentTab({
             <span>{agentEnabled ? "Pause Engine" : "Activate Engine"}</span>
           </button>
 
-          {/* AI Insights Button */}
           <button
             id="agent-header-ai-insights-btn"
             onClick={() => setIsGeminiSidebarOpen(true)}
@@ -624,7 +733,6 @@ export function AgentTab({
             <span>AI Insights</span>
           </button>
 
-          {/* Customize Strategy button */}
           <button
             id="agent-header-customize-btn"
             onClick={() => setIsCustomizationOpen(true)}
@@ -683,7 +791,7 @@ export function AgentTab({
           </div>
           <div className="mt-1.5 text-xl font-bold text-slate-900 font-mono">${fmt(deployedCapital)}</div>
           <div className="text-[10px] text-slate-400 flex items-center gap-1">
-            <span>Max ${fmt(agentMaxSpend || maxSpendInput)}/trade</span>
+            <span>Max ${fmt(Number(maxSpendInput) || 0)}/trade</span>
             <button onClick={() => setShowAdjustModal(true)} className="text-emerald-600 font-bold hover:underline">
               Adjust
             </button>
@@ -766,7 +874,7 @@ export function AgentTab({
               </div>
               <div className="flex items-center gap-2 mt-0.5">
                 <span style={{ fontSize: 16, fontWeight: 900, color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>
-                  {currentStrategy?.name || "Dip Buyer Alpha"}
+                  {currentStrategy?.name || "No strategy selected"}
                 </span>
                 <button
                   onClick={() => setIsCustomizationOpen(true)}
@@ -810,7 +918,8 @@ export function AgentTab({
                 <input
                   type="number"
                   value={deployCapitalInput}
-                  onChange={(e) => setDeployCapitalInput(Number(e.target.value))}
+                  onChange={(e) => setDeployCapitalInput(e.target.value)}
+                  placeholder="e.g. 5000"
                   className="pl-6 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono w-28 focus:outline-emerald-500"
                 />
               </div>
@@ -825,7 +934,8 @@ export function AgentTab({
                 <input
                   type="number"
                   value={maxSpendInput}
-                  onChange={(e) => setMaxSpendInput(Number(e.target.value))}
+                  onChange={(e) => setMaxSpendInput(e.target.value)}
+                  placeholder="e.g. 500"
                   className="pl-6 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono w-24 focus:outline-emerald-500"
                 />
               </div>
@@ -834,8 +944,8 @@ export function AgentTab({
             <div className="flex items-end gap-2 mt-auto">
               <button
                 onClick={handleDeployStrategy}
-                disabled={deployLoading}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                disabled={deployLoading || !selectedStrategyId || !Number(deployCapitalInput)}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 {deployLoading ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} className="text-amber-300" />}
                 <span>{deployLoading ? "Deploying..." : "Deploy Strategy"}</span>
@@ -843,8 +953,8 @@ export function AgentTab({
 
               <button
                 onClick={runScan}
-                disabled={scanLoading}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition-all border border-slate-800 disabled:opacity-50 shadow-sm cursor-pointer"
+                disabled={scanLoading || !currentStrategy}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition-all border border-slate-800 disabled:opacity-50 shadow-sm cursor-pointer disabled:cursor-not-allowed"
               >
                 <Zap size={13} className={scanLoading ? "animate-spin text-amber-300" : "text-amber-300"} />
                 <span>{scanLoading ? "Scanning..." : "Scan & Trade"}</span>
@@ -853,7 +963,7 @@ export function AgentTab({
           </div>
         </div>
 
-        {agentEnabled && (
+        {agentEnabled && currentStrategy && (
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2 text-xs">
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
@@ -892,15 +1002,14 @@ export function AgentTab({
               </h2>
             </div>
             <p className="text-xs text-slate-500 m-0 mt-0.5">
-              Simulated alpha curve and institutional factor benchmarking vs SPY
+              {currentStrategy ? "Simulated alpha curve and institutional factor benchmarking vs SPY" : "Select a strategy to see performance simulation"}
             </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Quick Strategy Switcher Chips */}
             <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
               {STRATEGIES.map((s) => {
-                const active = (currentStrategy?.id || "dip_buyer") === s.id;
+                const active = selectedStrategyId === s.id;
                 return (
                   <button
                     key={s.id}
@@ -915,110 +1024,126 @@ export function AgentTab({
               })}
             </div>
 
-            {/* Timeframe selector */}
-            <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-              {["1mo", "3mo", "1y"].map((tf) => (
+            {currentStrategy && (
+              <>
+                <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                  {["1mo", "3mo", "1y"].map((tf) => (
+                    <button
+                      key={tf}
+                      onClick={() => setBenchmarkTimeframe(tf)}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                        benchmarkTimeframe === tf ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      {tf.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+
                 <button
-                  key={tf}
-                  onClick={() => setBenchmarkTimeframe(tf)}
-                  className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                    benchmarkTimeframe === tf ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                  onClick={() => setCompareBenchmark(!compareBenchmark)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                    compareBenchmark ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-500 border-slate-200"
                   }`}
                 >
-                  {tf.toUpperCase()}
+                  {compareBenchmark ? "SPY Comparison ON" : "SPY Comparison OFF"}
                 </button>
-              ))}
-            </div>
-
-            {/* SPY Benchmark toggle */}
-            <button
-              onClick={() => setCompareBenchmark(!compareBenchmark)}
-              className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                compareBenchmark ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-500 border-slate-200"
-              }`}
-            >
-              {compareBenchmark ? "SPY Comparison ON" : "SPY Comparison OFF"}
-            </button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Chart Area */}
         <div className="w-full h-72 sm:h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={benchmarkChartData} margin={{ top: 6, right: 6, left: -16, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gStrat" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gSpy" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} unit="%" />
-              <RechartsTooltip
-                content={({ active, payload, label }) => {
-                  if (active && payload?.length) {
-                    return (
-                      <div className="bg-white p-3 rounded-xl shadow-lg border border-slate-200 text-xs">
-                        <div className="font-bold text-slate-900 mb-1">{label}</div>
-                        <div className="text-emerald-600 font-bold flex items-center gap-1">
-                          <span>{currentStrategy?.name || "Strategy"}:</span>
-                          <span>+{payload[0]?.value}%</span>
-                        </div>
-                        {compareBenchmark && payload[1] && (
-                          <div className="text-blue-600 font-semibold flex items-center gap-1 mt-0.5">
-                            <span>S&P 500 (SPY):</span>
-                            <span>+{payload[1]?.value}%</span>
+          {currentStrategy ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={benchmarkChartData} margin={{ top: 6, right: 6, left: -16, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gStrat" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gSpy" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} unit="%" />
+                <RechartsTooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload?.length) {
+                      return (
+                        <div className="bg-white p-3 rounded-xl shadow-lg border border-slate-200 text-xs">
+                          <div className="font-bold text-slate-900 mb-1">{label}</div>
+                          <div className="text-emerald-600 font-bold flex items-center gap-1">
+                            <span>{currentStrategy.name}:</span>
+                            <span>+{payload[0]?.value}%</span>
                           </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Legend
-                verticalAlign="top"
-                height={28}
-                formatter={(v) => (
-                  <span className="text-[11px] font-bold text-slate-700">
-                    {v === "strategy" ? `${currentStrategy?.name || "Strategy Alpha"}` : "S&P 500 (SPY Benchmark)"}
-                  </span>
+                          {compareBenchmark && payload[1] && (
+                            <div className="text-blue-600 font-semibold flex items-center gap-1 mt-0.5">
+                              <span>S&P 500 (SPY):</span>
+                              <span>+{payload[1]?.value}%</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Legend
+                  verticalAlign="top"
+                  height={28}
+                  formatter={(v) => (
+                    <span className="text-[11px] font-bold text-slate-700">
+                      {v === "strategy" ? `${currentStrategy.name} Alpha` : "S&P 500 (SPY Benchmark)"}
+                    </span>
+                  )}
+                />
+                <Area type="monotone" dataKey="strategy" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#gStrat)" />
+                {compareBenchmark && (
+                  <Area type="monotone" dataKey="spy" stroke="#3b82f6" strokeWidth={2} strokeDasharray="4 4" fillOpacity={1} fill="url(#gSpy)" />
                 )}
-              />
-              <Area type="monotone" dataKey="strategy" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#gStrat)" />
-              {compareBenchmark && (
-                <Area type="monotone" dataKey="spy" stroke="#3b82f6" strokeWidth={2} strokeDasharray="4 4" fillOpacity={1} fill="url(#gSpy)" />
-              )}
-            </AreaChart>
-          </ResponsiveContainer>
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+              <div className="text-center">
+                <BarChart2 size={32} className="mx-auto text-slate-300 mb-2" />
+                <p className="font-semibold">No strategy selected</p>
+                <p className="text-xs">Pick a strategy above to see performance simulation.</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Quant Strategy Metrics Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-4 pt-3 border-t border-slate-100">
-          <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-center">
-            <div className="text-[10px] font-bold text-slate-400 uppercase">CAGR (Expected)</div>
-            <div className="text-base font-extrabold text-emerald-600 font-mono mt-0.5">{performanceStats.cagr}</div>
-          </div>
-          <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-center">
-            <div className="text-[10px] font-bold text-slate-400 uppercase">Sharpe Ratio</div>
-            <div className="text-base font-extrabold text-slate-900 font-mono mt-0.5">{performanceStats.sharpe}</div>
-          </div>
-          <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-center">
-            <div className="text-[10px] font-bold text-slate-400 uppercase">Max Drawdown</div>
-            <div className="text-base font-extrabold text-rose-600 font-mono mt-0.5">{performanceStats.maxDrawdown}</div>
-          </div>
-          <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-center">
-            <div className="text-[10px] font-bold text-slate-400 uppercase">Profit Factor</div>
-            <div className="text-base font-extrabold text-slate-900 font-mono mt-0.5">{performanceStats.profitFactor}</div>
-          </div>
-          <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-center col-span-2 sm:col-span-1">
-            <div className="text-[10px] font-bold text-slate-400 uppercase">Historical Win Rate</div>
-            <div className="text-base font-extrabold text-emerald-600 font-mono mt-0.5">{performanceStats.winRate}</div>
-          </div>
+          {currentStrategy ? (
+            <>
+              <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-center">
+                <div className="text-[10px] font-bold text-slate-400 uppercase">CAGR (Expected)</div>
+                <div className="text-base font-extrabold text-emerald-600 font-mono mt-0.5">{performanceStats.cagr}</div>
+              </div>
+              <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-center">
+                <div className="text-[10px] font-bold text-slate-400 uppercase">Sharpe Ratio</div>
+                <div className="text-base font-extrabold text-slate-900 font-mono mt-0.5">{performanceStats.sharpe}</div>
+              </div>
+              <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-center">
+                <div className="text-[10px] font-bold text-slate-400 uppercase">Max Drawdown</div>
+                <div className="text-base font-extrabold text-rose-600 font-mono mt-0.5">{performanceStats.maxDrawdown}</div>
+              </div>
+              <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-center">
+                <div className="text-[10px] font-bold text-slate-400 uppercase">Profit Factor</div>
+                <div className="text-base font-extrabold text-slate-900 font-mono mt-0.5">{performanceStats.profitFactor}</div>
+              </div>
+              <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-center col-span-2 sm:col-span-1">
+                <div className="text-[10px] font-bold text-slate-400 uppercase">Historical Win Rate</div>
+                <div className="text-base font-extrabold text-emerald-600 font-mono mt-0.5">{performanceStats.winRate}</div>
+              </div>
+            </>
+          ) : (
+            <div className="col-span-5 text-center text-slate-400 text-xs py-2">Select a strategy to view performance metrics.</div>
+          )}
         </div>
       </div>
 
@@ -1245,7 +1370,6 @@ export function AgentTab({
               <span className="text-[10px] font-semibold text-slate-400">{watchlist.length} Monitored</span>
             </div>
 
-            {/* Watchlist items */}
             <div className="space-y-1.5 overflow-y-auto max-h-[260px] pr-1 flex-1">
               {watchlist.length === 0 ? (
                 <div className="py-8 text-center text-slate-400 text-xs">
@@ -1292,7 +1416,6 @@ export function AgentTab({
               )}
             </div>
 
-            {/* Quick add suggestions */}
             <div className="mt-3 pt-3 border-t border-slate-100">
               <div className="text-[10px] font-bold text-slate-400 uppercase mb-1.5">Quick Add Suggestions</div>
               <div className="flex flex-wrap gap-1 mb-2">
@@ -1310,7 +1433,6 @@ export function AgentTab({
                   ))}
               </div>
 
-              {/* Input field + Add button */}
               <div className="flex gap-1.5">
                 <input
                   type="text"
@@ -1406,6 +1528,7 @@ export function AgentTab({
 
 // ----------------------------------------------------------------------
 // Sub-components: CustomizationPanel & AdjustCapitalModal
+// (unchanged)
 // ----------------------------------------------------------------------
 
 function CustomizationPanel({
@@ -1628,4 +1751,4 @@ function AdjustCapitalModal({ deployedCapital, availableCash, adjustAmount, setA
       </div>
     </div>
   );
-}
+} 

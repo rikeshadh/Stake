@@ -238,12 +238,13 @@ Key Guidelines:
       const functionResponseParts: any[] = [];
 
       for (const call of toolCalls) {
-        const toolResult = await executeToolCall(call.name, call.args);
+        // FIX: call.name can be undefined -> coerce to "" to satisfy executeToolCall signature
+        const toolResult = await executeToolCall(call.name ?? "", call.args);
         executedToolLogs.push({ name: call.name, args: call.args, result: toolResult });
 
         functionResponseParts.push({
           functionResponse: {
-            name: call.name,
+            name: call.name ?? "",   // also coerce here
             response: { output: toolResult },
           },
         });

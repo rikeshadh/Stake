@@ -2,18 +2,16 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Sparkles,
-  Bot,
-  Sliders,
-  BarChart2,
-  BrainCircuit,
+  Layers,
   ChevronRight,
   ChevronLeft,
   X,
   CheckCircle2,
-  Layers,
   Minimize2,
   Maximize2,
   Wallet,
+  PieChart,
+  List,
 } from "lucide-react";
 
 export function InteractiveTour({
@@ -25,78 +23,55 @@ export function InteractiveTour({
   const [isMinimized, setIsMinimized] = useState(false);
   const [targetRect, setTargetRect] = useState(null);
 
+  // Steps: Portfolio (overview, holdings, allocation) + Market
   const steps = useMemo(() => [
     {
-      id: "welcome",
-      title: "Your Portfolio Dashboard",
+      id: "portfolio_overview",
+      title: "Your Portfolio Overview",
       badge: "PORTFOLIO DESK",
-      desc: "Track your cash balance, holdings, and net worth here in real time.",
+      desc: "Track your net worth, cash balance, and all-time returns in one glance.",
       icon: Sparkles,
       iconColor: "#059669",
       accentBg: "rgba(5, 150, 105, 0.12)",
-      targetId: "main-portfolio-overview",
+      targetId: "main-portfolio-overview", // ID of the top banner
       actionTab: "home",
       tip: "Use the Wallet button to deposit or withdraw funds anytime.",
     },
     {
-      id: "quick_trade",
-      title: "Trade 30+ US Stocks",
-      badge: "QUICK TRADE",
-      desc: "Buy fractional shares from just $1 at live market prices.",
-      icon: Layers,
+      id: "holdings_list",
+      title: "Active Holdings",
+      badge: "POSITIONS",
+      desc: "See all your stocks, their current value, and daily P&L at a glance.",
+      icon: List,
       iconColor: "#0284c7",
       accentBg: "rgba(2, 132, 199, 0.12)",
+      targetId: "holdings-list-container", // add ID to the holdings wrapper
+      actionTab: "home",
+      tip: "Click Buy/Sell to trade directly from your holdings.",
+    },
+    {
+      id: "asset_allocation",
+      title: "Asset Allocation",
+      badge: "DIVERSIFICATION",
+      desc: "Understand how your capital is distributed across sectors and cash.",
+      icon: PieChart,
+      iconColor: "#8b5cf6",
+      accentBg: "rgba(139, 92, 246, 0.12)",
+      targetId: "asset-allocation-donut", // ID for the donut chart container
+      actionTab: "home",
+      tip: "A balanced portfolio helps manage risk effectively.",
+    },
+    {
+      id: "quick_trade",
+      title: "Trade 30+ US Stocks",
+      badge: "MARKET",
+      desc: "Buy fractional shares from just $1 at live market prices.",
+      icon: Layers,
+      iconColor: "#f59e0b",
+      accentBg: "rgba(245, 158, 11, 0.12)",
       targetId: "market-grid-container",
       actionTab: "market",
       tip: "Click 'Quick Trade' on a stock card for instant Market or Limit orders.",
-    },
-    {
-      id: "agent_strategies",
-      title: "AI Trading Strategies",
-      badge: "AUTOMATION",
-      desc: "Deploy strategies like Momentum Breakout or Dip Buyer DCA with custom risk limits.",
-      icon: Bot,
-      iconColor: "#8b5cf6",
-      accentBg: "rgba(139, 92, 246, 0.12)",
-      targetId: "agent-strategy-deploy-bar",
-      actionTab: "agent",
-      tip: "Pick a strategy, allocate capital, and let AI trade for you.",
-    },
-    {
-      id: "agent_benchmark",
-      title: "Performance vs S&P 500",
-      badge: "BENCHMARK",
-      desc: "Compare your strategy's returns against the S&P 500 benchmark.",
-      icon: BarChart2,
-      iconColor: "#059669",
-      accentBg: "rgba(5, 150, 105, 0.12)",
-      targetId: "agent-benchmark-card",
-      actionTab: "agent",
-      tip: "Toggle SPY comparison across 1M, 3M, and 1Y timeframes.",
-    },
-    {
-      id: "agent_radar",
-      title: "Live Trade Signals",
-      badge: "SIGNAL RADAR",
-      desc: "High-conviction setups with entry prices and confidence scores.",
-      icon: BrainCircuit,
-      iconColor: "#f59e0b",
-      accentBg: "rgba(245, 158, 11, 0.12)",
-      targetId: "agent-radar-card",
-      actionTab: "agent",
-      tip: "Signals refresh automatically on every market tick.",
-    },
-    {
-      id: "agent_execution",
-      title: "Execution Audit Trail",
-      badge: "AUDIT LOG",
-      desc: "Every automated trade is logged with price, time, and rationale.",
-      icon: Sliders,
-      iconColor: "#10b981",
-      accentBg: "rgba(16, 185, 129, 0.12)",
-      targetId: "agent-audit-card",
-      actionTab: "agent",
-      tip: "Revert any order with one click to unwind a position.",
     },
   ], []);
 
@@ -117,7 +92,6 @@ export function InteractiveTour({
       const el = document.getElementById(step.targetId);
       if (el) {
         const rect = el.getBoundingClientRect();
-        // Viewport-relative coords: root overlay container is position:fixed
         setTargetRect({
           top: rect.top,
           left: rect.left,
@@ -125,12 +99,14 @@ export function InteractiveTour({
           height: rect.height,
         });
 
-        // Smooth scroll if element is outside comfortable viewing area
-        const inView =
-          rect.top >= 70 &&
-          rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) - 120;
-        if (!inView) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Do NOT scroll when on Market tab
+        if (step.actionTab !== "market") {
+          const inView =
+            rect.top >= 70 &&
+            rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) - 120;
+          if (!inView) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
         }
       } else {
         setTargetRect(null);
@@ -207,7 +183,7 @@ export function InteractiveTour({
 
   if (!isOpen) return null;
 
-  // Place the guide card adjacent to the highlighted section (fallback: bottom-right)
+  // Positioning logic (unchanged)
   const CARD_GAP = 14;
   const vw = window.innerWidth || document.documentElement.clientWidth;
   const vh = window.innerHeight || document.documentElement.clientHeight;
@@ -238,12 +214,11 @@ export function InteractiveTour({
         pointerEvents: "none",
       }}
     >
-      {/* 1. Subtle, Clean Focus Outline (No overlapping labels) */}
       {targetRect && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
           style={{
             position: "absolute",
             top: Math.max(0, targetRect.top - 6),
@@ -255,12 +230,11 @@ export function InteractiveTour({
             boxShadow: `0 0 0 6px ${step.accentBg}, 0 12px 32px rgba(0,0,0,0.08)`,
             pointerEvents: "none",
             zIndex: 8001,
-            transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+            transition: "top 0.3s cubic-bezier(0.16, 1, 0.3, 1), left 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease",
           }}
         />
       )}
 
-      {/* 2. Sleek Bottom Floating HUD Card */}
       <AnimatePresence>
         <motion.div
           drag
@@ -284,10 +258,9 @@ export function InteractiveTour({
             zIndex: 8002,
             overflow: "hidden",
             textAlign: "left",
-            transition: "top 0.25s cubic-bezier(0.16, 1, 0.3, 1), left 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         >
-          {/* Header Strip with Controls */}
+          {/* Header */}
           <div
             style={{
               display: "flex",
@@ -383,135 +356,160 @@ export function InteractiveTour({
 
           {/* Content Body */}
           {!isMinimized && (
-            <div style={{ padding: "16px 18px" }}>
-              <h3
-                style={{
-                  fontSize: 15,
-                  fontWeight: 800,
-                  color: "#0f172a",
-                  margin: "0 0 6px",
-                  lineHeight: 1.3,
-                  letterSpacing: "-0.01em",
-                }}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={step.id}
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                style={{ padding: "16px 18px" }}
               >
-                {step.title}
-              </h3>
+                <h3
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 800,
+                    color: "#0f172a",
+                    margin: "0 0 6px",
+                    lineHeight: 1.3,
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  {step.title}
+                </h3>
 
-              <p
-                style={{
-                  fontSize: 12.5,
-                  lineHeight: 1.55,
-                  color: "#475569",
-                  margin: "0 0 12px",
-                }}
-              >
-                {step.desc}
-              </p>
+                <p
+                  style={{
+                    fontSize: 12.5,
+                    lineHeight: 1.55,
+                    color: "#475569",
+                    margin: "0 0 12px",
+                  }}
+                >
+                  {step.desc}
+                </p>
 
-              {/* Practical Tip */}
-              {step.tip && (
+                {step.tip && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "7px 10px",
+                      background: step.accentBg,
+                      borderRadius: 9,
+                      marginBottom: 12,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#334155",
+                    }}
+                  >
+                    <Wallet size={12} style={{ color: step.iconColor, flexShrink: 0 }} />
+                    <span>{step.tip}</span>
+                  </div>
+                )}
+
+                {/* Step Indicators & Actions */}
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 6,
-                    padding: "7px 10px",
-                    background: step.accentBg,
-                    borderRadius: 9,
-                    marginBottom: 12,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "#334155",
+                    justifyContent: "space-between",
+                    paddingTop: 10,
+                    borderTop: "1px solid #f1f5f9",
                   }}
                 >
-                  <Wallet size={12} style={{ color: step.iconColor, flexShrink: 0 }} />
-                  <span>{step.tip}</span>
-                </div>
-              )}
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    {steps.map((_, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setCurrentStep(idx)}
+                        style={{
+                          width: currentStep === idx ? 16 : 5,
+                          height: 5,
+                          borderRadius: 3,
+                          background: currentStep === idx ? step.iconColor : "#cbd5e1",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                        }}
+                        title={`Step ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
 
-              {/* Step Indicators & Actions */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  paddingTop: 10,
-                  borderTop: "1px solid #f1f5f9",
-                }}
-              >
-                {/* Progress pills */}
-                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                  {steps.map((_, idx) => (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <button
-                      key={idx}
+                      id="tour-skip-btn"
                       type="button"
-                      onClick={() => setCurrentStep(idx)}
+                      onClick={handleSkip}
                       style={{
-                        width: currentStep === idx ? 16 : 5,
-                        height: 5,
-                        borderRadius: 3,
-                        background: currentStep === idx ? step.iconColor : "#cbd5e1",
+                        background: "transparent",
                         border: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                      title={`Step ${idx + 1}`}
-                    />
-                  ))}
-                </div>
-
-                {/* Navigation buttons */}
-                <div style={{ display: "flex", gap: 6 }}>
-                  {!isFirst && (
-                    <button
-                      type="button"
-                      onClick={handlePrev}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 3,
-                        padding: "5px 10px",
-                        borderRadius: 7,
-                        border: "1px solid #cbd5e1",
-                        background: "#ffffff",
-                        color: "#475569",
+                        color: "#94a3b8",
                         fontSize: 11.5,
                         fontWeight: 700,
                         cursor: "pointer",
+                        padding: "5px 8px",
                       }}
                     >
-                      <ChevronLeft size={13} /> Back
+                      Skip
                     </button>
-                  )}
 
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "5px 14px",
-                      borderRadius: 7,
-                      border: "none",
-                      background: "#059669",
-                      color: "#ffffff",
-                      fontSize: 11.5,
-                      fontWeight: 800,
-                      cursor: "pointer",
-                      boxShadow: "0 3px 8px rgba(5, 150, 105, 0.25)",
-                    }}
-                  >
-                    <span>{isLast ? "Done" : "Next"}</span>
-                    {isLast ? <CheckCircle2 size={13} /> : <ChevronRight size={13} />}
-                  </button>
+                    {!isFirst && (
+                      <button
+                        type="button"
+                        onClick={handlePrev}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                          padding: "5px 10px",
+                          borderRadius: 7,
+                          border: "1px solid #cbd5e1",
+                          background: "#ffffff",
+                          color: "#475569",
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <ChevronLeft size={13} /> Back
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        padding: "5px 14px",
+                        borderRadius: 7,
+                        border: "none",
+                        background: "#059669",
+                        color: "#ffffff",
+                        fontSize: 11.5,
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        boxShadow: "0 3px 8px rgba(5, 150, 105, 0.25)",
+                      }}
+                    >
+                      <span>{isLast ? "Done" : "Next"}</span>
+                      {isLast ? <CheckCircle2 size={13} /> : <ChevronRight size={13} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            </AnimatePresence>
           )}
         </motion.div>
       </AnimatePresence>
     </div>
+
+    
   );
 }

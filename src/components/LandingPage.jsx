@@ -198,7 +198,7 @@ export function LandingPage({
           </p>
 
           <div className="stake-hero-actions" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
-            <button id="hero-start-trading-btn" className="stake-btn-mint" onClick={handleOpenSignup}>
+            <button id="hero-start-trading-btn" className="stake-btn-mint" onClick={handleOpenLogin}>
               Start Trading Now <ArrowRight size={17} />
             </button>
           </div>
