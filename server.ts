@@ -1,4 +1,4 @@
-import app from "./server/app";
+import app from "./server/app.ts";
 import { createServer as createViteServer } from "vite";
 
 const PORT = Number(process.env.PORT) || 3000;
