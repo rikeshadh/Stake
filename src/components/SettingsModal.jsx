@@ -8,7 +8,6 @@ import {
   Sliders,
   Trash2,
   AlertTriangle,
-  Sparkles, // <-- added for tour icon
 } from "lucide-react";
 import { CURRENCIES } from "../utils";
 
@@ -21,7 +20,6 @@ export function SettingsModal({
   setPrivacyMode,
   onOpenKyc,
   onDeleteAccount,
-  onOpenTour,
   kycStatus = "UNVERIFIED",
   user,
 }) {
@@ -85,30 +83,6 @@ export function SettingsModal({
 
           {/* Modal Body */}
           <div className="p-6 overflow-y-auto space-y-6">
-            {/* ═══ NEW: Platform Walkthrough Section ═══ */}
-            <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-200 flex items-center justify-between">
-              <div>
-                <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
-                  <Sparkles size={15} className="text-indigo-600" />
-                  Platform Walkthrough
-                </div>
-                <p className="text-[11.5px] text-slate-500 mt-0.5">
-                  Learn how to trade, manage your portfolio, and use the AI agent in a guided interactive tour.
-                </p>
-              </div>
-              <button
-                id="settings-start-tour-btn"
-                type="button"
-                onClick={() => {
-                  onClose();
-                  if (onOpenTour) onOpenTour();
-                }}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs transition-colors"
-              >
-                Start Tour
-              </button>
-            </div>
-
             {/* Currency Selection Section */}
             <div>
               <div className="flex items-center gap-2 mb-2">

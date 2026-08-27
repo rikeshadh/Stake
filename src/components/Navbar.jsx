@@ -17,6 +17,7 @@ import {
   Trash2,
   BellRing,
   ArrowLeft,
+  Sparkles,
 } from "lucide-react";
 import { Logo } from "./Charts";
 
@@ -30,6 +31,7 @@ export function Navbar({
   onOpenWallet,
   onOpenKyc,
   onOpenSettings,
+  onOpenAiInsights,
   onLogout,
   onExitGuest,
   kycStatus = "UNVERIFIED",
@@ -146,6 +148,20 @@ export function Navbar({
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* AI Insights Global Button */}
+          {onOpenAiInsights && (
+            <button
+              id="nav-ai-insights-btn"
+              type="button"
+              onClick={onOpenAiInsights}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Open AI Insights Copilot"
+            >
+              <Sparkles size={14} className="text-amber-300" />
+              <span className="hidden sm:inline">AI Insights</span>
+            </button>
+          )}
+
           {/* Notification Button & Popover */}
           <div ref={notifDropdownRef} className="relative">
             <button

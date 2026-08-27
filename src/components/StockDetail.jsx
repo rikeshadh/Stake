@@ -23,6 +23,7 @@ import { fetchYFinanceQuote, fetchYFinanceChart } from "../api";
 import { fmt, fmtShares, initials, formatStockPrice, formatMoney, getCurrencySymbol } from "../utils";
 
 const RANGES = ["1D", "1W", "1M", "3M", "1Y", "ALL"];
+const chartCache = new Map();
 
 export function StockDetail({
   selected,
@@ -48,12 +49,22 @@ export function StockDetail({
   const [liveCandles, setLiveCandles] = useState(null);
   const [isLoadingLive, setIsLoadingLive] = useState(false);
 
-  // Fetch real-time live data via yfinance endpoint
+  // Fetch real-time live data via yfinance endpoint with in-memory caching for instant switching
   useEffect(() => {
     let isMounted = true;
     async function loadLiveData() {
       if (!selected) return;
-      setIsLoadingLive(true);
+
+      const cacheKey = `${selected}_${range.toLowerCase()}`;
+      if (chartCache.has(cacheKey)) {
+        const cached = chartCache.get(cacheKey);
+        if (cached.candles?.length > 0) setLiveCandles(cached.candles);
+        if (cached.history?.length > 0) setLiveHistory(cached.history);
+        if (cached.quote) setLiveQuote(cached.quote);
+      } else {
+        setIsLoadingLive(true);
+      }
+
       try {
         const [quoteRes, chartRes] = await Promise.allSettled([
           fetchYFinanceQuote(selected),
@@ -61,17 +72,32 @@ export function StockDetail({
         ]);
 
         if (isMounted) {
+          let updatedQuote = null;
+          let updatedCandles = null;
+          let updatedHistory = null;
+
           if (quoteRes.status === "fulfilled" && quoteRes.value) {
+            updatedQuote = quoteRes.value;
             setLiveQuote(quoteRes.value);
           }
           if (chartRes.status === "fulfilled" && chartRes.value) {
             if (chartRes.value?.candles?.length > 0) {
+              updatedCandles = chartRes.value.candles;
               setLiveCandles(chartRes.value.candles);
             }
             if (chartRes.value?.history?.length > 0) {
+              updatedHistory = chartRes.value.history;
               setLiveHistory(chartRes.value.history);
             }
           }
+
+          // Store in fast cache
+          chartCache.set(cacheKey, {
+            quote: updatedQuote,
+            candles: updatedCandles,
+            history: updatedHistory,
+            timestamp: Date.now(),
+          });
         }
       } catch (e) {
         console.error("Live stock feed error:", e);
@@ -274,27 +300,15 @@ export function StockDetail({
           marginBottom: 24,
         }}
       >
-        {/* Chart Header Controls */}
+        {/* Chart Header Controls - Unified layout for Lines and Candlesticks */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", gap: 4, background: darkMode ? "#1a2520" : "rgba(0,0,0,0.04)", padding: 3, borderRadius: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {/* Chart Type Toggle: Lines vs Candlesticks */}
+            <div className={`stake-pill-group ${darkMode ? "stake-pill-group-dark" : ""}`}>
               <button
                 id="stock-chart-type-lines"
                 onClick={() => setChartType("lines")}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: 8,
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  background: chartType === "lines" ? "#006c49" : "transparent",
-                  color: chartType === "lines" ? "#ffffff" : textSecondary,
-                  transition: "all 0.15s ease",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
+                className={`stake-pill-btn ${darkMode ? "stake-pill-btn-dark" : ""} ${chartType === "lines" ? "stake-pill-btn-active" : ""}`}
               >
                 <TrendingUp size={14} /> Lines
               </button>
@@ -302,85 +316,38 @@ export function StockDetail({
               <button
                 id="stock-chart-type-candlestick"
                 onClick={() => setChartType("candlestick")}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: 8,
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  background: chartType === "candlestick" ? "#006c49" : "transparent",
-                  color: chartType === "candlestick" ? "#ffffff" : textSecondary,
-                  transition: "all 0.15s ease",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
+                className={`stake-pill-btn ${darkMode ? "stake-pill-btn-dark" : ""} ${chartType === "candlestick" ? "stake-pill-btn-active" : ""}`}
               >
                 <BarChart2 size={14} /> Candlesticks
               </button>
             </div>
 
-            {chartType === "candlestick" && (
-              <button
-                onClick={() => setShowVolume(!showVolume)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 12px",
-                  borderRadius: 9,
-                  border: `1px solid ${showVolume ? "#10b981" : borderCol}`,
-                  background: showVolume ? (darkMode ? "rgba(16,185,129,0.14)" : "#f0fdf4") : "transparent",
-                  color: showVolume ? "#10b981" : textSecondary,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                <div
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: 3,
-                    border: `1.5px solid ${showVolume ? "#10b981" : textSecondary}`,
-                    background: showVolume ? "#10b981" : "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {showVolume && <Check size={11} color="#ffffff" strokeWidth={3.5} />}
-                </div>
-                <span>Volume bars</span>
-              </button>
-            )}
+            {/* Volume Bars Toggle - Always in the exact same spot regardless of chart mode */}
+            <button
+              id="stock-chart-volume-toggle"
+              onClick={() => setShowVolume(!showVolume)}
+              className={`stake-volume-toggle ${darkMode ? "stake-volume-toggle-dark" : ""} ${showVolume ? "active" : ""}`}
+            >
+              <div className="stake-checkbox-box">
+                {showVolume && <Check size={10} color="#ffffff" strokeWidth={3.5} />}
+              </div>
+              <span>Volume bars</span>
+            </button>
           </div>
 
-          {chartType === "candlestick" && (
-            <div style={{ display: "flex", gap: 4, background: darkMode ? "#1a2520" : "rgba(0,0,0,0.04)", padding: 3, borderRadius: 10 }}>
-              {RANGES.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRange(r)}
-                  style={{
-                    padding: "5px 12px",
-                    borderRadius: 8,
-                    fontSize: 12,
-                    cursor: "pointer",
-                    fontWeight: range === r ? 800 : 600,
-                    border: "none",
-                    background: range === r ? "#006c49" : "transparent",
-                    color: range === r ? "#ffffff" : textSecondary,
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Time Range Selector - Always in the exact same spot regardless of chart mode */}
+          <div className={`stake-pill-group ${darkMode ? "stake-pill-group-dark" : ""}`}>
+            {RANGES.map((r) => (
+              <button
+                key={r}
+                id={`stock-range-btn-${r}`}
+                onClick={() => setRange(r)}
+                className={`stake-pill-btn ${darkMode ? "stake-pill-btn-dark" : ""} ${range === r ? "stake-pill-btn-active" : ""}`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ width: "100%", marginTop: 8 }}>
@@ -395,6 +362,7 @@ export function StockDetail({
               height={350}
               darkMode={darkMode}
               showVolume={showVolume}
+              range={range}
             />
           ) : (
             <CandlestickChart
@@ -405,6 +373,7 @@ export function StockDetail({
               darkMode={darkMode}
               showVolume={showVolume}
               chartType={chartType}
+              range={range}
               onChartTypeChange={setChartType}
             />
           )}

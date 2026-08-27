@@ -17,7 +17,7 @@ export function WalletModal({
 }) {
   const [mode, setMode] = useState("deposit");
   const [amtStr, setAmtStr] = useState("10000");
-  const [gateway, setGateway] = useState("Direct Bank Wire");
+  const gateway = "Direct Bank Wire";
 
   if (!isOpen) return null;
 

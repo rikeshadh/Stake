@@ -1,0 +1,324 @@
+/* ==========================================================================
+   Stake AI - Unified Reusable Stylesheet (style.css)
+   Reduces repetitive inline styling, enhances performance and visual consistency.
+   ========================================================================== */
+
+/* --- Card & Panel Containers --- */
+.stake-card {
+  border-radius: 20px;
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stake-card-dark {
+  background: #111827;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.stake-glass-panel {
+  border-radius: 16px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.stake-glass-panel-dark {
+  background: rgba(26, 34, 54, 0.7);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* --- Pill Groups & Range Switchers --- */
+.stake-pill-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 3px;
+  border-radius: 10px;
+  user-select: none;
+}
+
+.stake-pill-group-dark {
+  background: #1a2520;
+}
+
+.stake-pill-btn {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: #64748b;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.stake-pill-btn:hover {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.stake-pill-btn-dark {
+  color: #94a3b8;
+}
+
+.stake-pill-btn-dark:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.stake-pill-btn-active {
+  background: #006c49 !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 6px rgba(0, 108, 73, 0.25);
+}
+
+/* --- Volume & Indicator Toggles --- */
+.stake-volume-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.stake-volume-toggle:hover {
+  border-color: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.stake-volume-toggle.active {
+  border-color: #10b981;
+  background: #f0fdf4;
+  color: #10b981;
+}
+
+.stake-volume-toggle-dark {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+}
+
+.stake-volume-toggle-dark:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.stake-volume-toggle-dark.active {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.14);
+  color: #10b981;
+}
+
+.stake-checkbox-box {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1.5px solid #94a3b8;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.stake-volume-toggle.active .stake-checkbox-box {
+  border-color: #10b981;
+  background: #10b981;
+}
+
+/* --- Badges & Status Chips --- */
+.stake-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2.5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.stake-badge-emerald {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.stake-badge-amber {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.stake-badge-rose {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.stake-badge-blue {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.2);
+}
+
+.stake-badge-gray {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+/* --- Reusable Buttons --- */
+.stake-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  border: none;
+}
+
+.stake-btn-primary {
+  background: #006c49;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 108, 73, 0.25);
+}
+
+.stake-btn-primary:hover {
+  background: #005a3c;
+  transform: translateY(-0.5px);
+}
+
+.stake-btn-emerald {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.stake-btn-emerald:hover {
+  background: #059669;
+  transform: translateY(-0.5px);
+}
+
+.stake-btn-outline {
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #0f172a;
+}
+
+.stake-btn-outline:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.stake-btn-outline-dark {
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  background: #1a2236;
+}
+
+.stake-btn-outline-dark:hover {
+  background: #242f4c;
+}
+
+/* --- Monospace & Financial Value Typography --- */
+.stake-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.stake-metric-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+}
+
+.stake-metric-label-dark {
+  color: #94a3b8;
+}
+
+.stake-metric-val {
+  font-size: 14px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  color: #0f172a;
+}
+
+.stake-metric-val-dark {
+  color: #f8fafc;
+}
+
+/* --- Tooltip --- */
+.stake-chart-tooltip {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  font-family: 'JetBrains Mono', monospace;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.stake-chart-tooltip-dark {
+  background: rgba(15, 23, 42, 0.94);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f8fafc;
+}
+
+/* --- Optimized Custom Scrollbars --- */
+.stake-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.stake-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.stake-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.25);
+  border-radius: 9999px;
+}
+
+.stake-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.45);
+}
+
+/* --- Fast Transitions & Animations --- */
+.fast-transition {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}

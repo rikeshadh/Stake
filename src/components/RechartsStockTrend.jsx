@@ -1,4 +1,4 @@
-import { useState, useEffect, useId, useMemo } from "react";
+import { useId, useMemo } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -11,22 +11,19 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
-import { fetchYFinanceChart } from "../api";
 import { fmt, getCurrencySymbol, getCurrencyRate } from "../utils";
-import { TrendingUp, TrendingDown, Calendar, Check } from "lucide-react";
+import { Calendar } from "lucide-react";
 
-const TIME_RANGES = [
-  { id: "1D", label: "1D", range: "1d", interval: "5m" },
-  { id: "1W", label: "1W", range: "5d", interval: "15m" },
-  { id: "1M", label: "1M", range: "1mo", interval: "1d" },
-  { id: "3M", label: "3M", range: "3mo", interval: "1d" },
-  { id: "1Y", label: "1Y", range: "1y", interval: "1wk" },
-  { id: "ALL", label: "ALL", range: "5y", interval: "1mo" },
-];
+// Fixed reference baseline for pure deterministic rendering without Date.now()/Math.random() in render
+const BASE_TIMESTAMP = 1715000000000;
+
+function pseudoRand(seed) {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
 
 function generateSyntheticPoints(basePrice, count, rangeId) {
   const points = [];
-  const now = Date.now();
   const stepMs =
     rangeId === "1D"
       ? 5 * 60 * 1000
@@ -39,14 +36,15 @@ function generateSyntheticPoints(basePrice, count, rangeId) {
       : 30 * 24 * 3600 * 1000;
 
   const volatility = rangeId === "1D" ? 0.004 : rangeId === "1W" ? 0.008 : 0.015;
-  const startPrice = basePrice * (0.88 + Math.random() * 0.2);
+  const startPrice = basePrice * (0.88 + pseudoRand(basePrice + 1) * 0.2);
   let curPrice = startPrice;
 
   for (let i = 0; i < count; i++) {
-    const time = new Date(now - (count - 1 - i) * stepMs);
+    const time = new Date(BASE_TIMESTAMP - (count - 1 - i) * stepMs);
     const progress = i / (count - 1);
     const target = startPrice + (basePrice - startPrice) * progress;
-    const delta = (Math.random() - 0.48) * curPrice * volatility + (target - curPrice) * 0.15;
+    const rVal = pseudoRand(basePrice * 17 + i * 31);
+    const delta = (rVal - 0.48) * curPrice * volatility + (target - curPrice) * 0.15;
     curPrice = Math.max(curPrice * 0.5, curPrice + delta);
 
     const timeLabel =
@@ -66,7 +64,7 @@ function generateSyntheticPoints(basePrice, count, rangeId) {
         minute: "2-digit",
       }),
       priceUSD: Number(curPrice.toFixed(2)),
-      volume: Math.floor(10000 + Math.random() * 85000),
+      volume: Math.floor(10000 + pseudoRand(i * 19 + 5) * 85000),
     });
   }
 
@@ -143,110 +141,86 @@ function CustomTrendTooltip({ active, payload, firstVal, symbol, darkMode }) {
 }
 
 export function RechartsStockTrend({
-  ticker = "NVDA",
   basePrice = 150,
   currency = "USD",
   height = 340,
   darkMode = false,
-  showVolume: initialShowVolume = true,
+  showVolume = true,
+  range = "1M",
+  liveHistory,
+  liveCandles,
 }) {
-  const [selectedRange, setSelectedRange] = useState("1M");
-  const [showVolume, setShowVolume] = useState(initialShowVolume);
-  const [chartData, setChartData] = useState([]);
   const chartGradId = useId().replace(/[^a-zA-Z0-9]/g, "");
-
   const rate = getCurrencyRate(currency);
   const symbol = getCurrencySymbol(currency);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadTrendData() {
-      const cfg = TIME_RANGES.find((r) => r.id === selectedRange) || TIME_RANGES[2];
+  // Compute chart points synchronously with priority on props (liveCandles / liveHistory)
+  const internalData = useMemo(() => {
+    if (liveCandles && liveCandles.length > 3) {
+      return liveCandles.map((c, idx) => {
+        const dt = new Date(c.time || c.date || BASE_TIMESTAMP - (liveCandles.length - idx) * 3600000);
+        const timeLabel =
+          range === "1D"
+            ? dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : range === "1W" || range === "1M"
+            ? dt.toLocaleDateString([], { month: "short", day: "numeric" })
+            : dt.toLocaleDateString([], { month: "short", year: "2-digit" });
 
-      try {
-        const res = await fetchYFinanceChart(ticker, cfg.range, cfg.interval);
-        if (isMounted && res) {
-          if (res.candles && res.candles.length > 3) {
-            const formatted = res.candles.map((c, idx) => {
-              const dt = new Date(c.time || c.date || Date.now() - (res.candles.length - idx) * 3600000);
-              const timeLabel =
-                selectedRange === "1D"
-                  ? dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                  : selectedRange === "1W" || selectedRange === "1M"
-                  ? dt.toLocaleDateString([], { month: "short", day: "numeric" })
-                  : dt.toLocaleDateString([], { month: "short", year: "2-digit" });
-
-              return {
-                time: timeLabel,
-                fullDate: dt.toLocaleString([], {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                }),
-                priceUSD: Number((c.close || c.price || basePrice).toFixed(2)),
-                openUSD: c.open,
-                highUSD: c.high,
-                lowUSD: c.low,
-                volume: c.volume || Math.floor(15000 + Math.random() * 45000),
-                isUp: (c.close || c.price || basePrice) >= (c.open || basePrice),
-              };
-            });
-            setChartData(formatted);
-            return;
-          } else if (res.history && res.history.length > 3) {
-            const formatted = res.history.map((p, idx) => {
-              const dt = new Date(Date.now() - (res.history.length - idx) * 3600000);
-              const prev = idx > 0 ? res.history[idx - 1] : p;
-              return {
-                time:
-                  selectedRange === "1D"
-                    ? dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                    : dt.toLocaleDateString([], { month: "short", day: "numeric" }),
-                fullDate: dt.toLocaleString(),
-                priceUSD: Number((p || basePrice).toFixed(2)),
-                volume: Math.floor(20000 + Math.random() * 50000),
-                isUp: p >= prev,
-              };
-            });
-            setChartData(formatted);
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn("Recharts live fetch fallback:", err);
-      }
-
-      if (isMounted) {
-        const count = selectedRange === "1D" ? 36 : selectedRange === "1W" ? 42 : selectedRange === "1M" ? 30 : 52;
-        const synth = generateSyntheticPoints(basePrice || 100, count, selectedRange);
-        setChartData(synth);
-      }
+        return {
+          time: timeLabel,
+          fullDate: dt.toLocaleString([], {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          priceUSD: Number((c.close || c.price || basePrice).toFixed(2)),
+          openUSD: c.open,
+          highUSD: c.high,
+          lowUSD: c.low,
+          volume: c.volume || Math.floor(15000 + pseudoRand(idx * 7 + 11) * 45000),
+          isUp: (c.close || c.price || basePrice) >= (c.open || basePrice),
+        };
+      });
     }
 
-    loadTrendData();
-    return () => {
-      isMounted = false;
-    };
-  }, [ticker, selectedRange, basePrice]);
+    if (liveHistory && liveHistory.length > 3) {
+      return liveHistory.map((p, idx) => {
+        const dt = new Date(BASE_TIMESTAMP - (liveHistory.length - idx) * 3600000);
+        const prev = idx > 0 ? liveHistory[idx - 1] : p;
+        return {
+          time:
+            range === "1D"
+              ? dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : dt.toLocaleDateString([], { month: "short", day: "numeric" }),
+          fullDate: dt.toLocaleString(),
+          priceUSD: Number((p || basePrice).toFixed(2)),
+          volume: Math.floor(20000 + pseudoRand(idx * 13 + 19) * 50000),
+          isUp: p >= prev,
+        };
+      });
+    }
+
+    // Fast synthetic fallback
+    const count = range === "1D" ? 28 : range === "1W" ? 35 : range === "1M" ? 28 : 40;
+    return generateSyntheticPoints(basePrice || 100, count, range);
+  }, [range, basePrice, liveCandles, liveHistory]);
 
   const convertedData = useMemo(() => {
-    if (!chartData || chartData.length === 0) return [];
-    return chartData.map((d) => ({
+    if (!internalData || internalData.length === 0) return [];
+    return internalData.map((d) => ({
       ...d,
       price: Number((d.priceUSD * rate).toFixed(2)),
       high: d.highUSD ? Number((d.highUSD * rate).toFixed(2)) : undefined,
       low: d.lowUSD ? Number((d.lowUSD * rate).toFixed(2)) : undefined,
       open: d.openUSD ? Number((d.openUSD * rate).toFixed(2)) : undefined,
     }));
-  }, [chartData, rate]);
+  }, [internalData, rate]);
 
   const firstVal = convertedData[0]?.price || 0;
   const lastVal = convertedData[convertedData.length - 1]?.price || 0;
   const isPositive = lastVal >= firstVal;
-  const priceChange = lastVal - firstVal;
-  const pctChange = firstVal > 0 ? (priceChange / firstVal) * 100 : 0;
 
   const minPrice = useMemo(() => {
     if (convertedData.length === 0) return 0;
@@ -272,111 +246,7 @@ export function RechartsStockTrend({
   const volChartHeight = showVolume ? Math.max(65, height * 0.28) : 0;
 
   return (
-    <div style={{ width: "100%" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-          flexWrap: "wrap",
-          gap: 12,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 13,
-              fontWeight: 800,
-              color: isPositive ? "#10b981" : "#ef4444",
-              fontFamily: "'JetBrains Mono', monospace",
-            }}
-          >
-            {isPositive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-            <span>
-              {isPositive ? "+" : ""}
-              {symbol} {fmt(priceChange)} ({isPositive ? "+" : ""}
-              {fmt(pctChange)}%)
-            </span>
-            <span style={{ fontSize: 11, color: darkMode ? "#94a3b8" : "#64748b", fontWeight: 600, marginLeft: 4 }}>
-              over {selectedRange}
-            </span>
-          </div>
-
-          <button
-            onClick={() => setShowVolume(!showVolume)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              borderRadius: 8,
-              border: `1px solid ${showVolume ? "#10b981" : darkMode ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"}`,
-              background: showVolume ? (darkMode ? "rgba(16,185,129,0.14)" : "#f0fdf4") : "transparent",
-              color: showVolume ? "#10b981" : darkMode ? "#94a3b8" : "#64748b",
-              fontSize: 11.5,
-              fontWeight: 700,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <div
-              style={{
-                width: 13,
-                height: 13,
-                borderRadius: 3,
-                border: `1.5px solid ${showVolume ? "#10b981" : "#94a3b8"}`,
-                background: showVolume ? "#10b981" : "transparent",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {showVolume && <Check size={10} color="#ffffff" strokeWidth={3.5} />}
-            </div>
-            <span>Volume Bars</span>
-          </button>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            background: darkMode ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
-            padding: 3,
-            borderRadius: 10,
-          }}
-        >
-          {TIME_RANGES.map((r) => {
-            const isSelected = selectedRange === r.id;
-            return (
-              <button
-                key={r.id}
-                id={`recharts-range-btn-${r.id}`}
-                onClick={() => setSelectedRange(r.id)}
-                style={{
-                  padding: "5px 12px",
-                  borderRadius: 8,
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontWeight: isSelected ? 800 : 600,
-                  background: isSelected ? (darkMode ? "#10b981" : "#006c49") : "transparent",
-                  color: isSelected ? "#ffffff" : darkMode ? "#94a3b8" : "#64748b",
-                  transition: "all 0.15s ease",
-                  fontFamily: "'JetBrains Mono', monospace",
-                }}
-              >
-                {r.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
+    <div style={{ width: "100%", userSelect: "none" }}>
       <div style={{ width: "100%", height: priceChartHeight, position: "relative" }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={convertedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -441,8 +311,7 @@ export function RechartsStockTrend({
               strokeWidth={2.4}
               fillOpacity={1}
               fill={`url(#grad-${chartGradId})`}
-              isAnimationActive={true}
-              animationDuration={450}
+              isAnimationActive={false}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -476,8 +345,7 @@ export function RechartsStockTrend({
                   dataKey="volume"
                   fill={darkMode ? "rgba(16, 185, 129, 0.45)" : "rgba(16, 185, 129, 0.6)"}
                   radius={[3, 3, 0, 0]}
-                  isAnimationActive={true}
-                  animationDuration={400}
+                  isAnimationActive={false}
                 />
               </BarChart>
             </ResponsiveContainer>

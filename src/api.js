@@ -385,16 +385,20 @@ export async function sendAgentChat({ email, message, history = [] }) {
 }
 
 // ===== ADDED: Strategy Analysis =====
-export async function fetchStrategyAnalysis(symbol, timeframe = "1d") {
+export async function fetchStrategyAnalysis(param1, param2 = "1mo") {
+  let payload = {};
+  if (typeof param1 === "object" && param1 !== null) {
+    payload = { ...param1 };
+  } else if (typeof param1 === "string") {
+    payload = { symbol: param1, timeframe: param2 || "1mo" };
+  }
+
   const response = await fetch(`${API_URL}/api/agent/strategy-analysis`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      symbol,
-      timeframe,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

@@ -1,4 +1,4 @@
-import { useId, useState, useRef, useEffect } from "react";
+import { useId, useState, useRef, useEffect, useMemo } from "react";
 import logoImg from "../assets/logo.png";
 import { fmt, getSmoothSvgPath } from "../utils";
 import { fetchYFinanceChart } from "../api";
@@ -284,7 +284,7 @@ export function CandlestickChart({
   darkMode = false,
   showVolume = false,
   currency = "$",
-  chartType: externalChartType = "line",
+  chartType: externalChartType = "candle",
 }) {
   const [hoverIdx, setHoverIdx] = useState(null);
   const containerRef = useRef(null);
@@ -293,60 +293,88 @@ export function CandlestickChart({
   const activeMode = externalChartType === "candlestick" ? "candle" : externalChartType;
   const isLineMode = activeMode === "line" || activeMode === "smooth";
 
-  // Derive candlestick and volume series
-  let candleList = [];
-  if (externalCandles && externalCandles.length > 0) {
-    candleList = externalCandles;
-  } else if (history && history.length > 0) {
-    const chunkSize = Math.max(1, Math.floor(history.length / 28));
-    for (let i = 0; i < history.length; i += chunkSize) {
-      const chunk = history.slice(i, i + chunkSize);
-      if (chunk.length === 0) continue;
-      const open = chunk[0];
-      const close = chunk[chunk.length - 1];
-      const maxVal = Math.max(...chunk);
-      const minVal = Math.min(...chunk);
-      const high = maxVal + Math.abs(close - open) * 0.22;
-      const low = minVal - Math.abs(close - open) * 0.22;
-      const volume = Math.floor(180000 + (((i * 47) % 100) / 100) * 650000);
-      candleList.push({
-        open,
-        close,
-        high,
-        low,
-        volume,
-        isUp: close >= open,
-        date: `T-${candleList.length + 1}`
-      });
+  // Derive candlestick and volume series memoized
+  const candleList = useMemo(() => {
+    if (externalCandles && externalCandles.length > 0) {
+      return externalCandles;
     }
-  }
-
-  if (candleList.length === 0) {
-    return <div style={{ height, background: darkMode ? "#161d19" : "rgba(0,0,0,0.02)", borderRadius: 16 }} />;
-  }
-
-  const allHighs = candleList.map((c) => c.high);
-  const allLows = candleList.map((c) => c.low);
-  const minPrice = Math.min(...allLows);
-  const maxPrice = Math.max(...allHighs);
-  const priceRange = Math.max(maxPrice - minPrice, 0.001);
-
-  const allVolumes = candleList.map((c) => c.volume || 1000);
-  const maxVolume = Math.max(...allVolumes, 1000);
+    if (history && history.length > 0) {
+      const list = [];
+      const chunkSize = Math.max(1, Math.floor(history.length / 28));
+      for (let i = 0; i < history.length; i += chunkSize) {
+        const chunk = history.slice(i, i + chunkSize);
+        if (chunk.length === 0) continue;
+        const open = chunk[0];
+        const close = chunk[chunk.length - 1];
+        const maxVal = Math.max(...chunk);
+        const minVal = Math.min(...chunk);
+        const high = maxVal + Math.abs(close - open) * 0.22;
+        const low = minVal - Math.abs(close - open) * 0.22;
+        const volume = Math.floor(180000 + (((i * 47) % 100) / 100) * 650000);
+        list.push({
+          open,
+          close,
+          high,
+          low,
+          volume,
+          isUp: close >= open,
+          date: `T-${list.length + 1}`
+        });
+      }
+      return list;
+    }
+    return [];
+  }, [externalCandles, history]);
 
   const w = 700;
   const padLeft = 14;
   const padRight = 85;
   const chartW = w - padLeft - padRight;
 
-  // Split height between price chart (74%) and volume chart (26%)
   const priceH = showVolume ? height * 0.74 : height;
   const volH = showVolume ? Math.max(64, height * 0.26) : 0;
   const padY = 20;
-  const candleW = Math.max(4, (chartW / candleList.length) * 0.65);
+  const candleW = Math.max(4, candleList.length > 0 ? (chartW / candleList.length) * 0.65 : 10);
+
+  const { minPrice, priceRange, maxVolume, pts, linePath, areaPath } = useMemo(() => {
+    if (candleList.length === 0) {
+      return { minPrice: 0, maxPrice: 100, priceRange: 100, maxVolume: 1000, pts: [], linePath: "", areaPath: "" };
+    }
+    const allHighs = candleList.map((c) => c.high);
+    const allLows = candleList.map((c) => c.low);
+    const minP = Math.min(...allLows);
+    const maxP = Math.max(...allHighs);
+    const pRange = Math.max(maxP - minP, 0.001);
+
+    const allVols = candleList.map((c) => c.volume || 1000);
+    const maxV = Math.max(...allVols, 1000);
+
+    const points = candleList.map((c, i) => {
+      const x = padLeft + (i + 0.5) * (chartW / candleList.length);
+      const y = priceH - padY - ((c.close - minP) / pRange) * (priceH - padY * 2);
+      return [x, y];
+    });
+
+    const lPath = getSmoothSvgPath(points);
+    const aPath = `${lPath} L ${padLeft + chartW},${priceH - 4} L ${padLeft},${priceH - 4} Z`;
+
+    return {
+      minPrice: minP,
+      maxPrice: maxP,
+      priceRange: pRange,
+      maxVolume: maxV,
+      pts: points,
+      linePath: lPath,
+      areaPath: aPath,
+    };
+  }, [candleList, chartW, priceH, padLeft, padY]);
+
+  if (candleList.length === 0) {
+    return <div style={{ height, background: darkMode ? "#161d19" : "rgba(0,0,0,0.02)", borderRadius: 16 }} />;
+  }
 
   const handleMouseMove = (e) => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || candleList.length === 0) return;
     const rect = containerRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const pct = Math.max(0, Math.min(1, mouseX / rect.width));
@@ -358,15 +386,6 @@ export function CandlestickChart({
   const firstCandle = candleList[0];
   const activeChange = activeCandle ? activeCandle.close - (activeCandle.open || firstCandle.open) : 0;
   const activeChangePct = activeCandle && activeCandle.open ? (activeChange / activeCandle.open) * 100 : 0;
-
-  // Line chart coordinates if toggled
-  const pts = candleList.map((c, i) => {
-    const x = padLeft + (i + 0.5) * (chartW / candleList.length);
-    const y = priceH - padY - ((c.close - minPrice) / priceRange) * (priceH - padY * 2);
-    return [x, y];
-  });
-  const linePath = getSmoothSvgPath(pts);
-  const areaPath = `${linePath} L ${padLeft + chartW},${priceH - 4} L ${padLeft},${priceH - 4} Z`;
 
   const bgBorder = darkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)";
   const textColor = darkMode ? "#e2e8f0" : "#191c1e";
@@ -384,7 +403,7 @@ export function CandlestickChart({
         fontFamily: "'Hanken Grotesk', sans-serif"
       }}
     >
-      {/* Top HUD: OHLCV Bar + Controls */}
+      {/* Top HUD: OHLCV Bar */}
       <div
         style={{
           display: "flex",

@@ -164,7 +164,9 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
       alerts: [],
       transactions: [],
       agentEnabled: false,
-      agentStrategy: "dip_buyer",
+      agentDeployedCapital: 0,
+      agentMaxSpend: 500,
+      agentStrategy: "",
       holdings: {},
     };
     const demoToken = `stk_guest_tok_${Date.now()}`;
@@ -175,7 +177,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
     } catch {
       // ignore storage error
     }
-    onLoginSuccess(demoUser, demoToken, { triggerTour: true });
+    onLoginSuccess(demoUser, demoToken);
   };
 
   // =====================================================================

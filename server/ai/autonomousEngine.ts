@@ -49,74 +49,9 @@ export interface BacktestResult {
 }
 
 // In-Memory store for Agent Actions & Memory
-export const globalAgentActions: AgentAction[] = [
-  {
-    id: "act-101",
-    userEmail: "trader@stake.com",
-    ticker: "TSLA",
-    side: "BUY",
-    shares: 4.5,
-    price: 248.50,
-    total: 1118.25,
-    strategy: "dip_buyer",
-    reason: "TSLA pulled back -1.82% intraday below moving average. Executed fractional dip accumulation within $2,000 spend cap.",
-    timestamp: Date.now() - 3600000 * 2,
-    status: "EXECUTED",
-    canRevertUntil: Date.now() - 3600000 * 2 + 300000,
-  },
-  {
-    id: "act-102",
-    userEmail: "trader@stake.com",
-    ticker: "NVDA",
-    side: "BUY",
-    shares: 8.0,
-    price: 137.86,
-    total: 1102.88,
-    strategy: "momentum",
-    reason: "Surge in Level 2 bid volume (+18,000 shares on TOP 5 bids). Joined continuation breakout.",
-    timestamp: Date.now() - 3600000 * 18,
-    status: "SETTLED",
-    canRevertUntil: Date.now() - 3600000 * 18 + 300000,
-  },
-  {
-    id: "act-103",
-    userEmail: "trader@stake.com",
-    ticker: "AAPL",
-    side: "BUY",
-    shares: 5.0,
-    price: 228.45,
-    total: 1142.25,
-    strategy: "dca",
-    reason: "Scheduled periodic DCA lot executed across #1 watchlist equity.",
-    timestamp: Date.now() - 3600000 * 36,
-    status: "SETTLED",
-    canRevertUntil: Date.now() - 3600000 * 36 + 300000,
-  },
-];
+export const globalAgentActions: AgentAction[] = [];
 
-export const globalAgentMemory: AgentMemoryLog[] = [
-  {
-    id: "mem-1",
-    userEmail: "trader@stake.com",
-    timestamp: Date.now() - 3600000 * 2,
-    text: "Detected heavy institutional limit buy walls on NVDA at $136.50. Risk profile upgraded to Bullish Accumulation.",
-    type: "SCAN",
-  },
-  {
-    id: "mem-2",
-    userEmail: "trader@stake.com",
-    timestamp: Date.now() - 3600000 * 12,
-    text: "Portfolio diversification score is 82/100 across Semiconductors, Consumer Tech, and Digital Assets. Max single-stock weight capped at 30%.",
-    type: "RISK_TRIGGER",
-  },
-  {
-    id: "mem-3",
-    userEmail: "trader@stake.com",
-    timestamp: Date.now() - 3600000 * 24,
-    text: "Market volatility index elevated (VIX +4.2%). Armed circuit breaker at 5% portfolio drawdown.",
-    type: "SAFETY_ALERT",
-  },
-];
+export const globalAgentMemory: AgentMemoryLog[] = [];
 
 // ✅ Added a default ticker ("NVDA") to avoid missing argument errors.
 export function runStrategyBacktest(

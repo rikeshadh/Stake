@@ -16,7 +16,7 @@ import { LiveIndicesFooter } from "./components/LiveIndicesFooter";
 import { AuthPage } from "./components/AuthPage";
 import { KycPage } from "./components/KycPage";
 import { SettingsModal } from "./components/SettingsModal";
-import { InteractiveTour } from "./components/InteractiveTour";
+import { GeminiStrategySidebar } from "./components/GeminiStrategySidebar";
 import { fmtShares } from "./utils";
 import {
   syncUserState,
@@ -133,24 +133,7 @@ export default function App() {
     setQuickAlertModalOpen,
   ] = useState(false);
 
-  const [tourOpen, setTourOpen] = useState(false);
-
-  // Auto-trigger guided tutorial for first-time users or guest sandbox
-  useEffect(() => {
-    if (user) {
-      try {
-        const completed = localStorage.getItem("stake_tutorial_completed");
-        if (!completed) {
-          const timer = setTimeout(() => {
-            setTourOpen(true);
-          }, 700);
-          return () => clearTimeout(timer);
-        }
-      } catch {
-        // ignore
-      }
-    }
-  }, [user]);
+  const [aiInsightsOpen, setAiInsightsOpen] = useState(false);
 
   // =========================================================
   // Portfolio & Balances
@@ -1533,12 +1516,6 @@ export default function App() {
           }!`
         );
       }
-
-      if (options.triggerTour || authUser.isDemo || authUser.isGuest) {
-        setTimeout(() => {
-          setTourOpen(true);
-        }, 500);
-      }
     },
     [showToast]
   );
@@ -1639,7 +1616,9 @@ export default function App() {
       isDemo: true,
       watchlist: [],
       agentEnabled: false,
-      agentStrategy: "dip_buyer",
+      agentDeployedCapital: 0,
+      agentMaxSpend: 500,
+      agentStrategy: "",
       holdings: {},
       orders: [],
       alerts: [],
@@ -1653,7 +1632,7 @@ export default function App() {
     } catch {
       // ignore
     }
-    handleLoginSuccess(demoUser, demoToken, { triggerTour: true });
+    handleLoginSuccess(demoUser, demoToken);
   }, [handleLoginSuccess]);
 
   // =========================================================
@@ -1909,8 +1888,8 @@ export default function App() {
           )
         }
 
-        onOpenTour={() =>
-          setTourOpen(
+        onOpenAiInsights={() =>
+          setAiInsightsOpen(
             true
           )
         }
@@ -1948,25 +1927,9 @@ export default function App() {
 
       {/* Main */}
       <main
-        style={{
-          flex:
-            1,
-
-          maxWidth:
-            1400,
-
-          width:
-            "100%",
-
-          margin:
-            "0 auto",
-
-          padding:
-            "20px 24px 60px",
-
-          boxSizing:
-            "border-box",
-        }}
+        className={`flex-1 w-full max-w-[1400px] mx-auto px-3 sm:px-6 py-5 pb-20 box-border transition-all duration-200 ${
+          aiInsightsOpen ? "xl:mr-[420px] xl:max-w-[calc(100vw-440px)]" : ""
+        }`}
       >
         {/* Stock Detail */}
         {selectedStock ? (
@@ -2743,15 +2706,6 @@ export default function App() {
           handleDeleteAccount
         }
 
-        onOpenTour={() => {
-          setSettingsOpen(
-            false
-          );
-          setTourOpen(
-            true
-          );
-        }}
-
         onOpenKyc={() => {
           setSettingsOpen(
             false
@@ -2772,39 +2726,23 @@ export default function App() {
       />
 
       {/* =====================================================
-          INTERACTIVE GUIDED TOUR
+          AI INSIGHTS GLOBAL SIDEBAR
          ===================================================== */}
 
-      <InteractiveTour
+      <GeminiStrategySidebar
         isOpen={
-          tourOpen
+          aiInsightsOpen
         }
 
         onClose={() =>
-          setTourOpen(
+          setAiInsightsOpen(
             false
           )
         }
 
-        isGuest={
-          Boolean(
-            guestMode ||
-              user?.isGuest ||
-              user?.isDemo
-          )
+        user={
+          user
         }
-
-        onNavigateTab={(
-          targetTab
-        ) => {
-          setSelectedStock(
-            null
-          );
-
-          setTab(
-            targetTab
-          );
-        }}
       />
 
       {/* =====================================================
