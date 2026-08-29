@@ -13,7 +13,7 @@ import {
   ReferenceDot,
 } from "recharts";
 import { fmt, getCurrencySymbol, getCurrencyRate } from "../utils";
-import { Calendar, TrendingUp, TrendingDown, Sparkles, User, Tag } from "lucide-react";
+import { Calendar, Tag } from "lucide-react";
 
 // Fixed reference baseline for pure deterministic rendering without Date.now()/Math.random() in render
 const BASE_TIMESTAMP = 1715000000000;
@@ -277,6 +277,7 @@ export function RechartsStockTrend({
 
       return {
         id: ord.id || `marker-${idx}`,
+        index: idx,
         time: point.time,
         price: point.price,
         execPrice,
@@ -436,7 +437,12 @@ export function RechartsStockTrend({
                   stroke={darkMode ? "#06110c" : "#ffffff"}
                   strokeWidth={2.5}
                   onClick={() => setSelectedMarkerOrder(marker)}
-                  style={{ cursor: "pointer", filter: "drop-shadow(0 0 6px rgba(0,229,153,0.5))" }}
+                  className="stake-trade-marker"
+                  style={{
+                    cursor: "pointer",
+                    filter: `drop-shadow(0 0 6px ${marker.isBuy ? "rgba(0,229,153,0.5)" : "rgba(239,68,68,0.45)"})`,
+                    animationDelay: `${marker.index * 75}ms`,
+                  }}
                 />
               ))}
 

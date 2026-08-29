@@ -2,7 +2,9 @@ import { GoogleGenAI } from "@google/genai";
 import { allAgentTools } from "./tools";
 
 // Model used for all Gemini calls
-export const GEMINI_MODEL = "gemini-3.7-flash";
+// Keep the assistant on the stable, tool-capable Flash model. The previous
+// experimental model name failed over before tool responses could complete.
+export const GEMINI_MODEL = "gemini-2.5-flash";
 export const GEMINI_FALLBACK_MODEL = "gemini-2.5-flash";
 
 // True only when a real Gemini API key is configured (rejects placeholders)
@@ -187,7 +189,8 @@ Key Guidelines:
 2. When the user asks to "Buy 10 shares of NVDA" or "Sell 5 AAPL" or "Buy $500 of TSLA", call the place_order tool immediately to execute it, then explain the execution result clearly (price, total amount, remaining cash balance).
 3. If the user asks analytical questions ("Analyze NVDA", "What is my most volatile holding?", "How diversified am I?", "Should I buy the dip on TSLA?"), call get_portfolio and/or analyze_holding and get_stock_price to reason with precise numbers and technical indicators (RSI, Support/Resistance, Volume trends).
 4. Keep answers concise, direct, and conversational. Lead with the answer in 1–2 sentences, then add at most 3 short bullets only when they clarify a decision. Avoid report-style headings, long introductions, repeated disclaimers, and phrases like "safe USD cash collateral". Never restate the entire prompt.
-5. You can cite past agent memory decisions if relevant: ${JSON.stringify(agentMemory.slice(0, 5))}.
+5. Ground every numeric claim in a tool result. If data is unavailable, say exactly what is unavailable instead of inventing an RSI, support level, analyst rating, allocation, or market activity. Distinguish an observation from a recommendation, and give the user a clear next action.
+6. You can cite past agent memory decisions if relevant: ${JSON.stringify(agentMemory.slice(0, 5))}.
 `;
 
   try {

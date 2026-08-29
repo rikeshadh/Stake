@@ -22,7 +22,6 @@ export function TransactionHistory({
   currency = "USD",
 }) {
   const [filterType, setFilterType] = useState("ALL"); // ALL, BUY, SELL
-  const [authFilter, setAuthFilter] = useState("ALL"); // ALL, AUTHENTICATED, GUEST
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState("NEWEST"); // NEWEST, OLDEST, VALUE_HIGH, VALUE_LOW
 
@@ -37,18 +36,12 @@ export function TransactionHistory({
       safeFilterType === "ALL" ||
       txType === safeFilterType;
 
-    const isGuestTx = tx?.isDemo || tx?.isGuest || (tx?.id && tx.id.toString().includes("DEMO"));
-    const matchesAuth =
-      authFilter === "ALL" ||
-      (authFilter === "AUTHENTICATED" && !isGuestTx) ||
-      (authFilter === "GUEST" && isGuestTx);
-
     const matchesSearch =
       !searchQuery ||
       (tx.stock || tx.ticker || tx.scrip || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       tx.id?.toString().toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesType && matchesAuth && matchesSearch;
+    return matchesType && matchesSearch;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -334,32 +327,6 @@ export function TransactionHistory({
           />
         </div>
 
-        {/* Auth / Guest Scope Filter Pills */}
-        <div style={{ display: "flex", gap: 3, background: bgInput, padding: 3, borderRadius: 8, border: `1px solid ${borderCol}` }}>
-          {[
-            { id: "ALL", label: "All Scope" },
-            { id: "AUTHENTICATED", label: "Authenticated" },
-            { id: "GUEST", label: "Guest / Demo" },
-          ].map((a) => (
-            <button
-              key={a.id}
-              onClick={() => setAuthFilter(a.id)}
-              style={{
-                padding: "5px 11px",
-                borderRadius: 6,
-                border: "none",
-                fontSize: 11.5,
-                fontWeight: authFilter === a.id ? 700 : 500,
-                cursor: "pointer",
-                background: authFilter === a.id ? (a.id === "GUEST" ? "#f59e0b" : "#0284c7") : "transparent",
-                color: authFilter === a.id ? "#ffffff" : textSecondary,
-                transition: "all 0.15s ease",
-              }}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
 
         {/* Action Type Filter Pills */}
         <div style={{ display: "flex", gap: 4, background: bgInput, padding: 3, borderRadius: 8, border: `1px solid ${borderCol}` }}>

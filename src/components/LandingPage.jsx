@@ -65,7 +65,7 @@ function FaqItem({ q, a }) {
         }}
       >
         <span>{q}</span>
-        <span style={{ color: "#059669", flexShrink: 0 }}>
+        <span style={{ color: "#00E599", flexShrink: 0 }}>
           {isOpen ? <Minus size={16} /> : <Plus size={16} />}
         </span>
       </button>
@@ -229,7 +229,7 @@ export function LandingPage({
 
   const modalConfig = {
     faq: {
-      icon: <HelpCircle size={20} color="#059669" />,
+      icon: <HelpCircle size={20} color="#00E599" />,
       title: "Frequently Asked Questions",
       subtitle: "HELP & ANSWERS",
       content: (
@@ -258,7 +258,7 @@ export function LandingPage({
       ),
     },
     privacy: {
-      icon: <FileText size={20} color="#059669" />,
+      icon: <FileText size={20} color="#00E599" />,
       title: "Privacy Policy",
       subtitle: "LEGAL",
       content: (
@@ -269,7 +269,7 @@ export function LandingPage({
       ),
     },
     terms: {
-      icon: <Scale size={20} color="#059669" />,
+      icon: <Scale size={20} color="#00E599" />,
       title: "Terms of Service",
       subtitle: "LEGAL",
       content: (
@@ -280,7 +280,7 @@ export function LandingPage({
       ),
     },
     risks: {
-      icon: <AlertTriangle size={20} color="#059669" />,
+      icon: <AlertTriangle size={20} color="#00E599" />,
       title: "Risk Disclosures",
       subtitle: "IMPORTANT",
       content: (
@@ -291,7 +291,7 @@ export function LandingPage({
       ),
     },
     support: {
-      icon: <MessageCircle size={20} color="#059669" />,
+      icon: <MessageCircle size={20} color="#00E599" />,
       title: "Support & Assistance",
       subtitle: "HELP CENTER",
       content: (
@@ -540,7 +540,7 @@ export function LandingPage({
         <section style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px 24px" }}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 12px", borderRadius: 999, background: "rgba(21,247,166,0.12)", color: "#065f46", fontSize: 12, fontWeight: 800, marginBottom: 8, fontFamily: "var(--font-body)" }}>
-              <Zap size={14} className="text-[#059669]" /> LIVE TERMINAL BENCHMARK
+              <Zap size={14} className="text-[#00E599]" /> LIVE TERMINAL BENCHMARK
             </div>
             <h2 className="stake-section-title" style={{ textAlign: "center" }}>
               High-Speed Execution Engine
@@ -568,7 +568,7 @@ export function LandingPage({
           <div style={{ maxWidth: 1080, margin: "0 auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#059669", letterSpacing: "0.08em", fontFamily: "var(--font-body)" }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#00E599", letterSpacing: "0.08em", fontFamily: "var(--font-body)" }}>
                   LIVE MARKET HIGHLIGHTS (API STREAM)
                 </div>
                 <h2 className="stake-section-title" style={{ margin: "4px 0 0" }}>
@@ -638,7 +638,7 @@ export function LandingPage({
                             fontWeight: 700,
                             fontSize: 12,
                             background: s.change >= 0 ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
-                            color: s.change >= 0 ? "#059669" : "#b61722",
+                            color: s.change >= 0 ? "#00E599" : "#b61722",
                             fontFamily: "var(--font-mono)",
                           }}
                         >
@@ -657,7 +657,7 @@ export function LandingPage({
                             borderRadius: 8,
                             border: "none",
                             background: "rgba(16,185,129,0.12)",
-                            color: "#059669",
+                            color: "#00E599",
                             fontWeight: 700,
                             fontSize: 12,
                             cursor: "pointer",
@@ -686,7 +686,7 @@ export function LandingPage({
           }}
         >
           <div style={{ textAlign: "center", marginBottom: 40 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#059669", letterSpacing: "0.08em", fontFamily: "var(--font-body)" }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#00E599", letterSpacing: "0.08em", fontFamily: "var(--font-body)" }}>
               SIMPLE ONBOARDING
             </div>
             <h2 className="stake-section-title" style={{ textAlign: "center" }}>
@@ -696,7 +696,7 @@ export function LandingPage({
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 24 }}>
             <div style={{ background: "#ffffff", padding: 28, borderRadius: 20, border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "#059669", fontFamily: "var(--font-mono)", marginBottom: 12 }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "#00E599", fontFamily: "var(--font-mono)", marginBottom: 12 }}>
                 01
               </div>
               <h3 style={{ fontSize: 18, fontWeight: 800, color: "#191c1e", margin: "0 0 8px", fontFamily: "var(--font-display)" }}>
@@ -708,7 +708,7 @@ export function LandingPage({
             </div>
 
             <div style={{ background: "#ffffff", padding: 28, borderRadius: 20, border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "#059669", fontFamily: "var(--font-mono)", marginBottom: 12 }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "#00E599", fontFamily: "var(--font-mono)", marginBottom: 12 }}>
                 02
               </div>
               <h3 style={{ fontSize: 18, fontWeight: 800, color: "#191c1e", margin: "0 0 8px", fontFamily: "var(--font-display)" }}>
@@ -720,7 +720,7 @@ export function LandingPage({
             </div>
 
             <div style={{ background: "#ffffff", padding: 28, borderRadius: 20, border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "#059669", fontFamily: "var(--font-mono)", marginBottom: 12 }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "#00E599", fontFamily: "var(--font-mono)", marginBottom: 12 }}>
                 03
               </div>
               <h3 style={{ fontSize: 18, fontWeight: 800, color: "#191c1e", margin: "0 0 8px", fontFamily: "var(--font-display)" }}>
@@ -861,7 +861,7 @@ export function LandingPage({
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 {currentModal.icon}
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#059669", letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-body)" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#00E599", letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-body)" }}>
                     {currentModal.subtitle}
                   </div>
                   <h3 style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 0", color: "#191c1e", fontFamily: "var(--font-display)" }}>
@@ -907,7 +907,7 @@ export function LandingPage({
                     padding: "12px",
                     borderRadius: 12,
                     border: "none",
-                    background: "#059669",
+                    background: "#00E599",
                     color: "#ffffff",
                     fontSize: 14,
                     fontWeight: 700,

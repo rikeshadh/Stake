@@ -17,7 +17,6 @@ import {
   TrendingUp,
   X,
   Zap,
-  BarChart3,
   RotateCcw,
   ShieldAlert,
   SlidersHorizontal,
@@ -40,8 +39,6 @@ const SECTOR_PRESETS = [
   { label: "High Growth", tickers: ["TSLA", "PLTR", "COIN", "CRWD"] },
   { label: "Blue Chips", tickers: ["JNJ", "UNH", "V", "JPM", "WMT"] },
 ];
-
-const DEFAULT_WATCHLIST = ["NVDA", "TSLA", "AAPL", "MSFT", "COIN"];
 
 async function fetchJsonSafe(url, options) {
   try {
@@ -103,7 +100,6 @@ export function AgentTab({
   onToggleAgent,
   onSelectStrategy,
   onChangeMaxSpend,
-  agentStrategy = "dip_buyer",
   agentMaxSpend = 500,
   cashBalance = 0,
   holdings = {},
@@ -116,7 +112,7 @@ export function AgentTab({
   const targetEmail = user?.email || "guestTrader67@stake.com";
 
   // Strategy configuration state
-  const [strategyId, setStrategyId] = useState(user?.agentStrategy || agentStrategy || "dip_buyer");
+  const [strategyId, setStrategyId] = useState(user?.agentStrategy || null);
   const [allocation, setAllocation] = useState(String(user?.agentDeployedCapital ?? 0));
   const [maxSpend, setMaxSpend] = useState(String(user?.agentMaxSpend || agentMaxSpend || 500));
   const [riskLevel, setRiskLevel] = useState(user?.riskLevel || "Balanced");
@@ -124,12 +120,7 @@ export function AgentTab({
   const [takeProfitPct, setTakeProfitPct] = useState("6.0");
 
   // Universe Watchlist
-  const [watchlist, setWatchlist] = useState(() => {
-    if (user?.watchlist && Array.isArray(user?.watchlist) && user.watchlist.length > 0) {
-      return user.watchlist;
-    }
-    return DEFAULT_WATCHLIST;
-  });
+  const [watchlist, setWatchlist] = useState([]);
   const [newTickerInput, setNewTickerInput] = useState("");
 
   // Live Signals & Executed Activity
@@ -146,12 +137,10 @@ export function AgentTab({
   const [btDays, setBtDays] = useState(90);
   const [btCapital] = useState(10000);
   const [btRunning, setBtRunning] = useState(false);
-  const [btResult, setBtResult] = useState(() =>
-    computeInitialBacktest("dip_buyer", "NVDA", 90, 10000)
-  );
+  const [btResult, setBtResult] = useState(null);
 
   const selectedStrategy = useMemo(
-    () => STRATEGIES.find((s) => s.id === strategyId) || STRATEGIES[0],
+    () => STRATEGIES.find((s) => s.id === strategyId) || null,
     [strategyId]
   );
 
@@ -163,7 +152,7 @@ export function AgentTab({
   const unallocatedCash = Math.max(0, Number(cashBalance || 0) - deployedCap);
 
   const generateLocalSignals = useCallback((list) => {
-    const defaultSignals = (list.length > 0 ? list : DEFAULT_WATCHLIST).map((sym) => {
+    const defaultSignals = list.map((sym) => {
       const stock = stocks[sym] || { price: 150.0, changePercent: 1.5, name: sym };
       const isDip = (stock.changePercent ?? 0) < -0.8;
       const isMom = (stock.changePercent ?? 0) > 1.8;
@@ -189,6 +178,11 @@ export function AgentTab({
 
   // Load signals & activity from API
   const refreshAgentFeed = useCallback(async () => {
+    if (!watchlist.length || !strategyId) {
+      setSignals([]);
+      setActivity([]);
+      return;
+    }
     try {
       const encoded = encodeURIComponent(targetEmail);
       const [sigData, actData] = await Promise.all([
@@ -209,12 +203,17 @@ export function AgentTab({
       console.warn("Signal refresh error:", e);
       generateLocalSignals(watchlist);
     }
-  }, [targetEmail, watchlist, generateLocalSignals]);
+  }, [targetEmail, watchlist, strategyId, generateLocalSignals]);
 
   useEffect(() => {
     let active = true;
 
     async function loadData() {
+      if (!watchlist.length || !strategyId) {
+        setSignals([]);
+        setActivity([]);
+        return;
+      }
       try {
         const encoded = encodeURIComponent(targetEmail);
         const [sigData, actData] = await Promise.all([
@@ -246,7 +245,7 @@ export function AgentTab({
     return () => {
       active = false;
     };
-  }, [targetEmail, watchlist, generateLocalSignals]);
+  }, [targetEmail, watchlist, strategyId, generateLocalSignals]);
 
   // Run Backtest Simulator
   const handleRunBacktest = async () => {
@@ -336,7 +335,7 @@ export function AgentTab({
       if (onRefreshUserData) await onRefreshUserData();
       await refreshAgentFeed();
 
-      showToast?.(`✅ ${selectedStrategy.name} successfully deployed and armed.`);
+      showToast?.(`✅ ${selectedStrategy?.name || "Strategy"} successfully deployed and armed.`);
     } catch (err) {
       console.warn("Deploy error:", err);
       showToast?.("Strategy settings configured locally.");
@@ -481,14 +480,6 @@ export function AgentTab({
         <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 mb-3 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 backdrop-blur-md">
-                <Bot size={13} />
-                Stake AI Workspace
-              </span>
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-slate-800/50 text-emerald-300 border border-emerald-500/20 backdrop-blur-md">
-                <Sparkles size={11} className="text-emerald-400" />
-                Gemini 2.5 Flash
-              </span>
               {agentEnabled && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
@@ -508,16 +499,6 @@ export function AgentTab({
 
           {/* Action CTAs */}
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              id="agent-open-stake-ai-btn"
-              type="button"
-              onClick={() => setStakeAiOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-[#06110c] text-xs font-black shadow-lg shadow-emerald-500/30 cursor-pointer transition-all active:scale-98 backdrop-blur-sm border border-emerald-400/30"
-            >
-              <Sparkles size={16} />
-              <span>Launch Stake AI</span>
-            </button>
-
             <button
               id="agent-master-toggle-btn"
               type="button"
@@ -589,7 +570,6 @@ export function AgentTab({
       <div className="stake-agent-tabs flex items-center gap-2 border-b border-emerald-500/15 pb-3 overflow-x-auto">
         {[
           { id: "radar", label: "Signal Radar", icon: Activity },
-          { id: "backtest", label: "Backtest Simulator", icon: BarChart3 },
           { id: "rules", label: "Strategy Settings", icon: SlidersHorizontal },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -1241,7 +1221,7 @@ export function AgentTab({
 
                 <div className="mt-6 flex items-center justify-between">
                   <span className="text-xs text-slate-500 font-medium">
-                    Active: <strong className="text-slate-900">{selectedStrategy.name}</strong>
+                    Active: <strong className="text-slate-900">{selectedStrategy?.name || "No strategy selected"}</strong>
                   </span>
 
                   <button

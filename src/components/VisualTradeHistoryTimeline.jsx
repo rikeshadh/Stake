@@ -2,27 +2,20 @@ import { useState } from "react";
 import {
   TrendingUp,
   TrendingDown,
-  Clock,
   Sparkles,
   User,
   CheckCircle2,
   Filter,
-  ArrowUpRight,
-  ArrowDownRight,
   Calendar,
-  Layers,
-  ChevronRight,
 } from "lucide-react";
-import { fmt, formatMoney } from "../utils";
+import { fmt } from "../utils";
 
 export function VisualTradeHistoryTimeline({
   orders = [],
   ticker,
-  stockName,
   currentPrice = 150,
   onOpenOrderDesk,
   darkMode = false,
-  currency = "USD",
 }) {
   const [filterType, setFilterType] = useState("ALL"); // ALL, BUY, SELL, AGENT
 

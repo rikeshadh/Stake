@@ -285,6 +285,8 @@ export function CandlestickChart({
   showVolume = false,
   currency = "$",
   chartType: externalChartType = "candle",
+  orders = [],
+  ticker = "",
 }) {
   const [hoverIdx, setHoverIdx] = useState(null);
   const containerRef = useRef(null);
@@ -368,6 +370,23 @@ export function CandlestickChart({
       areaPath: aPath,
     };
   }, [candleList, chartW, priceH, padLeft, padY]);
+
+  const tradeMarkers = useMemo(() => {
+    const matchingOrders = orders.filter((order) => {
+      const symbol = (order.ticker || order.scrip || order.symbol || "").toUpperCase();
+      return !ticker || symbol === ticker.toUpperCase();
+    });
+
+    return matchingOrders.map((order, index) => {
+      const candleIndex = Math.max(
+        0,
+        Math.min(candleList.length - 1, candleList.length - 1 - index * Math.max(1, Math.floor(candleList.length / (matchingOrders.length + 1))))
+      );
+      const candle = candleList[candleIndex];
+      const side = (order.side || order.type || "BUY").toUpperCase();
+      return { id: order.id || `candle-trade-${index}`, index, candleIndex, candle, side, isBuy: side === "BUY" };
+    });
+  }, [orders, ticker, candleList]);
 
   if (candleList.length === 0) {
     return <div style={{ height, background: darkMode ? "#161d19" : "rgba(0,0,0,0.02)", borderRadius: 16 }} />;
@@ -511,6 +530,27 @@ export function CandlestickChart({
               );
             })
           )}
+
+          {/* Every completed manual or AI order is visible on both chart modes. */}
+          {tradeMarkers.map((marker) => {
+            const cx = padLeft + (marker.candleIndex + 0.5) * (chartW / candleList.length);
+            const price = marker.candle.close || marker.candle.open;
+            const cy = priceH - padY - ((price - minPrice) / priceRange) * (priceH - padY * 2);
+            const color = marker.isBuy ? "#00E599" : "#ef4444";
+            return (
+              <g
+                key={marker.id}
+                className="stake-trade-marker"
+                style={{ animationDelay: `${marker.index * 75}ms` }}
+                aria-label={`${marker.side} trade marker`}
+              >
+                <circle cx={cx} cy={cy} r="8" fill={color} stroke={darkMode ? "#06110c" : "#ffffff"} strokeWidth="2.5" />
+                <text x={cx} y={cy + 3} fill={marker.isBuy ? "#062b1a" : "#ffffff"} fontSize="7" fontWeight="900" textAnchor="middle">
+                  {marker.isBuy ? "B" : "S"}
+                </text>
+              </g>
+            );
+          })}
 
           {/* Hover Crosshair */}
           {hoverIdx !== null && (

@@ -11,7 +11,6 @@ import { WatchlistTab } from "./components/WatchlistTab";
 import { AgentTab } from "./components/AgentTab";
 import { TransactionHistory } from "./components/TransactionHistory";
 import { AlertsManager } from "./components/AlertsManager";
-import { AlertsManagerDrawer } from "./components/AlertsManagerDrawer";
 import { SetAlertModal } from "./components/SetAlertModal";
 import { LiveIndicesFooter } from "./components/LiveIndicesFooter";
 import { AuthPage } from "./components/AuthPage";
@@ -32,6 +31,17 @@ import {
   setStoredAuthToken,
   clearAuthSession,
 } from "./api";
+
+const FALLBACK_MARKET_STOCKS = [
+  { ticker: "NVDA", name: "NVIDIA Corporation", sector: "Semiconductors & AI", price: 137.86, change: 3.76, changePercent: 2.8, color: "#76b900" },
+  { ticker: "AAPL", name: "Apple Inc.", sector: "Consumer & Retail", price: 228.45, change: 3.17, changePercent: 1.4, color: "#555555" },
+  { ticker: "TSLA", name: "Tesla Inc.", sector: "Electric Vehicles", price: 248.5, change: -5.34, changePercent: -2.1, color: "#e82127" },
+  { ticker: "MSFT", name: "Microsoft Corp.", sector: "Cloud & Software", price: 432.5, change: 3.64, changePercent: 0.85, color: "#00a4ef" },
+  { ticker: "AMZN", name: "Amazon.com Inc.", sector: "Consumer & Retail", price: 187.6, change: 3.05, changePercent: 1.65, color: "#ff9900" },
+  { ticker: "GOOGL", name: "Alphabet Inc.", sector: "Cloud & Software", price: 178.4, change: -0.8, changePercent: -0.45, color: "#4285f4" },
+  { ticker: "AMD", name: "Advanced Micro Devices", sector: "Semiconductors & AI", price: 154.2, change: -1.79, changePercent: -1.15, color: "#ed1c24" },
+  { ticker: "JPM", name: "JPMorgan Chase & Co.", sector: "Financials & Banking", price: 214.1, change: 1.14, changePercent: 0.54, color: "#0b5cab" },
+];
 
 function generateInitialHistory(basePrice, count = 28) {
   const arr = [basePrice];
@@ -134,7 +144,6 @@ export default function App() {
     setQuickAlertModalOpen,
   ] = useState(false);
 
-  const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
 
   const [aiInsightsOpen, setAiInsightsOpen] = useState(false);
 
@@ -310,20 +319,21 @@ export default function App() {
 
     async function initData() {
       try {
-        const remoteStocks =
-          await fetchStocks();
+        const remoteStocks = await fetchStocks();
+        const marketStocks = Array.isArray(remoteStocks) && remoteStocks.length > 0
+          ? remoteStocks
+          : FALLBACK_MARKET_STOCKS;
 
         if (
           isMounted &&
-          remoteStocks &&
-          remoteStocks.length > 0
+          marketStocks.length > 0
         ) {
           setStockMetaList(
-            remoteStocks
+            marketStocks
           );
 
           const map = {};
-          remoteStocks.forEach((s) => {
+          marketStocks.forEach((s) => {
             map[s.ticker] = {
               price: s.price,
               open: s.open || s.price,
@@ -1901,12 +1911,6 @@ export default function App() {
           )
         }
 
-        onOpenAlertsManager={() =>
-          setAlertsDrawerOpen(
-            true
-          )
-        }
-
         onLogout={
           handleLogout
         }
@@ -1917,6 +1921,7 @@ export default function App() {
               !a.triggered
           ).length
         }
+        alerts={alerts}
         notifications={notifications}
         onAddNotification={addNotification}
         onMarkAllRead={markAllNotificationsRead}
@@ -2006,6 +2011,10 @@ export default function App() {
 
             currency={
               currency
+            }
+
+            orders={
+              orders
             }
           />
         ) : (
@@ -2796,45 +2805,6 @@ export default function App() {
             }
           }
         }
-      />
-
-      {/* =====================================================
-          ALERTS MANAGER DRAWER
-         ===================================================== */}
-
-      <AlertsManagerDrawer
-        isOpen={alertsDrawerOpen}
-        onClose={() => setAlertsDrawerOpen(false)}
-        alerts={alerts}
-        stocks={stocks}
-        stockMetaList={stockMetaList}
-        onDeleteAlert={handleDeleteAlert}
-        onOpenSetAlert={() => {
-          setAlertsDrawerOpen(false);
-          setQuickAlertModalOpen(true);
-        }}
-        onSelectStock={(ticker) => {
-          setAlertsDrawerOpen(false);
-          setSelectedStock(ticker);
-          setTab("market");
-        }}
-        onOpenTrade={(ticker, side) => {
-          setAlertsDrawerOpen(false);
-          setSelectedStock(ticker);
-          setOrderDeskMode(side || "BUY");
-          setOrderDeskOpen(true);
-        }}
-        onClearTriggeredAlerts={() => {
-          const activeOnly = alerts.filter((a) => !a.triggered);
-          setAlerts(activeOnly);
-          triggerBackendSync(user, cash, holdings, watchlist, orders, agentEnabled);
-          showToast("Cleared triggered alerts");
-        }}
-        onCancelAllAlerts={() => {
-          setAlerts([]);
-          triggerBackendSync(user, cash, holdings, watchlist, orders, agentEnabled);
-          showToast("All active price alerts cancelled");
-        }}
       />
 
       {/* =====================================================

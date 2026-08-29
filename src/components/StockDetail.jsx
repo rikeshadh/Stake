@@ -365,6 +365,7 @@ export function StockDetail({
               darkMode={darkMode}
               showVolume={showVolume}
               range={range}
+              orders={orders}
             />
           ) : (
             <CandlestickChart
@@ -377,10 +378,20 @@ export function StockDetail({
               chartType={chartType}
               range={range}
               onChartTypeChange={setChartType}
+              orders={orders}
+              ticker={selected}
             />
           )}
         </div>
       </div>
+
+      <VisualTradeHistoryTimeline
+        orders={orders}
+        ticker={selected}
+        currentPrice={currentPrice}
+        onOpenOrderDesk={onOpenOrderDesk}
+        darkMode={darkMode}
+      />
 
       {/* 2. ACTIONS & POSITION SECTION */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 20, marginBottom: 24 }}>

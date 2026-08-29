@@ -33,7 +33,7 @@ export function Navbar({
   onOpenKyc,
   onOpenSettings,
   onOpenAiInsights,
-  onOpenAlertsManager,
+  alerts = [],
   alertsCount = 0,
   onLogout,
   onExitGuest,
@@ -81,6 +81,7 @@ export function Navbar({
   const unreadCount = notifications.filter(
     (n) => n.unread === true || n.read === false || (!n.read && n.unread !== false)
   ).length;
+  const activeAlerts = alerts.filter((alert) => !alert.triggered && alert.active !== false);
 
   const filteredNotifs = notifications.filter((n) => {
     if (notifFilter === "ALL") return true;
@@ -162,28 +163,6 @@ export function Navbar({
             >
               <Sparkles size={14} className="text-[#15F7A6]" />
               <span className="hidden sm:inline">Stake AI</span>
-            </button>
-          )}
-
-          {/* Dedicated Alert Manager Drawer Trigger */}
-          {onOpenAlertsManager && (
-            <button
-              id="nav-alert-manager-btn"
-              type="button"
-              onClick={onOpenAlertsManager}
-              className="relative p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-all cursor-pointer flex items-center justify-center"
-              title="Open Price Alert Manager"
-              aria-label="Price Alert Manager"
-            >
-              <SlidersHorizontal size={16} />
-              {alertsCount > 0 && (
-                <span
-                  id="nav-alerts-active-badge"
-                  className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 bg-emerald-600 text-white font-black text-[9.5px] rounded-full flex items-center justify-center ring-2 ring-white"
-                >
-                  {alertsCount}
-                </span>
-              )}
             </button>
           )}
 
@@ -277,6 +256,18 @@ export function Navbar({
                   ))}
                 </div>
 
+                {activeAlerts.length > 0 && (
+                  <div className="mx-3 mb-2.5 rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5">
+                    <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-emerald-700">Active price alerts</div>
+                    {activeAlerts.slice(0, 3).map((alert) => (
+                      <div key={alert.id} className="flex items-center justify-between py-1 text-[11px] font-semibold text-slate-700">
+                        <span>{alert.ticker} {alert.condition === "BELOW" ? "below" : "above"} ${Number(alert.targetPrice).toFixed(2)}</span>
+                        <BellRing size={12} className="text-emerald-600" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
                   {filteredNotifs.length === 0 ? (
                     <div className="py-8 text-center text-slate-400">
@@ -366,20 +357,6 @@ export function Navbar({
                   )}
                 </div>
 
-                {onOpenAlertsManager && (
-                  <div className="mt-3 pt-2.5 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNotifOpen(false);
-                        onOpenAlertsManager();
-                      }}
-                      className="w-full py-1.5 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
-                    >
-                      <SlidersHorizontal size={13} /> Manage Active Price Alerts ({alertsCount})
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -453,23 +430,6 @@ export function Navbar({
                           }`}
                         >
                           {kycStatus === "VERIFIED" ? "Verified" : "Pending"}
-                        </span>
-                      </button>
-
-                      <button
-                        id="profile-menu-alerts-btn"
-                        type="button"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          if (onOpenAlertsManager) onOpenAlertsManager();
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center justify-between cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <SlidersHorizontal size={14} className="text-emerald-600" /> Price Alerts
-                        </div>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                          {alertsCount}
                         </span>
                       </button>
 

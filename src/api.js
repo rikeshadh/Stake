@@ -377,9 +377,15 @@ export async function sendAgentChat({ email, message, history = [] }) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, message, history }),
   });
-  const data = await res.json();
+  const raw = await res.text();
+  let data;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    throw new Error("Stake AI is temporarily unavailable. Please try again in a moment.");
+  }
   if (!res.ok || !data.success) {
-    throw new Error(data.message || "AI request failed.");
+    throw new Error(data?.message || "Stake AI is temporarily unavailable. Please try again in a moment.");
   }
   return data;
 }
