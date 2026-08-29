@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useId, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -10,9 +10,10 @@ import {
   Tooltip,
   CartesianGrid,
   ReferenceLine,
+  ReferenceDot,
 } from "recharts";
 import { fmt, getCurrencySymbol, getCurrencyRate } from "../utils";
-import { Calendar } from "lucide-react";
+import { Calendar, TrendingUp, TrendingDown, Sparkles, User, Tag } from "lucide-react";
 
 // Fixed reference baseline for pure deterministic rendering without Date.now()/Math.random() in render
 const BASE_TIMESTAMP = 1715000000000;
@@ -107,7 +108,7 @@ function CustomTrendTooltip({ active, payload, firstVal, symbol, darkMode }) {
             style={{
               fontSize: 11.5,
               fontWeight: 800,
-              color: diff >= 0 ? "#10b981" : "#ef4444",
+              color: diff >= 0 ? "#00E599" : "#ef4444",
               display: "inline-flex",
               alignItems: "center",
               gap: 2,
@@ -130,7 +131,7 @@ function CustomTrendTooltip({ active, payload, firstVal, symbol, darkMode }) {
             borderTop: `1px solid ${darkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
           }}
         >
-          {data.high && <span>H: <strong style={{ color: "#10b981" }}>{symbol} {fmt(data.high)}</strong></span>}
+          {data.high && <span>H: <strong style={{ color: "#00E599" }}>{symbol} {fmt(data.high)}</strong></span>}
           {data.low && <span>L: <strong style={{ color: "#ef4444" }}>{symbol} {fmt(data.low)}</strong></span>}
           {data.volume && <span>Vol: <strong>{data.volume > 1e6 ? `${(data.volume / 1e6).toFixed(1)}M` : `${(data.volume / 1e3).toFixed(0)}K`}</strong></span>}
         </div>
@@ -149,10 +150,14 @@ export function RechartsStockTrend({
   range = "1M",
   liveHistory,
   liveCandles,
+  orders = [],
+  ticker = "",
 }) {
   const chartGradId = useId().replace(/[^a-zA-Z0-9]/g, "");
   const rate = getCurrencyRate(currency);
   const symbol = getCurrencySymbol(currency);
+  const [showTradeMarkers, setShowTradeMarkers] = useState(true);
+  const [selectedMarkerOrder, setSelectedMarkerOrder] = useState(null);
 
   // Compute chart points synchronously with priority on props (liveCandles / liveHistory)
   const internalData = useMemo(() => {
@@ -239,17 +244,132 @@ export function RechartsStockTrend({
     return Math.max(...convertedData.map((d) => d.volume || 10000));
   }, [convertedData]);
 
-  const strokeColor = isPositive ? "#10b981" : "#ef4444";
-  const fillColor = isPositive ? "#10b981" : "#ef4444";
+  const strokeColor = isPositive ? "#00E599" : "#ef4444";
+  const fillColor = isPositive ? "#00E599" : "#ef4444";
+
+  // Map relevant orders to chart coordinates for trade markers
+  const tradeMarkers = useMemo(() => {
+    if (!showTradeMarkers || !orders || orders.length === 0 || convertedData.length === 0) {
+      return [];
+    }
+
+    const filtered = orders.filter((o) => {
+      const sym = (o.ticker || o.scrip || o.symbol || "").toUpperCase();
+      return !ticker || sym === ticker.toUpperCase();
+    });
+
+    if (filtered.length === 0) return [];
+
+    // Distribute markers along recent data points so they overlay visually on the chart
+    const dataLen = convertedData.length;
+    return filtered.map((ord, idx) => {
+      const targetIdx = Math.max(
+        0,
+        Math.min(dataLen - 1, Math.floor(dataLen - 1 - (idx * Math.floor(dataLen / (filtered.length + 1)))))
+      );
+      const point = convertedData[targetIdx] || convertedData[dataLen - 1];
+      const side = (ord.side || ord.type || "BUY").toUpperCase();
+      const isAgent = Boolean(
+        ord.isAgent || ord.reason?.toLowerCase().includes("agent") || ord.reason?.toLowerCase().includes("ai")
+      );
+      const shares = Number(ord.shares || ord.quantity || 1);
+      const execPrice = Number(ord.price || ord.executionPrice || point.price);
+
+      return {
+        id: ord.id || `marker-${idx}`,
+        time: point.time,
+        price: point.price,
+        execPrice,
+        shares,
+        side,
+        isBuy: side === "BUY",
+        isAgent,
+        orderRef: ord,
+      };
+    });
+  }, [orders, ticker, convertedData, showTradeMarkers]);
 
   const priceChartHeight = showVolume ? Math.max(200, height * 0.72) : height;
   const volChartHeight = showVolume ? Math.max(65, height * 0.28) : 0;
 
   return (
     <div style={{ width: "100%", userSelect: "none" }}>
+      {/* Chart Toolbar / Trade Markers Legend */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 10,
+          fontSize: 11.5,
+          fontFamily: "'JetBrains Mono', monospace",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {orders.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowTradeMarkers(!showTradeMarkers)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "4px 10px",
+                borderRadius: 8,
+                border: `1px solid ${showTradeMarkers ? "#00E599" : (darkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)")}`,
+                background: showTradeMarkers ? "rgba(0,229,153,0.12)" : "transparent",
+                color: showTradeMarkers ? (darkMode ? "#00E599" : "#059669") : (darkMode ? "#94a3b8" : "#64748b"),
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: 11,
+              }}
+            >
+              <Tag size={12} />
+              <span>Trade Markers ({tradeMarkers.length})</span>
+            </button>
+          )}
+
+          {showTradeMarkers && tradeMarkers.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: darkMode ? "#94a3b8" : "#64748b" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#00E599", display: "inline-block" }} />
+                <span>BUY</span>
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444", display: "inline-block" }} />
+                <span>SELL</span>
+              </span>
+            </div>
+          )}
+        </div>
+
+        {selectedMarkerOrder && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: darkMode ? "#1e293b" : "#f1f5f9",
+              padding: "3px 8px",
+              borderRadius: 6,
+              fontSize: 11,
+              color: darkMode ? "#f8fafc" : "#0f172a",
+            }}
+          >
+            <span>Selected: <strong>{selectedMarkerOrder.side} {selectedMarkerOrder.shares} shares @ ${fmt(selectedMarkerOrder.execPrice)}</strong></span>
+            <button
+              onClick={() => setSelectedMarkerOrder(null)}
+              style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 12, padding: "0 2px" }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+
       <div style={{ width: "100%", height: priceChartHeight, position: "relative" }}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={convertedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <AreaChart data={convertedData} margin={{ top: 14, right: 10, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id={`grad-${chartGradId}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={fillColor} stopOpacity={darkMode ? 0.35 : 0.28} />
@@ -304,6 +424,22 @@ export function RechartsStockTrend({
               }}
             />
 
+            {/* Visual Trade History Markers rendered directly on the chart line */}
+            {showTradeMarkers &&
+              tradeMarkers.map((marker) => (
+                <ReferenceDot
+                  key={marker.id}
+                  x={marker.time}
+                  y={marker.price}
+                  r={7}
+                  fill={marker.isBuy ? "#00E599" : "#ef4444"}
+                  stroke={darkMode ? "#06110c" : "#ffffff"}
+                  strokeWidth={2.5}
+                  onClick={() => setSelectedMarkerOrder(marker)}
+                  style={{ cursor: "pointer", filter: "drop-shadow(0 0 6px rgba(0,229,153,0.5))" }}
+                />
+              ))}
+
             <Area
               type="monotone"
               dataKey="price"
@@ -321,7 +457,7 @@ export function RechartsStockTrend({
         <div style={{ width: "100%", marginTop: 10, borderTop: `1px dashed ${darkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, paddingTop: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", color: darkMode ? "#94a3b8" : "#64748b", marginBottom: 4, padding: "0 2px" }}>
             <span style={{ fontWeight: 700, letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#00E599", display: "inline-block" }} />
               VOLUME HISTOGRAM
             </span>
             <span style={{ background: darkMode ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)", padding: "1px 6px", borderRadius: 4 }}>
@@ -343,7 +479,7 @@ export function RechartsStockTrend({
                 />
                 <Bar
                   dataKey="volume"
-                  fill={darkMode ? "rgba(16, 185, 129, 0.45)" : "rgba(16, 185, 129, 0.6)"}
+                  fill={darkMode ? "rgba(0, 229, 153, 0.45)" : "rgba(0, 229, 153, 0.6)"}
                   radius={[3, 3, 0, 0]}
                   isAnimationActive={false}
                 />

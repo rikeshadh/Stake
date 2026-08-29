@@ -37,11 +37,10 @@ export function HomeDashboard({
   dayChange = () => 0,
 }) {
   const [moversTab, setMoversTab] = useState("gainers"); // "gainers" | "losers" | "turnover"
-  const [showGuide, setShowGuide] = useState(true);
+  const showLegacyOnboarding = Boolean(import.meta.env.VITE_LEGACY_ONBOARDING);
 
   // Calculate holdings metrics
   const holdingTickers = Object.keys(holdings).filter((t) => holdings[t]?.shares > 0.0001);
-  const isNewAccount = holdingTickers.length === 0 && (cashBalance === 0 || cashBalance < 100);
   const totalStockValue = holdingTickers.reduce((acc, t) => {
     const curPrice = stocks[t]?.price || 0;
     return acc + holdings[t].shares * curPrice;
@@ -95,8 +94,8 @@ export function HomeDashboard({
       transition={{ duration: 0.22, ease: "easeOut" }}
       style={{ paddingTop: 16, textAlign: "left" }}
     >
-      {/* 0. NEW ACCOUNT ONBOARDING & TOOLTIP STEPPER (Clean, Dismissible) */}
-      {showGuide && (
+      {/* Legacy onboarding markup retained for layout compatibility; disabled. */}
+      {showLegacyOnboarding && (
         <div
           style={{
             background: "linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)",
@@ -127,7 +126,7 @@ export function HomeDashboard({
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <h3 style={{ fontSize: 16, fontWeight: 800, color: textPrimary, margin: 0 }}>
-                    {isNewAccount ? "New Account Setup & Quick-Start Guide" : "Stake Trading Tips & System Overview"}
+                    ""
                   </h3>
                 </div>
                 <p style={{ fontSize: 12.5, color: textSecondary, margin: "2px 0 0" }}>
@@ -137,7 +136,7 @@ export function HomeDashboard({
             </div>
 
             <button
-              onClick={() => setShowGuide(false)}
+              onClick={() => {}}
               style={{
                 background: "transparent",
                 border: "none",

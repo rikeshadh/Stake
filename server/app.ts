@@ -383,7 +383,7 @@ const inMemoryUsers: Record<string, any> = {
     agentEnabled: false,
     agentDeployedCapital: 0,
     agentMaxSpend: 500,
-    agentStrategy: "dip_buyer",
+    agentStrategy: "",
     privacyMode: false,
     kycStatus: "VERIFIED",
     kycData: {
@@ -420,7 +420,7 @@ const inMemoryUsers: Record<string, any> = {
     agentEnabled: false,
     agentDeployedCapital: 0,
     agentMaxSpend: 500,
-    agentStrategy: "momentum_breakout",
+    agentStrategy: "",
     privacyMode: false,
     kycStatus: "VERIFIED",
     kycData: {
@@ -706,7 +706,6 @@ app.post("/api/auth/register", async (req, res) => {
   const { hash, salt } = hashPassword(password);
 
   // New clean account: unverified KYC, zero holdings, zero watchlist, zero alerts, $0 cash.
-  // Stake AI is activated by default so the autonomous engine is live from day one.
   const VALID_STRATEGIES = ["dip_buyer", "momentum", "dca", "volatility_sentinel", "defensive_yield"];
   const requestedStrategy = String(req.body.strategy || "").trim();
   const newUser = {
@@ -719,10 +718,10 @@ app.post("/api/auth/register", async (req, res) => {
     cash: 0,
     holdings: {},
     watchlist: [],
-    agentEnabled: true,
+    agentEnabled: false,
     agentDeployedCapital: 0,
     agentMaxSpend: 500,
-    agentStrategy: VALID_STRATEGIES.includes(requestedStrategy) ? requestedStrategy : "dip_buyer",
+    agentStrategy: VALID_STRATEGIES.includes(requestedStrategy) ? requestedStrategy : "",
     privacyMode: false,
     kycStatus: "UNVERIFIED",
     kycData: {},
@@ -978,7 +977,7 @@ app.post("/api/user/reset", async (req, res) => {
     agentEnabled: false,
     agentDeployedCapital: 0,
     agentMaxSpend: 500,
-    agentStrategy: "momentum_breakout",
+    agentStrategy: "",
     kycStatus: "VERIFIED",
   };
 
@@ -1396,7 +1395,7 @@ async function getUserRecord(email: string) {
         agentEnabled: false,
         agentDeployedCapital: 0,
         agentMaxSpend: 500,
-        agentStrategy: "dip_buyer",
+        agentStrategy: "",
         orders: [],
         alerts: [],
         transactions: [],
@@ -1613,10 +1612,10 @@ app.post("/api/agent/watchlist", async (req, res) => {
       cash: 0,
       holdings: {},
       watchlist: clean,
-      agentEnabled: true,
+      agentEnabled: false,
       agentDeployedCapital: 0,
       agentMaxSpend: 500,
-      agentStrategy: "dip_buyer",
+      agentStrategy: "",
       orders: [],
       alerts: [],
       transactions: [],
@@ -1631,6 +1630,9 @@ app.get("/api/agent/signals", async (req, res) => {
   const email = ((req.query.userId || req.query.email || "trader@stake.com") as string).toLowerCase().trim();
   try {
     const user = await getUserRecord(email);
+    if (!user?.agentStrategy) {
+      return res.json({ success: true, signals: [] });
+    }
     const watchlist = (user.watchlist && user.watchlist.length > 0)
       ? user.watchlist
       : ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "GOOGL", "META", "COIN", "AMD", "PLTR", "ARM", "SMCI"];
@@ -1842,12 +1844,15 @@ app.post("/api/agent/backtest", async (req, res) => {
 
 // 6. POST /api/agent/deploy-strategy - Deploy capital & activate Stake AI strategy
 app.post("/api/agent/deploy-strategy", async (req, res) => {
-  const { email, userId, strategy = "dip_buyer", deployedCapital = 5000, maxSpend = 500, riskLevel = "Moderate" } = req.body;
+  const { email, userId, strategy = "dip_buyer", deployedCapital = 0, maxSpend = 500, riskLevel = "Moderate" } = req.body;
   const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
 
   try {
     const user = await getUserRecord(targetEmail);
-    const amountToDeploy = Math.max(100, Number(deployedCapital) || 1000);
+    const amountToDeploy = Number(deployedCapital);
+    if (!Number.isFinite(amountToDeploy) || amountToDeploy <= 0) {
+      return res.status(400).json({ success: false, message: "Enter an allocated capital amount before arming a strategy." });
+    }
 
     if ((user.cash || 0) < amountToDeploy) {
       if ((user.cash || 0) === 0) {

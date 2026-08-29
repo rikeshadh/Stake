@@ -1,36 +1,48 @@
-/* Stake Global Exchange - Restored Landing Page Styling */
+/* ==========================================================================
+   Stake Global Exchange - Liquid Glass #00E599 Green Theme Landing Page
+   - Cyber-mesh green animated energy field & glowing nodes (brand-new animation)
+   - Improved Liquid Glass buttons with specular highlights & tactile click feedback
+   - Interactive Live Floating Stock Bubbles
+   ========================================================================== */
+
 .stake-landing-root {
   min-height: 100vh;
-  background: #06110c;
-  color: #f8fafc;
+  background: #030a07;
+  color: #f0fdf7;
   font-family: var(--font-body);
   overflow-x: hidden;
   text-align: left;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
+  position: relative;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .stake-landing-root::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
+  display: none;
   width: 0;
   height: 0;
 }
 
-/* HERO SECTION (Generous natural spacing, beautiful display typography) */
+/* ==========================================================================
+   HERO SECTION - Cyber Neon Mint #00E599 Animated Atmosphere
+   ========================================================================== */
 .stake-hero-section {
   position: relative;
   min-height: 100vh;
-  height: 100vh;
-  background: radial-gradient(circle at 50% 32%, #0e2a1e 0%, #06110c 68%, #030806 100%);
+  background: 
+    radial-gradient(ellipse 90% 60% at 50% -15%, rgba(0, 229, 153, 0.16), transparent 65%),
+    radial-gradient(ellipse 70% 50% at 85% 55%, rgba(0, 200, 130, 0.1), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 15% 75%, rgba(0, 229, 153, 0.08), transparent 55%),
+    linear-gradient(180deg, #030b07 0%, #061910 45%, #030a07 100%);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 0 0 24px;
+  padding: 0 0 20px;
   overflow: hidden;
   box-sizing: border-box;
 }
 
-/* Background Subtle Glow Grid */
+/* Brand New Cyber-Mesh Green Grid */
 .stake-hero-section::before {
   content: '';
   position: absolute;
@@ -39,330 +51,529 @@
   right: 0;
   bottom: 0;
   background-image: 
-    radial-gradient(rgba(0, 229, 153, 0.12) 1.2px, transparent 1.2px);
-  background-size: 32px 32px;
+    linear-gradient(rgba(0, 229, 153, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 153, 0.07) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 20%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 20%, transparent 80%);
   pointer-events: none;
-  opacity: 0.6;
+  opacity: 0.85;
+  z-index: 1;
+  animation: cyberGridDrift 24s linear infinite;
 }
 
-/* Floating Stock Cards in Hero - Image-matched bouncing in place */
-.stock-hero-card {
+@keyframes cyberGridDrift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(48px); }
+}
+
+/* Ambient Radial Cyber Pulse */
+.stake-hero-section::after {
+  content: '';
   position: absolute;
-  width: 168px;
-  background: rgba(8, 24, 17, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 229, 153, 0.32);
-  border-radius: 18px;
-  padding: 15px 18px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(0, 229, 153, 0.14);
-  z-index: 10;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
-  user-select: none;
-  pointer-events: auto;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 900px;
+  height: 900px;
+  background: radial-gradient(circle, rgba(0, 229, 153, 0.12) 0%, rgba(0, 229, 153, 0.03) 45%, transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+  animation: cyberEnergyPulse 6s ease-in-out infinite alternate;
 }
 
-.stock-hero-card:hover {
-  transform: translateY(-4px) scale(1.03) !important;
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.65), 0 0 32px rgba(0, 229, 153, 0.28);
-  border-color: #00e599;
+@keyframes cyberEnergyPulse {
+  0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.9; }
 }
 
-.stock-hero-card.top-left {
-  top: 14%;
-  left: 3.5%;
-  transform: rotate(-2.5deg);
-  animation: cardEntry 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both, bounceTopLeft 4.6s ease-in-out 0.7s infinite;
+/* New Animated Green Energy Beams */
+.stake-hero-bg-animation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
 }
 
-.stock-hero-card.top-right {
-  top: 13%;
-  right: 3.5%;
-  transform: rotate(2.5deg);
-  animation: cardEntry 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both, bounceTopRight 5.0s ease-in-out 0.8s infinite;
+.stake-hero-energy-beam {
+  position: absolute;
+  width: 2px;
+  height: 180px;
+  background: linear-gradient(180deg, transparent, #00E599, transparent);
+  opacity: 0.4;
+  filter: drop-shadow(0 0 8px #00E599);
+  animation: energyBeamDown 5s ease-in-out infinite;
 }
 
-.stock-hero-card.bottom-left {
-  bottom: 12%;
-  left: 4.5%;
-  transform: rotate(1.5deg);
-  animation: cardEntry 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both, bounceBottomLeft 4.4s ease-in-out 0.9s infinite;
+.beam-1 { left: 18%; top: -10%; animation-delay: 0s; animation-duration: 6s; }
+.beam-2 { left: 42%; top: -10%; animation-delay: 1.8s; animation-duration: 7.2s; }
+.beam-3 { left: 74%; top: -10%; animation-delay: 0.9s; animation-duration: 5.5s; }
+.beam-4 { left: 88%; top: -10%; animation-delay: 3.2s; animation-duration: 6.8s; }
+
+@keyframes energyBeamDown {
+  0% { transform: translateY(-100px); opacity: 0; }
+  20% { opacity: 0.7; }
+  80% { opacity: 0.7; }
+  100% { transform: translateY(120vh); opacity: 0; }
 }
 
-.stock-hero-card.bottom-right {
-  bottom: 10%;
-  right: 4.5%;
-  transform: rotate(-2deg);
-  animation: cardEntry 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both, bounceBottomRight 4.8s ease-in-out 1.0s infinite;
+/* Cyber Nodes / Glowing Particle Radar */
+.stake-hero-radar-nodes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 2;
 }
 
-.stock-hero-card-ticker {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #94a3b8;
-  letter-spacing: 0.08em;
-  font-family: var(--font-mono);
-  text-transform: uppercase;
+.stake-radar-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 229, 153, 0.18);
+  transform: translate(-50%, -50%);
+  animation: radarExpand 8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
-.stock-hero-card-price {
-  font-size: 23px;
-  font-weight: 900;
-  color: #ffffff;
-  font-family: var(--font-mono);
-  margin: 3px 0 4px;
-  letter-spacing: -0.02em;
+.radar-1 { width: 300px; height: 300px; animation-delay: 0s; }
+.radar-2 { width: 600px; height: 600px; animation-delay: 2.5s; }
+.radar-3 { width: 900px; height: 900px; animation-delay: 5s; }
+
+@keyframes radarExpand {
+  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0.6; }
+  80% { opacity: 0.2; }
+  100% { transform: translate(-50%, -50%) scale(1.3); opacity: 0; }
 }
 
-.stock-hero-card-chart {
+/* ==========================================================================
+   LANDING PAGE TOP NAVBAR - Liquid Glass #00E599 Style
+   ========================================================================== */
+.stake-landing-nav {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
   width: 100%;
-  height: 24px;
-  display: block;
-  margin: 4px 0 6px;
+  max-width: 1380px;
+  min-height: 72px;
+  margin: 0 auto;
+  padding: 16px 32px;
+  box-sizing: border-box;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: none;
+  box-shadow: none;
 }
 
-.stock-hero-card-change {
-  font-size: 12px;
-  font-weight: 700;
-  font-family: var(--font-mono);
+.stake-landing-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.stake-landing-nav-links button {
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font: 700 13.5px var(--font-body);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.stake-landing-nav-links button:hover {
+  color: #00E599;
+  text-shadow: 0 0 14px rgba(0, 229, 153, 0.6);
+}
+
+.stake-landing-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ==========================================================================
+   IMPROVED LIQUID GLASS BUTTONS
+   ========================================================================== */
+.stake-glass-button {
+  min-height: 42px;
+  padding: 0 22px;
+  border-radius: 9999px;
+  color: #f1f5f9;
+  font: 800 13.5px var(--font-body);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-}
-
-.stock-hero-card-change.up {
-  color: #00e599;
-}
-
-.stock-hero-card-change.down {
-  color: #ef4444;
-}
-
-@keyframes cardEntry {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes bounceTopLeft {
-  0%, 100% { transform: translateY(0) rotate(-2.5deg); }
-  50% { transform: translateY(-14px) rotate(-1deg); }
-}
-
-@keyframes bounceTopRight {
-  0%, 100% { transform: translateY(0) rotate(2.5deg); }
-  50% { transform: translateY(-15px) rotate(4deg); }
-}
-
-@keyframes bounceBottomLeft {
-  0%, 100% { transform: translateY(0) rotate(1.5deg); }
-  50% { transform: translateY(-13px) rotate(0.2deg); }
-}
-
-@keyframes bounceBottomRight {
-  0%, 100% { transform: translateY(0) rotate(-2deg); }
-  50% { transform: translateY(-14px) rotate(-0.5deg); }
-}
-
-@media (max-width: 1024px) {
-  .stock-hero-card.top-left,
-  .stock-hero-card.top-right {
-    display: none;
-  }
-}
-
-@media (max-width: 768px) {
-  .stock-hero-card {
-    display: none !important;
-  }
-}
-
-/* Center Hero Typography */
-.stake-hero-center {
-  max-width: 860px;
-  margin: 36px auto 24px;
-  text-align: center;
-  z-index: 15;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.stake-hero-title {
-  font-family: var(--font-display);
-  font-size: clamp(42px, 6vw, 80px);
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.025em;
-  color: #ffffff;
-  margin: 0 0 20px 0;
-  text-align: center;
-}
-
-.stake-hero-subtitle {
-  font-family: var(--font-body);
-  font-size: clamp(15.5px, 1.8vw, 18px);
-  line-height: 1.6;
-  color: #94a3b8;
-  max-width: 600px;
-  margin: 0 0 32px 0;
-  text-align: center;
-  font-weight: 400;
-}
-
-.stake-hero-actions {
-  display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
+  gap: 8px;
+  background: 
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 100%),
+    rgba(10, 30, 20, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 6px 18px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  position: relative;
+  overflow: hidden;
+  user-select: none;
 }
 
+/* Specular Gleam Sheen on Hover */
+.stake-glass-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+
+.stake-glass-button:hover::before {
+  left: 120%;
+}
+
+.stake-glass-button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 229, 153, 0.4);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 10px 24px rgba(0, 0, 0, 0.45),
+    0 0 16px rgba(0, 229, 153, 0.2);
+}
+
+.stake-glass-button:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Quiet Glass Button Variant */
+.stake-glass-button-quiet {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  border-color: rgba(0, 229, 153, 0.35);
+  background: rgba(8, 25, 17, 0.75);
+}
+
+.stake-glass-button-quiet:hover {
+  color: #ffffff;
+  border-color: #00E599;
+  background: rgba(14, 40, 28, 0.9);
+}
+
+/* Primary Glass Button Variant - Neon #00E599 */
+.stake-glass-button-primary {
+  color: #04140b;
+  border-color: #00E599;
+  background: linear-gradient(135deg, #00E599 0%, #00b87a 100%);
+  font-weight: 800;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 6px 20px rgba(0, 229, 153, 0.45),
+    0 0 24px rgba(0, 229, 153, 0.25);
+}
+
+.stake-glass-button-primary:hover {
+  background: linear-gradient(135deg, #33f0b0 0%, #00E599 100%);
+  border-color: #ffffff;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 10px 28px rgba(0, 229, 153, 0.6),
+    0 0 36px rgba(0, 229, 153, 0.35);
+  transform: translateY(-2px);
+}
+
+/* Big Hero Primary CTA Button */
 .stake-btn-mint {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  background: #00e599;
-  color: #06110c;
-  font-size: 15px;
-  font-weight: 800;
-  padding: 14px 30px;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 32px;
   border-radius: 9999px;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: linear-gradient(135deg, #00E599 0%, #00b87a 100%);
+  color: #031109;
+  font-size: 15.5px;
+  font-weight: 800;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 6px 20px rgba(0, 229, 153, 0.35);
-  font-family: var(--font-body);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 8px 24px rgba(0, 229, 153, 0.45),
+    0 0 32px rgba(0, 229, 153, 0.25);
+  position: relative;
+  overflow: hidden;
+  user-select: none;
 }
 
 .stake-btn-mint:hover {
-  background: #25fab0;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 229, 153, 0.5);
+  background: linear-gradient(135deg, #33f0b0 0%, #00E599 100%);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 12px 32px rgba(0, 229, 153, 0.6),
+    0 0 44px rgba(0, 229, 153, 0.4);
 }
 
-.stake-btn-dark {
+.stake-btn-mint:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* ==========================================================================
+   HERO TYPOGRAPHY & COPY
+   ========================================================================== */
+.stake-hero-center {
+  position: relative;
+  z-index: 10;
+  max-width: 900px;
+  margin: 40px auto 20px;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.stake-hero-tag {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 700;
-  padding: 14px 28px;
+  padding: 6px 16px;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  cursor: pointer;
-  transition: all 0.2s ease;
+  background: rgba(0, 229, 153, 0.12);
+  border: 1px solid rgba(0, 229, 153, 0.35);
+  color: #00E599;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  box-shadow: 0 0 20px rgba(0, 229, 153, 0.2);
+}
+
+.stake-hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(38px, 5.5vw, 68px);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+  margin: 0 0 20px;
+  text-shadow: 0 6px 32px rgba(0, 0, 0, 0.6);
+}
+
+.stake-hero-title em {
+  font-style: normal;
+  color: #00E599;
+  text-shadow: 0 0 28px rgba(0, 229, 153, 0.4);
+}
+
+.stake-hero-subtitle {
   font-family: var(--font-body);
+  font-size: clamp(15px, 1.8vw, 18px);
+  color: #94a3b8;
+  max-width: 640px;
+  margin: 0 auto 32px;
+  line-height: 1.6;
 }
 
-.stake-btn-dark:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.35);
-  transform: translateY(-2px);
-}
-
-/* Lower Section Content (Light Theme for readability & contrast) */
-.stake-content-section {
-  background: #f8fafc;
-  color: #0f172a;
+/* ==========================================================================
+   LIVE INSTITUTIONAL FLOW MATRIX IN HERO (REPLACES FLOATING BUBBLES)
+   ========================================================================== */
+.stake-hero-matrix-wrapper {
   position: relative;
+  z-index: 12;
+  max-width: 960px;
+  width: 100%;
+  margin: 32px auto 0;
+  padding: 0 16px;
+}
+
+.stake-hero-matrix-card {
+  background: rgba(4, 20, 14, 0.78);
+  border: 1px solid rgba(0, 229, 153, 0.28);
+  border-radius: 20px;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.15), 0 0 30px rgba(0, 229, 153, 0.08);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+.stake-hero-matrix-card:hover {
+  border-color: rgba(0, 229, 153, 0.45);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.25), 0 0 40px rgba(0, 229, 153, 0.15);
+}
+
+.stake-hero-matrix-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.stake-matrix-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #00E599;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.stake-matrix-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00E599;
+  box-shadow: 0 0 10px #00E599;
+  animation: radarPing 1.8s infinite;
+}
+
+.stake-matrix-scrips-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.stake-matrix-scrip-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-mono);
+  user-select: none;
+}
+
+.stake-matrix-scrip-item:hover {
+  background: rgba(0, 229, 153, 0.12);
+  border-color: rgba(0, 229, 153, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.stake-matrix-scrip-sym {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.stake-matrix-scrip-price {
+  font-size: 12px;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.stake-matrix-scrip-tag {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+.stake-matrix-scrip-tag.up {
+  color: #00E599;
+  background: rgba(0, 229, 153, 0.18);
+}
+
+.stake-matrix-scrip-tag.down {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.stake-matrix-scrip-tag.down {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.18);
+}
+
+/* Alert List Trigger Pulse Animation */
+@keyframes alertTriggerPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6), 0 4px 12px rgba(0, 0, 0, 0.05);
+    border-color: rgba(245, 158, 11, 0.9);
+    background-color: rgba(254, 243, 199, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 24px 4px rgba(245, 158, 11, 0.4), 0 6px 16px rgba(0, 0, 0, 0.08);
+    border-color: #d97706;
+    background-color: rgba(254, 243, 199, 0.9);
+    transform: scale(1.008);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6), 0 4px 12px rgba(0, 0, 0, 0.05);
+    border-color: rgba(245, 158, 11, 0.9);
+    background-color: rgba(254, 243, 199, 0.5);
+  }
+}
+
+.stake-alert-triggered-pulse {
+  animation: alertTriggerPulse 2.4s infinite ease-in-out !important;
+  border: 1.5px solid #f59e0b !important;
+  position: relative;
+}
+
+/* ==========================================================================
+   CONTENT SECTION & CARDS
+   ========================================================================== */
+.stake-content-section {
+  position: relative;
+  background: #ffffff;
+  color: #0f172a;
   z-index: 10;
 }
 
 .stake-section-title {
   font-family: var(--font-display);
-  font-size: clamp(26px, 3.5vw, 38px);
-  font-weight: 700;
+  font-size: clamp(24px, 3.2vw, 36px);
+  font-weight: 800;
+  color: #0f172a;
   letter-spacing: -0.02em;
-  color: #191c1e;
-  margin: 6px 0 10px;
 }
 
-.stake-card-light {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 28px 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-  transition: all 0.2s ease;
-  text-align: left;
-}
-
-.stake-card-light:hover {
-  border-color: #006c49;
-  transform: translateY(-3px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
-}
-
-/* Agentic Feature Cards in Light Theme */
-.agentic-feature-card {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease !important;
-}
-
-.agentic-feature-card:hover {
-  transform: translateY(-5px) !important;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.08), 0 0 25px rgba(56, 189, 248, 0.15) !important;
-  border-color: #cbd5e1 !important;
-}
-
-.menu-item-hover:hover {
-  background: #f8fafc;
-}
-
-/* Modal Animations */
-@keyframes scaleUp {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-/* FAQ Side Drawer Overlay & Panel */
-.stake-faq-drawer-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  display: flex;
-  justify-content: flex-end;
-  animation: fadeIn 0.2s ease;
-}
-
-.stake-faq-drawer {
-  width: 100%;
-  max-width: 480px;
-  height: 100%;
-  background: #ffffff;
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.2);
-  display: flex;
-  flex-direction: column;
-  animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: 32px 28px;
-}
-
-@keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* Responsive Nav & Mobile Rules */
+@media (max-width: 860px) {
+  .stake-hero-section { min-height: 800px; height: auto; }
+  .stake-landing-nav { min-height: 68px; padding: 0 20px; }
+  .stake-landing-nav-links { display: none; }
+  .stake-glass-button { min-height: 38px; padding: 0 16px; font-size: 12.5px; }
+  .bubble-pos-5, .bubble-pos-6 { display: none; }
+  .bubble-pos-1 { top: 12%; left: 3%; }
+  .bubble-pos-2 { top: 12%; right: 3%; }
+  .bubble-pos-3 { top: 78%; left: 3%; }
+  .bubble-pos-4 { top: 78%; right: 3%; }
 }

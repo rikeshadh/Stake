@@ -186,7 +186,7 @@ Key Guidelines:
 1. Always utilize your tools when asked about stocks, portfolios, execution, volatility, diversification, or placing trades.
 2. When the user asks to "Buy 10 shares of NVDA" or "Sell 5 AAPL" or "Buy $500 of TSLA", call the place_order tool immediately to execute it, then explain the execution result clearly (price, total amount, remaining cash balance).
 3. If the user asks analytical questions ("Analyze NVDA", "What is my most volatile holding?", "How diversified am I?", "Should I buy the dip on TSLA?"), call get_portfolio and/or analyze_holding and get_stock_price to reason with precise numbers and technical indicators (RSI, Support/Resistance, Volume trends).
-4. Keep your tone sharp, professional, quantitative, confident, and conversational like an elite Wall Street portfolio strategist. Format with clean bullet points and bold key metrics.
+4. Keep answers concise, direct, and conversational. Lead with the answer in 1–2 sentences, then add at most 3 short bullets only when they clarify a decision. Avoid report-style headings, long introductions, repeated disclaimers, and phrases like "safe USD cash collateral". Never restate the entire prompt.
 5. You can cite past agent memory decisions if relevant: ${JSON.stringify(agentMemory.slice(0, 5))}.
 `;
 
@@ -480,28 +480,9 @@ ${
 
     return {
       success: true,
-      reply: `## 💼 Portfolio Intelligence Summary
-
-- **Total Portfolio Net Worth**: **$${netWorth.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}**
-- **Available Cash Collateral**: **$${cash.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}** (${netWorth > 0 ? ((cash / netWorth) * 100).toFixed(1) : "100"}% cash reserve)
-- **Equities Value**: **$${totalStock.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}** across **${positions.length}** open positions
-
----
-
-### 📈 Current Holdings Breakdown
-${
-  positions.length > 0
-    ? positions
-        .map(
-          (p) =>
-            `- **${p.ticker}**: **${p.shares} shares** @ $${p.price.toFixed(2)} = **$${p.val.toFixed(2)}** (${netWorth > 0 ? ((p.val / netWorth) * 100).toFixed(1) : 0}% allocation) • PnL: ${p.pnl >= 0 ? "+" : ""}$${p.pnl.toFixed(2)} (${p.pnlPct >= 0 ? "+" : ""}${p.pnlPct.toFixed(2)}%)`
-        )
-        .join("\n")
-    : "No open equity positions. All capital is held in safe USD cash collateral."
-}
-
----
-*Autonomous risk management is active. Spend cap per trade is configured safely.*`,
+      reply: positions.length === 0
+        ? `Your portfolio is currently empty: $${cash.toFixed(2)} in cash and no open positions. Add funds or ask me to analyze a ticker when you’re ready.`
+        : `Your portfolio is worth $${netWorth.toFixed(2)}: $${cash.toFixed(2)} cash and $${totalStock.toFixed(2)} invested across ${positions.length} position${positions.length === 1 ? "" : "s"}.\n\n${positions.slice(0, 3).map((p) => `• ${p.ticker}: ${p.shares} shares, $${p.val.toFixed(2)} (${p.pnl >= 0 ? "+" : ""}${p.pnlPct.toFixed(1)}%)`).join("\n")}`,
       toolCalls: [{ name: "get_portfolio", args: {} }],
     };
   }

@@ -9,18 +9,11 @@ import {
 import Markdown from "react-markdown";
 import { sendAgentChat } from "../api";
 
-const SUGGESTIONS = [
-  "Analyze NVDA",
-  "Should I buy the dip on TSLA?",
-  "What's my portfolio worth?",
-  "How diversified am I?",
-  "Buy $500 of NVDA",
-];
-
 export function GeminiStrategySidebar({
   isOpen,
   onClose,
   user,
+  onRefreshUserData,
 }) {
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
@@ -45,8 +38,15 @@ export function GeminiStrategySidebar({
         const data = await sendAgentChat({ email: targetEmail, message, history });
         setMessages((prev) => [
           ...prev,
-          { role: "model", text: data.reply, tools: data.toolCalls || [] },
+          {
+            role: "model",
+            text: data.reply || "Analysis completed.",
+            tools: data.toolCalls || [],
+          },
         ]);
+        if (data.executedActions?.length && onRefreshUserData) {
+          await onRefreshUserData();
+        }
       } catch (err) {
         setMessages((prev) => [
           ...prev,
@@ -56,7 +56,7 @@ export function GeminiStrategySidebar({
         setSending(false);
       }
     },
-    [chatInput, sending, messages, targetEmail]
+    [chatInput, sending, messages, targetEmail, onRefreshUserData]
   );
 
   const resetChat = () => setMessages([]);
@@ -66,7 +66,7 @@ export function GeminiStrategySidebar({
   return (
     <aside
       id="ai-insights-split-sidebar"
-      aria-label="AI Insights Split Screen Panel"
+      aria-label="Stake AI Split Screen Panel"
       className="fixed top-14 right-0 bottom-0 w-full sm:w-[400px] md:w-[420px] bg-white text-slate-900 z-40 shadow-xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200"
     >
       <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -77,7 +77,7 @@ export function GeminiStrategySidebar({
           <div>
             <div className="flex items-center gap-1.5">
               <h3 className="text-sm font-extrabold text-slate-900 m-0">
-                AI Insights
+                Stake AI
               </h3>
               <span className="text-[9.5px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
                 Split Screen
@@ -115,23 +115,10 @@ export function GeminiStrategySidebar({
               <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
                 <Sparkles size={24} />
               </div>
-              <div className="text-sm font-extrabold text-slate-900">Stake AI Intelligence</div>
+              <div className="text-sm font-extrabold text-slate-900">Your Stake AI copilot</div>
               <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
-                Get real-time stock analysis, portfolio health checks, or execute trades instantly.
+                Ask about a company, your portfolio, or the market. Stake AI gives you a clear starting point—you decide what happens next.
               </p>
-
-              <div className="flex flex-col gap-2 mt-5">
-                {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => handleSend(s)}
-                    className="text-left px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40 text-xs font-bold text-slate-700 transition-all cursor-pointer flex items-center justify-between group"
-                  >
-                    <span>{s}</span>
-                    <Send size={11} className="text-slate-400 group-hover:text-emerald-600 transition-colors" />
-                  </button>
-                ))}
-              </div>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -183,7 +170,7 @@ export function GeminiStrategySidebar({
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Ask anything or trade..."
+              placeholder="Ask Stake AI anything..."
               disabled={sending}
               className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-emerald-500"
             />

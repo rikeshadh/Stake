@@ -11,6 +11,7 @@ import { WatchlistTab } from "./components/WatchlistTab";
 import { AgentTab } from "./components/AgentTab";
 import { TransactionHistory } from "./components/TransactionHistory";
 import { AlertsManager } from "./components/AlertsManager";
+import { AlertsManagerDrawer } from "./components/AlertsManagerDrawer";
 import { SetAlertModal } from "./components/SetAlertModal";
 import { LiveIndicesFooter } from "./components/LiveIndicesFooter";
 import { AuthPage } from "./components/AuthPage";
@@ -133,6 +134,8 @@ export default function App() {
     setQuickAlertModalOpen,
   ] = useState(false);
 
+  const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
+
   const [aiInsightsOpen, setAiInsightsOpen] = useState(false);
 
   // =========================================================
@@ -165,7 +168,7 @@ export default function App() {
       () => user?.alerts || []
     );
 
-  // Notification Inbox State
+  // Notification Inbox State (Starts clean, no artificial mock badges)
   const [notifications, setNotifications] = useState(() => {
     try {
       const saved = localStorage.getItem("stake_notifications");
@@ -173,17 +176,7 @@ export default function App() {
     } catch {
       // fallback
     }
-    return [
-      {
-        id: "notif-welcome",
-        category: "TRADE",
-        type: "buy",
-        title: "Trading Terminal Active",
-        message: "Welcome to Stake Equities. Live feed and order router are operational.",
-        timestamp: "Just now",
-        unread: true,
-      },
-    ];
+    return [];
   });
 
   const addNotification = useCallback((notif) => {
@@ -239,12 +232,6 @@ export default function App() {
         ? user.agentEnabled
         : false
     );
-
-  const [agentStrategy, setAgentStrategy] =
-    useState(() => user?.agentStrategy || null);
-
-  const [agentMaxSpend, setAgentMaxSpend] =
-    useState(() => user?.agentMaxSpend || 5000);
 
   // =========================================================
   // Stocks Data & Simulation - Fetched dynamically from /api/stocks
@@ -1434,7 +1421,7 @@ export default function App() {
   // =========================================================
 
   const handleLoginSuccess = useCallback(
-    (authUser, token, options = {}) => {
+    (authUser, token) => {
       setUser(
         authUser
       );
@@ -1485,6 +1472,14 @@ export default function App() {
         null
       );
 
+      // Reset / clear old notifications for new session / demo account
+      setNotifications([]);
+      try {
+        localStorage.removeItem("stake_notifications");
+      } catch {
+        // ignore
+      }
+
       if (token) {
         setStoredAuthToken(token);
       }
@@ -1529,12 +1524,18 @@ export default function App() {
     setWatchlist([]);
     setAlerts([]);
     setOrders([]);
+    setNotifications([]);
     setAgentEnabled(false);
     setKycStatus("UNVERIFIED");
     setKycData(null);
     setAuthModal(null);
     setTab("home");
     clearAuthSession();
+    try {
+      localStorage.removeItem("stake_notifications");
+    } catch {
+      // ignore
+    }
     showToast("Logged out successfully");
   };
 
@@ -1896,6 +1897,12 @@ export default function App() {
 
         onOpenWallet={() =>
           setWalletOpen(
+            true
+          )
+        }
+
+        onOpenAlertsManager={() =>
+          setAlertsDrawerOpen(
             true
           )
         }
@@ -2402,8 +2409,15 @@ export default function App() {
                     enabled
                   );
 
+                  const updatedUser = {
+                    ...(user || {}),
+                    agentEnabled: enabled,
+                  };
+
+                  setUser(updatedUser);
+
                   triggerBackendSync(
-                    user,
+                    updatedUser,
                     cash,
                     holdings,
                     watchlist,
@@ -2412,27 +2426,47 @@ export default function App() {
                   );
                 }}
 
-                agentStrategy={
-                  agentStrategy
-                }
+                agentStrategy={user?.agentStrategy || "dip_buyer"}
 
                 onSelectStrategy={(
                   strategy
                 ) => {
-                  setAgentStrategy(
-                    strategy
+                  const updatedUser = {
+                    ...(user || {}),
+                    agentStrategy: strategy,
+                  };
+
+                  setUser(updatedUser);
+
+                  triggerBackendSync(
+                    updatedUser,
+                    cash,
+                    holdings,
+                    watchlist,
+                    orders,
+                    agentEnabled
                   );
                 }}
 
-                agentMaxSpend={
-                  agentMaxSpend
-                }
+                agentMaxSpend={user?.agentMaxSpend || 500}
 
                 onChangeMaxSpend={(
                   amount
                 ) => {
-                  setAgentMaxSpend(
-                    amount
+                  const updatedUser = {
+                    ...(user || {}),
+                    agentMaxSpend: amount,
+                  };
+
+                  setUser(updatedUser);
+
+                  triggerBackendSync(
+                    updatedUser,
+                    cash,
+                    holdings,
+                    watchlist,
+                    orders,
+                    agentEnabled
                   );
                 }}
 
@@ -2743,6 +2777,64 @@ export default function App() {
         user={
           user
         }
+
+        onRefreshUserData={
+          async () => {
+            try {
+              const email = user?.email;
+              if (!email) return;
+              const data = await fetchUserData(email);
+              if (!data) return;
+              if (data.cash !== undefined) setCash(data.cash);
+              if (data.holdings) setHoldings(data.holdings);
+              if (data.watchlist) setWatchlist(data.watchlist);
+              if (data.orders) setOrders(data.orders);
+              if (data.agentEnabled !== undefined) setAgentEnabled(data.agentEnabled);
+              setUser((previous) => ({ ...(previous || {}), ...data }));
+            } catch (error) {
+              console.warn("Unable to refresh user data from AI sidebar:", error);
+            }
+          }
+        }
+      />
+
+      {/* =====================================================
+          ALERTS MANAGER DRAWER
+         ===================================================== */}
+
+      <AlertsManagerDrawer
+        isOpen={alertsDrawerOpen}
+        onClose={() => setAlertsDrawerOpen(false)}
+        alerts={alerts}
+        stocks={stocks}
+        stockMetaList={stockMetaList}
+        onDeleteAlert={handleDeleteAlert}
+        onOpenSetAlert={() => {
+          setAlertsDrawerOpen(false);
+          setQuickAlertModalOpen(true);
+        }}
+        onSelectStock={(ticker) => {
+          setAlertsDrawerOpen(false);
+          setSelectedStock(ticker);
+          setTab("market");
+        }}
+        onOpenTrade={(ticker, side) => {
+          setAlertsDrawerOpen(false);
+          setSelectedStock(ticker);
+          setOrderDeskMode(side || "BUY");
+          setOrderDeskOpen(true);
+        }}
+        onClearTriggeredAlerts={() => {
+          const activeOnly = alerts.filter((a) => !a.triggered);
+          setAlerts(activeOnly);
+          triggerBackendSync(user, cash, holdings, watchlist, orders, agentEnabled);
+          showToast("Cleared triggered alerts");
+        }}
+        onCancelAllAlerts={() => {
+          setAlerts([]);
+          triggerBackendSync(user, cash, holdings, watchlist, orders, agentEnabled);
+          showToast("All active price alerts cancelled");
+        }}
       />
 
       {/* =====================================================

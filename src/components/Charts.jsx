@@ -24,13 +24,13 @@ export function Logo({ size = 26, textSize = 16, dark = false, showAi = false, t
           fontWeight: 900,
           fontSize: textSize,
           letterSpacing: "-0.04em",
-          color: computedColor,
+          color: dark ? "#ffffff" : computedColor,
           display: "flex",
           alignItems: "center",
           gap: 5,
         }}
       >
-        <span style={{ color: computedColor }}>Stake</span>
+        <span style={{ color: dark ? "#ffffff" : computedColor }}>Stake</span>
         {showAi && (
           <span
             style={{

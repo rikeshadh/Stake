@@ -19,6 +19,7 @@ import {
 import { CandlestickChart } from "./Charts";
 import { RechartsStockTrend } from "./RechartsStockTrend";
 import { SetAlertModal } from "./SetAlertModal";
+import { VisualTradeHistoryTimeline } from "./VisualTradeHistoryTimeline";
 import { fetchYFinanceQuote, fetchYFinanceChart } from "../api";
 import { fmt, fmtShares, initials, formatStockPrice, formatMoney, getCurrencySymbol } from "../utils";
 
@@ -39,6 +40,7 @@ export function StockDetail({
   darkMode = false,
   onSaveAlert,
   currency = "USD",
+  orders = [],
 }) {
   const [chartType, setChartType] = useState("lines");
   const [showVolume, setShowVolume] = useState(true);

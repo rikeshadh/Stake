@@ -18,6 +18,7 @@ import {
   BellRing,
   ArrowLeft,
   Sparkles,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Logo } from "./Charts";
 
@@ -32,6 +33,8 @@ export function Navbar({
   onOpenKyc,
   onOpenSettings,
   onOpenAiInsights,
+  onOpenAlertsManager,
+  alertsCount = 0,
   onLogout,
   onExitGuest,
   kycStatus = "UNVERIFIED",
@@ -98,14 +101,14 @@ export function Navbar({
       n.category === "AGENT" ||
       n.type === "agent";
 
-    if (notifFilter === "AUTH_TRADE" || notifFilter === "TRADE") return isTrade;
-    if (notifFilter === "GUEST_ALERT" || notifFilter === "PRICE_ALERT") return isPriceAlert;
+    if (notifFilter === "TRADE") return isTrade;
+    if (notifFilter === "ALERTS") return isPriceAlert;
     if (notifFilter === "AGENT") return isAgent;
     return true;
   });
 
   return (
-    <header className="sticky top-0 z-50 bg-white/98 backdrop-blur-lg border-b border-slate-200 shadow-xs">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div
@@ -147,18 +150,40 @@ export function Navbar({
           </nav>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          {/* AI Insights Global Button */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Stake AI Copilot Button */}
           {onOpenAiInsights && (
             <button
               id="nav-ai-insights-btn"
               type="button"
               onClick={onOpenAiInsights}
               className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-              title="Open AI Insights Copilot"
+              title="Open Stake AI Copilot"
             >
-              <Sparkles size={14} className="text-amber-300" />
-              <span className="hidden sm:inline">AI Insights</span>
+              <Sparkles size={14} className="text-[#15F7A6]" />
+              <span className="hidden sm:inline">Stake AI</span>
+            </button>
+          )}
+
+          {/* Dedicated Alert Manager Drawer Trigger */}
+          {onOpenAlertsManager && (
+            <button
+              id="nav-alert-manager-btn"
+              type="button"
+              onClick={onOpenAlertsManager}
+              className="relative p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-all cursor-pointer flex items-center justify-center"
+              title="Open Price Alert Manager"
+              aria-label="Price Alert Manager"
+            >
+              <SlidersHorizontal size={16} />
+              {alertsCount > 0 && (
+                <span
+                  id="nav-alerts-active-badge"
+                  className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 bg-emerald-600 text-white font-black text-[9.5px] rounded-full flex items-center justify-center ring-2 ring-white"
+                >
+                  {alertsCount}
+                </span>
+              )}
             </button>
           )}
 
@@ -173,14 +198,14 @@ export function Navbar({
                   ? "bg-emerald-50 text-emerald-700 border-emerald-300 shadow-xs"
                   : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
               }`}
-              title="Trade & Price Watch Notifications"
+              title="Notifications & Triggers"
               aria-label="Notifications"
             >
-              <Bell size={17} />
+              <Bell size={16} />
               {unreadCount > 0 && (
                 <span
                   id="nav-notification-badge"
-                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-emerald-600 text-white font-black text-[10px] rounded-full flex items-center justify-center ring-2 ring-white animate-pulse"
+                  className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 bg-emerald-600 text-white font-black text-[9.5px] rounded-full flex items-center justify-center ring-2 ring-white animate-pulse"
                 >
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
@@ -190,8 +215,7 @@ export function Navbar({
             {notifOpen && (
               <div
                 id="nav-notification-popover"
-                className="absolute right-0 sm:right-0 top-12 w-[calc(100vw-32px)] max-w-[400px] sm:w-[400px] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-4 font-sans text-slate-900 animate-in fade-in zoom-in-95 duration-100"
-                style={{ right: "min(0px, max(-120px, calc(100vw - 380px)))" }}
+                className="stake-notification-popover absolute right-0 top-12 w-[calc(100vw-32px)] max-w-[390px] sm:w-[390px] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-4 font-sans text-slate-900 animate-in fade-in zoom-in-95 duration-100"
               >
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2">
@@ -203,7 +227,7 @@ export function Navbar({
                         Notifications
                       </h3>
                       <p className="text-[11px] text-slate-400">
-                        {unreadCount} unread alert{unreadCount === 1 ? "" : "s"}
+                        {unreadCount} unread update{unreadCount === 1 ? "" : "s"}
                       </p>
                     </div>
                   </div>
@@ -231,12 +255,12 @@ export function Navbar({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 mb-2.5 pb-2 border-b border-slate-100 overflow-x-auto">
+                <div className="stake-notification-filters flex items-center gap-1 my-2.5 pb-2 border-b border-slate-100 overflow-x-auto">
                   {[
                     { id: "ALL", label: "All" },
-                    { id: "AUTH_TRADE", label: "Auth (Trades)" },
-                    { id: "GUEST_ALERT", label: "Guest (Alerts)" },
-                    { id: "AGENT", label: "Agent AI" },
+                    { id: "TRADE", label: "Trades" },
+                    { id: "ALERTS", label: "Price Alerts" },
+                    { id: "AGENT", label: "AI Agent" },
                   ].map((f) => (
                     <button
                       key={f.id}
@@ -257,22 +281,29 @@ export function Navbar({
                   {filteredNotifs.length === 0 ? (
                     <div className="py-8 text-center text-slate-400">
                       <Bell size={24} className="mx-auto mb-1.5 text-slate-300" />
-                      <p className="text-xs font-semibold">No notifications in this tab</p>
+                      <p className="text-xs font-semibold">No notifications</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
                         Trading executions and price triggers will appear here.
                       </p>
                     </div>
                   ) : (
                     filteredNotifs.map((notif) => {
-                      const isTrade = notif.type === "TRADE";
-                      const isBuy = notif.side === "BUY";
-                      const isPriceAlert = notif.type === "PRICE_ALERT";
+                      const isTrade =
+                        notif.type === "TRADE" ||
+                        notif.category === "TRADE" ||
+                        notif.type === "buy" ||
+                        notif.type === "sell";
+                      const isBuy = notif.side === "BUY" || notif.type === "buy";
+                      const isPriceAlert =
+                        notif.type === "PRICE_ALERT" ||
+                        notif.category === "PRICE_ALERT" ||
+                        notif.type === "alert";
 
                       return (
                         <div
                           key={notif.id}
-                          className={`p-2.5 rounded-xl border transition-all text-left flex items-start gap-2.5 ${
-                            notif.read
+                          className={`stake-notification-item p-2.5 rounded-xl border transition-all text-left flex items-start gap-2.5 ${
+                            notif.read || notif.unread === false
                               ? "bg-white border-slate-100 text-slate-600"
                               : "bg-emerald-50/40 border-emerald-100 text-slate-900 font-medium"
                           }`}
@@ -305,7 +336,7 @@ export function Navbar({
                               <h4 className="text-xs font-bold text-slate-900 truncate">
                                 {notif.title}
                               </h4>
-                              {!notif.read && (
+                              {(!notif.read && notif.unread !== false) && (
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
                               )}
                             </div>
@@ -334,6 +365,21 @@ export function Navbar({
                     })
                   )}
                 </div>
+
+                {onOpenAlertsManager && (
+                  <div className="mt-3 pt-2.5 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotifOpen(false);
+                        onOpenAlertsManager();
+                      }}
+                      className="w-full py-1.5 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
+                    >
+                      <SlidersHorizontal size={13} /> Manage Active Price Alerts ({alertsCount})
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -411,6 +457,23 @@ export function Navbar({
                       </button>
 
                       <button
+                        id="profile-menu-alerts-btn"
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          if (onOpenAlertsManager) onOpenAlertsManager();
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center justify-between cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <SlidersHorizontal size={14} className="text-emerald-600" /> Price Alerts
+                        </div>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                          {alertsCount}
+                        </span>
+                      </button>
+
+                      <button
                         id="profile-menu-settings-btn"
                         type="button"
                         onClick={() => {
@@ -421,8 +484,6 @@ export function Navbar({
                       >
                         <Sliders size={14} className="text-emerald-600" /> Settings & Cluster
                       </button>
-
-                      {/* Tour button is now inside Settings modal */}
 
                       <button
                         id="profile-menu-history-btn"
@@ -564,6 +625,7 @@ export function Navbar({
 // Helper function
 function formatNotifTime(ts) {
   if (!ts) return "Just now";
+  if (typeof ts === "string" && isNaN(Number(ts))) return ts;
   const diff = Date.now() - Number(ts);
   const mins = Math.floor(diff / (1000 * 60));
   if (mins < 1) return "Just now";

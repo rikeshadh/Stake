@@ -1,4 +1,4 @@
-import { Bell, Trash2, ArrowUpRight, ArrowDownRight, Clock, Plus } from "lucide-react";
+import { Bell, Trash2, ArrowUpRight, ArrowDownRight, Clock, Plus, Zap } from "lucide-react";
 import { fmt } from "../utils";
 
 export function AlertsManager({
@@ -119,9 +119,10 @@ export function AlertsManager({
             return (
               <div
                 key={al.id}
+                className={al.triggered ? "stake-alert-triggered-pulse" : ""}
                 style={{
-                  background: bgCard,
-                  border: `1px solid ${borderCol}`,
+                  background: al.triggered ? (darkMode ? "#291d09" : "#fffbeb") : bgCard,
+                  border: al.triggered ? "1.5px solid #f59e0b" : `1px solid ${borderCol}`,
                   borderRadius: 16,
                   padding: "16px 20px",
                   display: "flex",
@@ -129,7 +130,11 @@ export function AlertsManager({
                   alignItems: "center",
                   flexWrap: "wrap",
                   gap: 14,
-                  boxShadow: darkMode ? "0 4px 12px rgba(0,0,0,0.2)" : "0 4px 12px rgba(0,0,0,0.02)",
+                  boxShadow: al.triggered
+                    ? "0 0 20px rgba(245, 158, 11, 0.25)"
+                    : darkMode
+                    ? "0 4px 12px rgba(0,0,0,0.2)"
+                    : "0 4px 12px rgba(0,0,0,0.02)",
                   transition: "all 0.15s ease",
                 }}
               >
@@ -139,13 +144,19 @@ export function AlertsManager({
                       width: 44,
                       height: 44,
                       borderRadius: 12,
-                      background: isAbove ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                      background: al.triggered
+                        ? "rgba(245, 158, 11, 0.2)"
+                        : isAbove
+                        ? "rgba(16,185,129,0.12)"
+                        : "rgba(239,68,68,0.12)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
-                    {isAbove ? (
+                    {al.triggered ? (
+                      <Zap size={22} color="#f59e0b" />
+                    ) : isAbove ? (
                       <ArrowUpRight size={22} color="#10b981" />
                     ) : (
                       <ArrowDownRight size={22} color="#ef4444" />
@@ -166,19 +177,39 @@ export function AlertsManager({
                       >
                         {al.symbol}
                       </span>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 800,
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                          background: isAbove ? (darkMode ? "#1b3a2a" : "#dcfce7") : (darkMode ? "#3b1a20" : "#fee2e2"),
-                          color: isAbove ? "#10b981" : "#ef4444",
-                          fontFamily: "'JetBrains Mono', monospace",
-                        }}
-                      >
-                        {isAbove ? "≥ ABOVE TARGET" : "≤ BELOW TARGET"}
-                      </span>
+                      {al.triggered ? (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            background: "#fef3c7",
+                            color: "#b45309",
+                            border: "1px solid #fcd34d",
+                            fontFamily: "'JetBrains Mono', monospace",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          ● TRIGGERED
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            background: isAbove ? (darkMode ? "#1b3a2a" : "#dcfce7") : (darkMode ? "#3b1a20" : "#fee2e2"),
+                            color: isAbove ? "#10b981" : "#ef4444",
+                            fontFamily: "'JetBrains Mono', monospace",
+                          }}
+                        >
+                          {isAbove ? "≥ ABOVE TARGET" : "≤ BELOW TARGET"}
+                        </span>
+                      )}
                     </div>
 
                     <div style={{ fontSize: 13, color: textPrimary, marginTop: 4, fontWeight: 700 }}>
