@@ -1915,12 +1915,6 @@ export default function App() {
           handleLogout
         }
 
-        alertsCount={
-          alerts.filter(
-            (a) =>
-              !a.triggered
-          ).length
-        }
         alerts={alerts}
         notifications={notifications}
         onAddNotification={addNotification}
@@ -1946,77 +1940,25 @@ export default function App() {
         {/* Stock Detail */}
         {selectedStock ? (
           <StockDetail
-            selected={
-              selectedStock
-            }
-
-            stockMeta={
-              selectedMeta
-            }
-
-            stockData={
-              stocks[
-                selectedStock
-              ] || {
-                price:
-                  selectedMeta.price,
-              }
-            }
-
-            holdings={
-              holdings
-            }
-
-            cashBalance={
-              cash
-            }
-
-            watchlist={
-              watchlist
-            }
-
-            onToggleWatch={
-              toggleWatchlist
-            }
-
-            onBack={() =>
-              setSelectedStock(
-                null
-              )
-            }
-
-            onOpenOrderDesk={(
-              mode
-            ) => {
-              setOrderDeskMode(
-                mode
-              );
-
-              setOrderDeskOpen(
-                true
-              );
-            }}
-
-            dayChange={
-              dayChange
-            }
-
-            darkMode={
-              false
-            }
-
-            onSaveAlert={
-              handleSaveAlert
-            }
-
-            currency={
-              currency
-            }
-
-            orders={
-              orders
-            }
-          />
+  selected={selectedStock}
+  stockMeta={selectedMeta}
+  stockData={stocks[selectedStock] || { price: selectedMeta.price }}
+  holdings={holdings}
+  cashBalance={cash}
+  watchlist={watchlist}
+  onToggleWatch={toggleWatchlist}
+  onBack={() => setSelectedStock(null)}
+  onOpenOrderDesk={(mode) => {
+    setOrderDeskMode(mode);
+    setOrderDeskOpen(true);
+  }}
+  dayChange={dayChange}
+  darkMode={false}
+  onSaveAlert={handleSaveAlert}
+  currency={currency}
+  orders={orders}
+  alerts={alerts}   // <-- add this line
+/>
         ) : (
           <>
             {/* KYC */}

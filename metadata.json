@@ -1,6 +1,6 @@
 {
   "name": "Stake",
-  "description": "Stake Equities & International Stock Exchange Trading Platform",
+  "description": "International Stock Exchange Trading Platform",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

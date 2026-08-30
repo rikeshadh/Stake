@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Activity,
   ArrowUpRight,
-  Bot,
   Check,
   CircleDollarSign,
   Clock3,

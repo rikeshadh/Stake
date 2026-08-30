@@ -79,13 +79,7 @@ export function GeminiStrategySidebar({
               <h3 className="text-sm font-extrabold text-slate-900 m-0">
                 Stake AI
               </h3>
-              <span className="text-[9.5px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Split Screen
-              </span>
             </div>
-            <p className="text-[11px] text-slate-500 m-0">
-              Live stock intelligence & trade assistant
-            </p>
           </div>
         </div>
 
@@ -117,7 +111,7 @@ export function GeminiStrategySidebar({
               </div>
               <div className="text-sm font-extrabold text-slate-900">Your Stake AI copilot</div>
               <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
-                Ask about a company, your portfolio, or the market. Stake AI gives you a clear starting point—you decide what happens next.
+                Ask about a company, your portfolio, or the market.
               </p>
             </div>
           ) : (
@@ -170,7 +164,7 @@ export function GeminiStrategySidebar({
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Ask Stake AI anything..."
+              placeholder="Ask Stake AI"
               disabled={sending}
               className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-emerald-500"
             />

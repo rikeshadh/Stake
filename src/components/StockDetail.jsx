@@ -19,7 +19,6 @@ import {
 import { CandlestickChart } from "./Charts";
 import { RechartsStockTrend } from "./RechartsStockTrend";
 import { SetAlertModal } from "./SetAlertModal";
-import { VisualTradeHistoryTimeline } from "./VisualTradeHistoryTimeline";
 import { fetchYFinanceQuote, fetchYFinanceChart } from "../api";
 import { fmt, fmtShares, initials, formatStockPrice, formatMoney, getCurrencySymbol } from "../utils";
 
@@ -41,6 +40,7 @@ export function StockDetail({
   onSaveAlert,
   currency = "USD",
   orders = [],
+  alerts = [], // <-- NEW: accept alerts prop
 }) {
   const [chartType, setChartType] = useState("lines");
   const [showVolume, setShowVolume] = useState(true);
@@ -117,6 +117,8 @@ export function StockDetail({
   if (!selected || !stockData || !stockMeta) return null;
 
   const isWatched = watchlist.includes(selected);
+  // NEW: check if there is any active alert for this stock
+  const hasActiveAlert = alerts.some((alert) => alert.symbol === selected);
   const currentPrice = liveQuote?.price || stockData.price;
   const chg = liveQuote?.changePercent ? liveQuote.changePercent / 100 : dayChange(selected);
   const isUp = chg >= 0;
@@ -157,27 +159,37 @@ export function StockDetail({
         </button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* Set Alert Button */}
-          <button
-            onClick={() => setIsAlertModalOpen(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              background: darkMode ? "rgba(16,185,129,0.15)" : "#f0fdf4",
-              border: `1px solid ${darkMode ? "rgba(16,185,129,0.3)" : "#bbf7d0"}`,
-              color: "#10b981",
-              fontSize: 13,
-              fontWeight: 800,
-              padding: "8px 14px",
-              borderRadius: 10,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <Bell size={15} /> Set Alert
-          </button>
-
+          {/* Set Alert Button - Neutral when inactive, amber when active */}
+<button
+  onClick={() => setIsAlertModalOpen(true)}
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    background: hasActiveAlert
+      ? darkMode
+        ? "rgba(245,158,11,0.2)"   // amber tint dark
+        : "rgba(245,158,11,0.1)"    // amber tint light
+      : darkMode
+        ? "#1a2236"                 // same neutral as watch button dark
+        : "rgba(0,0,0,0.04)",       // same neutral as watch button light
+    border: `1px solid ${hasActiveAlert ? "#f59e0b" : borderCol}`,
+    color: hasActiveAlert ? "#f59e0b" : textSecondary,
+    fontSize: 13,
+    fontWeight: 800,
+    padding: "8px 14px",
+    borderRadius: 10,
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+  }}
+>
+  <Bell
+    size={15}
+    fill={hasActiveAlert ? "#f59e0b" : "none"}
+    color={hasActiveAlert ? "#f59e0b" : textSecondary}
+  />
+  {hasActiveAlert ? "Alert Active" : "Set Alert"}
+</button>
           {/* Watchlist Star Toggle */}
           <button
             onClick={() => onToggleWatch(selected)}
@@ -384,14 +396,6 @@ export function StockDetail({
           )}
         </div>
       </div>
-
-      <VisualTradeHistoryTimeline
-        orders={orders}
-        ticker={selected}
-        currentPrice={currentPrice}
-        onOpenOrderDesk={onOpenOrderDesk}
-        darkMode={darkMode}
-      />
 
       {/* 2. ACTIONS & POSITION SECTION */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 20, marginBottom: 24 }}>

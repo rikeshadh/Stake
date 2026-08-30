@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ArrowRight,
   Zap,
@@ -9,12 +9,12 @@ import {
   Shield,
   HelpCircle,
   X,
-  Plus,
-  Minus,
+  ChevronUp,
   FileText,
   Scale,
   AlertTriangle,
   MessageCircle,
+  Activity,
 } from "lucide-react";
 import { Logo, MarketMainChart } from "./Charts";
 import { AgenticShowcaseCards } from "./AgenticShowcaseCards";
@@ -33,88 +33,283 @@ const FALLBACK_STOCKS = [
   { ticker: "AMD", name: "Advanced Micro Devices", price: 154.20, change: -1.15, sector: "Semiconductors", volume: "38.7M" },
 ];
 
-function FaqItem({ q, a }) {
-  const [isOpen, setIsOpen] = useState(false);
+/* Percentages arrive from several upstream shapes, some with long float tails.
+   Normalise to two decimals so the tables and chips never overflow. */
+function pct(n) {
+  const v = Number(n);
+  if (!isFinite(v)) return "0.00";
+  return v.toFixed(2);
+}
+
+const REDUCE_QUERY = "(prefers-reduced-motion: reduce)";
+
+function useReducedMotion() {
+  /* Read the preference on mount, then keep listening — the user can flip it
+     from the OS while the page is open. */
+  const [reduced, setReduced] = useState(
+    () => typeof window !== "undefined" && window.matchMedia?.(REDUCE_QUERY).matches === true
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia?.(REDUCE_QUERY);
+    if (!mq) return;
+    const onChange = (e) => setReduced(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  return reduced;
+}
+
+/* Reveals its children once, the first time they scroll into view. */
+function Reveal({ children, delay = 0, as: Tag = "div", className = "", ...rest }) {
+  const ref = useRef(null);
+  /* No IntersectionObserver means no reveal to schedule, so start visible. */
+  const [shown, setShown] = useState(() => typeof IntersectionObserver === "undefined");
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShown(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -60px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <div
-      style={{
-        border: "1px solid #e2e8f0",
-        borderRadius: 14,
-        overflow: "hidden",
-        background: isOpen ? "#f8fafc" : "#ffffff",
-        transition: "all 0.15s ease",
-      }}
+    <Tag
+      ref={ref}
+      className={`stake-reveal ${shown ? "is-visible" : ""} ${className}`.trim()}
+      style={{ "--i": delay }}
+      {...rest}
     >
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          width: "100%",
-          padding: "16px 18px",
-          background: "none",
-          border: "none",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          cursor: "pointer",
-          fontSize: 14.5,
-          fontWeight: 700,
-          color: "#191c1e",
-          textAlign: "left",
-          gap: 8,
-          fontFamily: "var(--font-body)",
-        }}
-      >
-        <span>{q}</span>
-        <span style={{ color: "#00E599", flexShrink: 0 }}>
-          {isOpen ? <Minus size={16} /> : <Plus size={16} />}
-        </span>
-      </button>
-      {isOpen && (
-        <div style={{ padding: "0 18px 16px", fontSize: 13.5, color: "#475569", lineHeight: 1.6, fontFamily: "var(--font-body)" }}>
-          {a}
+      {children}
+    </Tag>
+  );
+}
+
+/* =============================================================================
+   SIGNATURE ELEMENT — live order book.
+   This is what a trader actually watches, so it doubles as the product demo:
+   resting size is drawn as a depth bar behind each level, and the most recent
+   fill prints along the bottom. Pauses when the tab is hidden, and freezes
+   entirely under reduced motion.
+   ============================================================================= */
+function useOrderBook(basePrice, paused) {
+  const seed = Number(basePrice) > 0 ? Number(basePrice) : 138.25;
+
+  const build = useCallback((mid) => {
+    const tick = mid > 200 ? 0.05 : 0.02;
+    const rows = (side) =>
+      Array.from({ length: 3 }, (_, i) => {
+        const level = i + 1;
+        return {
+          px: side === "ask" ? mid + tick * level : mid - tick * level,
+          size: Math.round(240 + Math.random() * 1500),
+          orders: Math.round(3 + Math.random() * 22),
+        };
+      });
+    return { asks: rows("ask").reverse(), bids: rows("bid") };
+  }, []);
+
+  const [book, setBook] = useState(() => build(seed));
+  const [last, setLast] = useState(() => ({ px: seed, dir: "up", n: 0 }));
+  const [print, setPrint] = useState(() => ({ time: "", px: seed, size: 400, dir: "up" }));
+
+  /* The running price lives in a ref so a tick can read it synchronously —
+     nesting setState calls inside an updater would make the updater impure. */
+  const pxRef = useRef(seed);
+
+  useEffect(() => {
+    if (paused) return;
+
+    /* When a fresh quote arrives the book snaps to it on the next tick rather
+       than in the effect body, which would cascade a render. */
+    let resync = true;
+
+    const step = () => {
+      if (document.hidden) return;
+
+      const prev = pxRef.current;
+      let next;
+      if (resync) {
+        resync = false;
+        next = seed;
+      } else {
+        const drift = (Math.random() - 0.47) * (seed > 200 ? 0.16 : 0.07);
+        next = Math.max(seed * 0.985, Math.min(seed * 1.015, prev + drift));
+      }
+      const dir = next >= prev ? "up" : "down";
+      pxRef.current = next;
+
+      setBook(build(next));
+      setLast((p) => ({ px: next, dir, n: p.n + 1 }));
+      setPrint({
+        time: new Date().toLocaleTimeString("en-US", { hour12: false }),
+        px: next,
+        size: Math.round(1 + Math.random() * 18) * 100,
+        dir,
+      });
+    };
+
+    const timer = setInterval(step, 1600);
+    return () => clearInterval(timer);
+  }, [paused, seed, build]);
+
+  const bestAsk = book.asks[book.asks.length - 1]?.px ?? seed;
+  const bestBid = book.bids[0]?.px ?? seed;
+  const maxSize = Math.max(...book.asks.map((r) => r.size), ...book.bids.map((r) => r.size), 1);
+
+  return { book, last, print, spread: bestAsk - bestBid, maxSize };
+}
+
+function OrderBookPanel({ stock, reduced }) {
+  const { book, last, print, spread, maxSize } = useOrderBook(stock?.price, reduced);
+
+  const row = (r, side, i) => (
+    <div
+      key={`${side}-${i}`}
+      className={`stake-book-row ${side}`}
+      style={{ "--d": `${Math.round((r.size / maxSize) * 100)}%`, "--i": i }}
+    >
+      <span className="stake-book-px">{r.px.toFixed(2)}</span>
+      <span className="stake-book-sz">{r.size.toLocaleString("en-US")}</span>
+      <span className="stake-book-mkt">{r.orders} ord</span>
+    </div>
+  );
+
+  return (
+    <div className="stake-book-stack">
+      <div className="stake-panel">
+        <div className="stake-panel-head">
+          <span>
+            Order book · <strong>{stock?.ticker || "NVDA"}</strong>
+          </span>
+          <span className="stake-live">
+            <span className="stake-live-dot" aria-hidden="true" />
+            Level 2
+          </span>
         </div>
-      )}
+
+        <div className="stake-book-rows">{book.asks.map((r, i) => row(r, "ask", i))}</div>
+
+        <div className="stake-book-spread">
+          <span>Spread {spread.toFixed(2)}</span>
+          <span key={last.n} className={`stake-book-last stake-num tick-${last.dir}`}>
+            {last.px.toFixed(2)}
+          </span>
+        </div>
+
+        <div className="stake-book-rows">{book.bids.map((r, i) => row(r, "bid", i))}</div>
+
+        <div className="stake-book-foot">
+          <span>Last print</span>
+          <span key={last.n} className={`stake-book-print ${print.dir}`}>
+            {print.time || "--:--:--"} · {print.px.toFixed(2)} ×{" "}
+            {print.size.toLocaleString("en-US")}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
 
-export function LandingPage({
-  onOpenLogin,
-  onOpenSignup,
-  onOpenAuth,
-}) {
+function FaqItem({ q, a, id }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className={`stake-faq-item ${isOpen ? "is-open" : ""}`}>
+      <button
+        type="button"
+        className="stake-faq-q"
+        aria-expanded={isOpen}
+        aria-controls={`faq-panel-${id}`}
+        onClick={() => setIsOpen((v) => !v)}
+      >
+        <span>{q}</span>
+        <span className="stake-faq-icon" aria-hidden="true">
+          {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </span>
+      </button>
+      <div className="stake-faq-a" id={`faq-panel-${id}`} role="region" hidden={!isOpen}>
+        <div>
+          <p>{a}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function LandingPage({ onOpenLogin, onOpenSignup, onOpenAuth }) {
   const [activeModal, setActiveModal] = useState(null);
   const [liveStocks, setLiveStocks] = useState(FALLBACK_STOCKS);
+  const [index, setIndex] = useState({ val: 5964.8, chg: 84.2, pct: 1.43 });
+  const reduced = useReducedMotion();
+  const closeRef = useRef(null);
+  const lastFocused = useRef(null);
 
-  // Fetch real-time stock data from API
+  /* Live quotes. Skips the request while the tab is hidden so a backgrounded
+     landing page stops polling the API. */
   useEffect(() => {
     let isMounted = true;
+
     const loadStocks = async () => {
+      if (document.hidden) return;
       try {
         const data = await fetchStocks();
-        if (isMounted && data && Array.isArray(data) && data.length > 0) {
-          const formatted = data.map((s) => ({
+        if (!isMounted || !Array.isArray(data) || data.length === 0) return;
+        setLiveStocks(
+          data.map((s) => ({
             ticker: s.ticker || s.symbol,
             name: s.name || s.companyName || s.ticker,
             price: Number(s.price || s.ltp || s.currentPrice || 100),
-            change: Number(s.change || s.changePercent || (s.price && s.prevClose ? (((s.price - s.prevClose) / s.prevClose) * 100).toFixed(2) : 1.25)),
+            change: Number(
+              s.change ??
+                s.changePercent ??
+                (s.price && s.prevClose ? ((s.price - s.prevClose) / s.prevClose) * 100 : 1.25)
+            ),
             sector: s.sector || "Equities",
-            volume: s.volume ? (typeof s.volume === "number" ? `${(s.volume / 1e6).toFixed(1)}M` : s.volume) : "24.5M",
-          }));
-          setLiveStocks(formatted);
-        }
+            volume: s.volume
+              ? typeof s.volume === "number"
+                ? `${(s.volume / 1e6).toFixed(1)}M`
+                : s.volume
+              : "24.5M",
+          }))
+        );
       } catch (err) {
         console.warn("Could not pull live landing stocks:", err);
       }
     };
 
     loadStocks();
-    const interval = setInterval(loadStocks, 15000); // Polling every 15s for live updates
+    const interval = setInterval(loadStocks, 15000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
   }, []);
+
+  /* The benchmark ticks rather than counting up: a quote that animates from zero
+     would read as decoration, whereas drift reads as a live feed. */
+  useEffect(() => {
+    if (reduced) return;
+    const t = setInterval(() => {
+      if (document.hidden) return;
+      setIndex((p) => {
+        const val = p.val + (Math.random() - 0.48) * 1.9;
+        const chg = val - 5880.6;
+        return { val, chg, pct: (chg / 5880.6) * 100 };
+      });
+    }, 2400);
+    return () => clearInterval(t);
+  }, [reduced]);
 
   const handleOpenLogin = () => {
     if (onOpenLogin) onOpenLogin();
@@ -126,204 +321,177 @@ export function LandingPage({
     else if (onOpenAuth) onOpenAuth("signup");
   };
 
-  const handleEnter = () => {
-    if (onOpenSignup) onOpenSignup();
-    else if (onOpenAuth) onOpenAuth("signup");
-    else if (onOpenLogin) onOpenLogin();
+  const handleEnter = handleOpenSignup;
+
+  const scrollTo = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
   };
 
+  /* Modal: close on Escape, lock the page behind it, and return focus on exit. */
+  useEffect(() => {
+    if (!activeModal) return;
+    lastFocused.current = document.activeElement;
+    const onKey = (e) => {
+      if (e.key === "Escape") setActiveModal(null);
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      if (lastFocused.current instanceof HTMLElement) lastFocused.current.focus();
+    };
+  }, [activeModal]);
+
   const privacyContent = `
-    <p><strong>Effective Date:</strong> January 1, 2026</p>
-    <p>At Stake Global Inc., we are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our trading platform.</p>
-    
-    <h4>Information We Collect</h4>
-    <p>We collect personal information you provide directly to us, such as when you create an account, deposit funds, or contact support. This may include your name, email address, phone number, financial information, and government-issued identification.</p>
-    
-    <h4>How We Use Your Information</h4>
-    <p>We use the information we collect to:</p>
+    <p><strong>Effective date:</strong> January 1, 2026</p>
+    <p>Stake Global Inc. collects only what it needs to run your account. This policy explains what we hold, why we hold it, and the choices you have.</p>
+    <h4>What we collect</h4>
+    <p>Information you give us when you open an account, fund it, or contact the desk: your name, email address, phone number, financial details, and government-issued identification.</p>
+    <h4>How we use it</h4>
     <ul>
-      <li>Provide, maintain, and improve our trading services</li>
-      <li>Process transactions and send related information</li>
-      <li>Send promotional communications (with your consent)</li>
-      <li>Monitor and analyze trends, usage, and activities</li>
-      <li>Detect, investigate, and prevent fraudulent transactions</li>
-      <li>Comply with legal obligations</li>
+      <li>Run and improve the trading platform</li>
+      <li>Settle transactions and send you the records</li>
+      <li>Send product email, only if you opt in</li>
+      <li>Detect and stop fraudulent activity</li>
+      <li>Meet our regulatory obligations</li>
     </ul>
-    
-    <h4>Information Sharing</h4>
-    <p>We do not sell your personal information. We may share your information with service providers, regulatory authorities, and in connection with business transfers.</p>
-    
-    <h4>Data Security</h4>
-    <p>We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.</p>
-    
-    <h4>Your Rights</h4>
-    <p>You have the right to access, correct, or delete your personal information. You may also opt-out of promotional communications at any time.</p>
-    
-    <h4>Contact Us</h4>
-    <p>If you have questions about this Privacy Policy, please contact us at privacy@stakeglobal.com</p>
+    <h4>Who sees it</h4>
+    <p>We do not sell personal information. We share it with service providers who help us operate, with regulators when required, and with an acquirer if the business transfers.</p>
+    <h4>How we protect it</h4>
+    <p>Data is encrypted in transit and at rest, and access is limited to staff who need it to do their job.</p>
+    <h4>Your choices</h4>
+    <p>You can access, correct, export, or delete your personal information, and unsubscribe from product email at any time.</p>
+    <h4>Reach us</h4>
+    <p>Email privacy@stakeglobal.com and we will respond within 30 days.</p>
   `;
 
   const termsContent = `
-    <p><strong>Effective Date:</strong> January 1, 2026</p>
-    <p>These Terms of Service govern your access to and use of the Stake Global Inc. trading platform and services.</p>
-    
-    <h4>Acceptance of Terms</h4>
-    <p>By accessing or using our platform, you agree to be bound by these Terms of Service and all applicable laws and regulations.</p>
-    
-    <h4>Eligibility</h4>
-    <p>You must be at least 18 years old and have the legal capacity to enter into binding contracts to use our services.</p>
-    
-    <h4>Account Responsibilities</h4>
-    <p>You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.</p>
-    
-    <h4>Trading Risks</h4>
-    <p>Equities trading involves substantial risk of loss and is not suitable for every investor. You acknowledge that you trade at your own risk.</p>
-    
-    <h4>Fees and Commissions</h4>
-    <p>While we offer zero-commission trading, certain fees may apply for specific services. Current fee schedules are available on our website.</p>
-    
-    <h4>Prohibited Conduct</h4>
-    <p>You agree not to engage in market manipulation, fraudulent activities, or any conduct that violates applicable laws or regulations.</p>
-    
-    <h4>Termination</h4>
-    <p>We reserve the right to suspend or terminate your account at our discretion for violation of these terms or suspicious activity.</p>
-    
-    <h4>Limitation of Liability</h4>
-    <p>Stake Global Inc. shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of our services.</p>
+    <p><strong>Effective date:</strong> January 1, 2026</p>
+    <p>These terms govern your use of the Stake Global Inc. platform. Opening an account means you accept them.</p>
+    <h4>Who can open an account</h4>
+    <p>You must be 18 or older and able to enter binding contracts where you live.</p>
+    <h4>Your account</h4>
+    <p>Keep your credentials private. Activity under your account is treated as yours, so tell us immediately if you suspect someone else has access.</p>
+    <h4>Trading risk</h4>
+    <p>Equities trading carries a substantial risk of loss and is not suitable for every investor. You trade at your own risk and remain responsible for every order you or your agents place.</p>
+    <h4>Fees</h4>
+    <p>Equities trades carry no commission. Some services — wire transfers, paper statements, regulatory pass-through charges — do carry a fee. The current schedule is published on our site.</p>
+    <h4>What you may not do</h4>
+    <p>No market manipulation, no fraudulent activity, and nothing that breaks the law or exchange rules.</p>
+    <h4>Ending the relationship</h4>
+    <p>You can close your account at any time. We may suspend or close an account for a breach of these terms or for activity we are required to escalate.</p>
+    <h4>Limits on our liability</h4>
+    <p>We are not liable for indirect, incidental, special, consequential, or punitive damages arising from your use of the platform.</p>
   `;
 
   const risksContent = `
-    <p><strong>Last Updated:</strong> January 1, 2026</p>
-    <p>Investing in securities involves significant risks. Before trading, please carefully consider the following risk disclosures:</p>
-    
-    <h4>Market Risk</h4>
-    <p>The value of your investments may fluctuate due to market conditions, economic factors, and company-specific events. You may lose part or all of your invested capital.</p>
-    
-    <h4>Liquidity Risk</h4>
-    <p>Certain securities may be difficult to sell quickly at a fair price, especially during periods of market volatility.</p>
-    
-    <h4>Volatility Risk</h4>
-    <p>Stock prices can be highly volatile. Rapid price movements may result in significant losses, particularly when using leverage or trading on margin.</p>
-    
-    <h4>AI Trading Risk</h4>
-    <p>Autonomous AI trading agents operate based on algorithms and quantitative historical data. Past performance does not guarantee future results, and AI strategies may underperform in certain market regimes.</p>
-    
-    <h4>No Investment Advice</h4>
-    <p>Stake Global Inc. does not provide investment advice. All trading decisions are made by you at your own discretion and risk.</p>
+    <p><strong>Last updated:</strong> January 1, 2026</p>
+    <p>Read this before you place your first order. Every item below can cost you money.</p>
+    <h4>Market risk</h4>
+    <p>Prices move with market conditions, the economy, and company news. You can lose part or all of the capital you commit.</p>
+    <h4>Liquidity risk</h4>
+    <p>Some securities are hard to sell quickly at a fair price, and spreads widen fastest exactly when you most want out.</p>
+    <h4>Volatility risk</h4>
+    <p>Prices can move sharply in seconds. Rapid moves produce outsized losses, especially on margin.</p>
+    <h4>Automated trading risk</h4>
+    <p>Autonomous agents act on algorithms and historical data. Past performance does not predict future results, and a strategy that worked in one market regime can fail in the next. Limits and stop-losses reduce exposure but cannot eliminate it.</p>
+    <h4>We do not advise</h4>
+    <p>Stake Global Inc. does not give investment advice. Every decision on this platform is yours.</p>
   `;
 
   const supportContent = `
-    <h4>Contact Our Support Team</h4>
-    <p>Our dedicated support team is available 24/5 to assist you with any questions or concerns.</p>
-    
-    <h4>Support Channels</h4>
+    <h4>Reach the desk</h4>
+    <p>Support is staffed 24 hours a day, five days a week, tracking the US market week.</p>
+    <h4>Channels</h4>
     <ul>
-      <li><strong>Email:</strong> support@stakeglobal.com</li>
-      <li><strong>Live Chat:</strong> Available directly within the trading terminal</li>
-      <li><strong>Help Center:</strong> Comprehensive documentation and interactive tours</li>
+      <li><strong>Email</strong> — support@stakeglobal.com</li>
+      <li><strong>Live chat</strong> — in the trading terminal, bottom right</li>
+      <li><strong>Help centre</strong> — documentation and guided tours</li>
     </ul>
-    
-    <h4>Response Times</h4>
-    <p>We strive to respond to all inquiries within 2 hours during market hours and within 24 hours on weekends.</p>
+    <h4>When to expect a reply</h4>
+    <p>Within two hours during market hours, within 24 hours at weekends. Anything touching an open position is escalated first.</p>
   `;
 
   const modalConfig = {
     faq: {
-      icon: <HelpCircle size={20} color="#00E599" />,
-      title: "Frequently Asked Questions",
-      subtitle: "HELP & ANSWERS",
+      icon: <HelpCircle size={20} color="var(--mint-text)" />,
+      title: "Common questions",
+      subtitle: "Help",
       content: (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="stake-faq">
           {[
             {
-              q: "What is Stake AI Equities Platform?",
-              a: "Stake AI is a high-speed equities trading terminal equipped with autonomous AI trading intelligence, real-time Level 2 market depth, fast order execution, and integrated cash wallet clearing.",
+              q: "What is Stake?",
+              a: "A US equities trading terminal with Level 2 market depth, fast order routing, an integrated cash wallet, and an optional autonomous trading agent.",
             },
             {
-              q: "How does the Autonomous Stake AI Agent work?",
-              a: "The Stake AI Trading Agent continuously scans order flow and market price anomalies. You can select custom quantitative strategies (such as Dip Buyer, Momentum Breakout, or Value DCA), set capital deployment limits, and activate or pause autonomous executions in real time.",
+              q: "How does the autonomous agent work?",
+              a: "The agent watches order flow and price anomalies against a strategy you pick — Dip Buyer, Momentum Breakout, or Value DCA. You set the capital limit and can pause it mid-session; it never exceeds the allocation you give it.",
             },
             {
-              q: "How do I deposit or deploy capital?",
-              a: "You can deposit instant collateral using the unified wallet, deploy custom capital allocation pools into Stake AI strategies, and manage positions with full transparency and safety rollbacks.",
+              q: "How do I add funds?",
+              a: "Deposit through the unified wallet, then assign a capital pool to any agent strategy. Allocations, positions, and the full ledger stay visible in one place.",
             },
             {
-              q: "Is Stake AI compatible with mobile and desktop?",
-              a: "Yes! Stake AI features a responsive, desktop-first and mobile-optimized interface with smooth interactive charts, quick order execution, and live tickers.",
+              q: "Does it work on mobile?",
+              a: "Yes. The terminal is responsive down to phone widths, with the same charts, order entry, and live quotes as the desktop layout.",
             },
           ].map((f, i) => (
-            <FaqItem key={i} q={f.q} a={f.a} />
+            <FaqItem key={i} id={i} q={f.q} a={f.a} />
           ))}
         </div>
       ),
     },
     privacy: {
-      icon: <FileText size={20} color="#00E599" />,
-      title: "Privacy Policy",
-      subtitle: "LEGAL",
-      content: (
-        <div
-          style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.7, fontFamily: "var(--font-body)" }}
-          dangerouslySetInnerHTML={{ __html: privacyContent }}
-        />
-      ),
+      icon: <FileText size={20} color="var(--mint-text)" />,
+      title: "Privacy policy",
+      subtitle: "Legal",
+      content: <div dangerouslySetInnerHTML={{ __html: privacyContent }} />,
     },
     terms: {
-      icon: <Scale size={20} color="#00E599" />,
-      title: "Terms of Service",
-      subtitle: "LEGAL",
-      content: (
-        <div
-          style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.7, fontFamily: "var(--font-body)" }}
-          dangerouslySetInnerHTML={{ __html: termsContent }}
-        />
-      ),
+      icon: <Scale size={20} color="var(--mint-text)" />,
+      title: "Terms of service",
+      subtitle: "Legal",
+      content: <div dangerouslySetInnerHTML={{ __html: termsContent }} />,
     },
     risks: {
-      icon: <AlertTriangle size={20} color="#00E599" />,
-      title: "Risk Disclosures",
-      subtitle: "IMPORTANT",
-      content: (
-        <div
-          style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.7, fontFamily: "var(--font-body)" }}
-          dangerouslySetInnerHTML={{ __html: risksContent }}
-        />
-      ),
+      icon: <AlertTriangle size={20} color="var(--mint-text)" />,
+      title: "Risk disclosures",
+      subtitle: "Important",
+      content: <div dangerouslySetInnerHTML={{ __html: risksContent }} />,
     },
     support: {
-      icon: <MessageCircle size={20} color="#00E599" />,
-      title: "Support & Assistance",
-      subtitle: "HELP CENTER",
-      content: (
-        <div
-          style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.7, fontFamily: "var(--font-body)" }}
-          dangerouslySetInnerHTML={{ __html: supportContent }}
-        />
-      ),
+      icon: <MessageCircle size={20} color="var(--mint-text)" />,
+      title: "Support",
+      subtitle: "Help centre",
+      content: <div dangerouslySetInnerHTML={{ __html: supportContent }} />,
     },
   };
 
   const currentModal = activeModal ? modalConfig[activeModal] : null;
+  const heroStock = liveStocks[0] || FALLBACK_STOCKS[0];
 
   return (
     <div className="stake-landing-root">
-      {/* =========================================================================
-          HERO SECTION - #15F7A6 Green Animated Cyber Field
-          ========================================================================= */}
+      {/* ===================================================================
+          HERO — argument on the left, live market microstructure on the right
+          =================================================================== */}
       <section className="stake-hero-section">
-        {/* Top Navbar */}
         <header className="stake-landing-nav">
-          {/* Logo */}
-          <div
+          <button
             id="landing-logo"
-            style={{ cursor: "pointer", display: "flex", alignItems: "center" }}
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            type="button"
+            className="stake-nav-mark"
+            onClick={() => window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" })}
             title="Stake Global Equities"
           >
-            <Logo size={32} textSize={20} dark={true} />
-          </div>
+            <Logo size={32} textSize={20} dark />
+          </button>
 
-          {/* Action Buttons */}
           <div className="stake-landing-nav-actions">
             <button
               id="landing-header-login-btn"
@@ -331,339 +499,221 @@ export function LandingPage({
               onClick={handleOpenLogin}
               className="stake-glass-button stake-glass-button-quiet"
             >
-              Log In
+              Log in
             </button>
-
             <button
               id="landing-header-signup-btn"
               type="button"
               onClick={handleOpenSignup}
               className="stake-glass-button stake-glass-button-primary"
             >
-              Get Started <ArrowRight size={15} />
+              Get started <ArrowRight size={15} />
             </button>
           </div>
         </header>
 
-        {/* Brand New Green Animated Cyber Beams */}
-        <div className="stake-hero-bg-animation">
-          <div className="stake-hero-energy-beam beam-1" />
-          <div className="stake-hero-energy-beam beam-2" />
-          <div className="stake-hero-energy-beam beam-3" />
-          <div className="stake-hero-energy-beam beam-4" />
-        </div>
+        <div className="stake-hero-grid">
+          <div className="stake-hero-copy">
+            <h1 className="stake-hero-title">
+              <span className="stake-line">Invest with precision.</span>
+              <span className="stake-line">
+                <em>Equities powered by AI.</em>
+              </span>
+            </h1>
 
-        {/* Brand New Green Animated Radar Nodes */}
-        <div className="stake-hero-radar-nodes">
-          <div className="stake-radar-circle radar-1" />
-          <div className="stake-radar-circle radar-2" />
-          <div className="stake-radar-circle radar-3" />
-        </div>
+            <p className="stake-hero-subtitle">
+              Trade US equities on live order flow with zero commission — or hand the desk to an
+              autonomous agent that works your strategy while the market moves.
+            </p>
 
-        {/* Center Hero Content */}
-        <div className="stake-hero-center">
-
-          <h1 className="stake-hero-title">
-            Invest with precision.<br />
-            <em>Equities powered by AI.</em>
-          </h1>
-
-          <p className="stake-hero-subtitle">
-            Trade US equities with real-time order flow and zero commissions, or deploy the autonomous Stake AI agent to continuously navigate market opportunities.
-          </p>
-
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
-            <button
-              id="hero-start-trading-btn"
-              className="stake-btn-mint"
-              onClick={handleOpenLogin}
-            >
-              Start Trading Now <ArrowRight size={18} />
-            </button>
+            <div className="stake-hero-actions">
+              <button id="hero-start-trading-btn" className="stake-btn-mint" onClick={handleOpenSignup}>
+                Start trading <ArrowRight size={18} />
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Bottom subtle indicator */}
-        <div style={{ textAlign: "center", zIndex: 10, paddingBottom: 16 }}>
-          <button
-            id="landing-scroll-explore-btn"
-            onClick={() => {
-              const el = document.getElementById("live-terminal");
-              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#94a3b8",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              transition: "color 0.2s ease",
-              fontFamily: "var(--font-body)",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#00E599")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
-          >
-            <span>Scroll for live markets</span>
-            <ChevronDown size={15} />
-          </button>
+          <OrderBookPanel stock={heroStock} reduced={reduced} />
         </div>
       </section>
 
-      {/* =========================================================================
-          CONTENT SECTION
-          ========================================================================= */}
+      {/* =================================================================== */}
       <div className="stake-content-section">
-        {/* Interactive Live Terminal Card Mockup */}
-        <section id="live-terminal" style={{ maxWidth: 1240, margin: "0 auto", padding: "56px 24px 40px", scrollMarginTop: "20px" }}>
-          <div
-            style={{
-              background: "#04140b",
-              borderRadius: 24,
-              border: "1px solid rgba(0, 229, 153, 0.25)",
-              boxShadow: "0 24px 70px rgba(0,0,0,0.45), 0 0 30px rgba(0, 229, 153, 0.08)",
-              overflow: "hidden",
-              color: "#ffffff",
-            }}
-          >
-            {/* Terminal Window Bar */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "16px 28px",
-                background: "rgba(0,0,0,0.5)",
-                borderBottom: "1px solid rgba(255,255,255,0.08)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f56" }} />
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ffbd2e" }} />
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#00E599" }} />
-                <span style={{ fontSize: 12.5, fontWeight: 800, color: "#94a3b8", marginLeft: 14, letterSpacing: "0.08em", fontFamily: "var(--font-mono)" }}>
-                  STAKE TERMINAL • LIVE FEED
+        {/* The proof figures open the white page rather than crowding the hero. */}
+        <dl className="stake-proof-strip">
+          {[
+            ["$0.00", "Commission per trade"],
+            ["T+1", "Settlement cycle"],
+            ["24/5", "Desk coverage"],
+            ["Level 2", "Depth included"],
+          ].map(([val, key]) => (
+            <div className="stake-proof-item" key={key}>
+              <dt className="stake-proof-val">{val}</dt>
+              <dd className="stake-proof-key">{key}</dd>
+            </div>
+          ))}
+        </dl>
+        {/* Terminal snapshot */}
+        <section id="live-terminal" className="stake-section" style={{ scrollMarginTop: 20 }}>
+          <Reveal className="stake-term">
+            <div className="stake-term-bar">
+              <span style={{ display: "flex", alignItems: "center" }}>
+                <span className="stake-term-dots" aria-hidden="true">
+                  <span className="stake-term-dot" style={{ background: "#ff5f56" }} />
+                  <span className="stake-term-dot" style={{ background: "#ffbd2e" }} />
+                  <span className="stake-term-dot" style={{ background: "#00E599" }} />
                 </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#00E599", fontFamily: "var(--font-mono)" }}>
-                <span className="w-2 h-2 rounded-full bg-[#00E599] animate-pulse inline-block" /> REAL-TIME STREAM
-              </div>
+                Stake terminal · live feed
+              </span>
+              <span className="stake-live">
+                <span className="stake-live-dot" aria-hidden="true" />
+                Real-time stream
+              </span>
             </div>
 
-            {/* Terminal Card Body */}
-            <div style={{ padding: "36px 40px 40px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 24, marginBottom: 32 }}>
+            <div className="stake-term-body">
+              <div className="stake-term-top">
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", fontFamily: "var(--font-mono)", textTransform: "uppercase" }}>
-                    GLOBAL MARKET CONDITION
+                  <div className="stake-stat-key">Global market condition</div>
+                  <div className="stake-index-val">
+                    {index.val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <span>S&amp;P 500 / Nasdaq</span>
                   </div>
-                  <div style={{ fontSize: 40, fontWeight: 900, color: "#ffffff", fontFamily: "var(--font-mono)", marginTop: 6, letterSpacing: "-0.02em" }}>
-                    5,964.80 <span style={{ fontSize: 16, color: "#94a3b8", fontWeight: 600 }}>S&P 500 / NASDAQ</span>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: "#00E599", display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontFamily: "var(--font-mono)" }}>
-                    <span>▲ +84.20 (+1.43%) today</span>
-                    <span style={{ color: "#64748b" }}>•</span>
-                    <span style={{ color: "#a7f3d0" }}>Risk-On Bullish Flow</span>
+                  <div className="stake-index-move">
+                    <span>
+                      ▲ +{fmt(index.chg)} (+{pct(index.pct)}%) today
+                    </span>
+                    <span style={{ color: "var(--fog-dim)" }}>·</span>
+                    <span style={{ color: "var(--mint-bright)" }}>Risk-on bullish flow</span>
                   </div>
                 </div>
 
-                {/* Market Breadth & Turnover Badges */}
-                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", padding: "12px 18px", borderRadius: 14, minWidth: 140 }}>
-                    <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}>MARKET BREADTH</div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "#00E599", fontFamily: "var(--font-mono)", marginTop: 4 }}>
-                      82% Advancing (4.1:1)
+                <div className="stake-stat-row">
+                  {[
+                    ["Market breadth", "82% advancing", "var(--mint)"],
+                    ["24h volume", "$448.2B", "#fff"],
+                    ["VIX volatility", "13.85 low", "var(--sky)"],
+                  ].map(([k, v, c]) => (
+                    <div className="stake-stat" key={k}>
+                      <div className="stake-stat-key">{k}</div>
+                      <div className="stake-stat-val" style={{ color: c }}>
+                        {v}
+                      </div>
                     </div>
-                  </div>
-                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", padding: "12px 18px", borderRadius: 14, minWidth: 140 }}>
-                    <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}>24H VOLUME</div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "#ffffff", fontFamily: "var(--font-mono)", marginTop: 4 }}>
-                      $ 448.2 B
-                    </div>
-                  </div>
-                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", padding: "12px 18px", borderRadius: 14, minWidth: 140 }}>
-                    <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}>VIX VOLATILITY</div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "#38bdf8", fontFamily: "var(--font-mono)", marginTop: 4 }}>
-                      13.85 (Low)
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Dynamic Live Stock Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 18 }}>
-                {liveStocks.slice(0, 4).map((s) => (
-                  <div
-                    key={s.ticker}
-                    onClick={handleEnter}
-                    style={{
-                      padding: "18px 22px",
-                      background: "rgba(255,255,255,0.04)",
-                      borderRadius: 16,
-                      border: "1px solid rgba(0, 229, 153, 0.15)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                    className="hover:border-[#00E599] hover:bg-white/[0.08]"
-                  >
-                    <div>
-                      <div style={{ fontSize: 17, fontWeight: 800, color: "#ffffff", fontFamily: "var(--font-mono)" }}>{s.ticker}</div>
-                      <div style={{ fontSize: 12.5, color: "#94a3b8", fontFamily: "var(--font-body)", marginTop: 2 }}>{s.name}</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#ffffff", fontFamily: "var(--font-mono)" }}>${fmt(s.price)}</div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: s.change >= 0 ? "#00E599" : "#f87171", fontFamily: "var(--font-mono)", marginTop: 2 }}>
-                        {s.change >= 0 ? "+" : ""}{s.change}%
-                      </div>
-                    </div>
-                  </div>
+              <div className="stake-quote-grid">
+                {liveStocks.slice(0, 4).map((s, i) => (
+                  <Reveal key={s.ticker} delay={i}>
+                    <button className="stake-quote" onClick={handleEnter} type="button">
+                      <span>
+                        <span className="stake-quote-sym">{s.ticker}</span>
+                        <span className="stake-quote-name" style={{ display: "block" }}>
+                          {s.name}
+                        </span>
+                      </span>
+                      <span>
+                        <span className="stake-quote-px" style={{ display: "block" }}>
+                          ${fmt(s.price)}
+                        </span>
+                        <span
+                          className={`stake-quote-chg ${s.change >= 0 ? "stake-up" : "stake-down"}`}
+                          style={{ display: "block" }}
+                        >
+                          {s.change >= 0 ? "+" : ""}
+                          {pct(s.change)}%
+                        </span>
+                      </span>
+                    </button>
+                  </Reveal>
                 ))}
               </div>
             </div>
-          </div>
+          </Reveal>
         </section>
 
-        {/* =========================================================================
-            AGENTIC SHOWCASE CARDS
-            ========================================================================= */}
+        {/* Agentic showcase */}
         <div id="agentic-platform">
           <AgenticShowcaseCards onGetStarted={handleOpenSignup} />
         </div>
 
-        {/* High-Speed Execution Engine Section */}
-        <section style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px 24px" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 12px", borderRadius: 999, background: "rgba(21,247,166,0.12)", color: "#065f46", fontSize: 12, fontWeight: 800, marginBottom: 8, fontFamily: "var(--font-body)" }}>
-              <Zap size={14} className="text-[#00E599]" /> LIVE TERMINAL BENCHMARK
+        {/* Execution engine */}
+        <section className="stake-section stake-band">
+          <Reveal className="stake-section-head stake-section-head-center">
+            <div className="stake-eyebrow" style={{ justifyContent: "center" }}>
+              <Zap size={13} /> Live terminal benchmark
             </div>
-            <h2 className="stake-section-title" style={{ textAlign: "center" }}>
-              High-Speed Execution Engine
-            </h2>
-            <p style={{ fontSize: 15, color: "#64748b", margin: 0, fontFamily: "var(--font-body)" }}>
-              Direct access to live order flow, sub-second routing, and real-time interactive charts.
+            <h2 className="stake-section-title">High-speed execution engine</h2>
+            <p className="stake-section-lede">
+              Direct access to live order flow, sub-second routing, and interactive charts you can
+              scrub tick by tick.
             </p>
-          </div>
+          </Reveal>
 
-          <div style={{ width: "100%", maxWidth: 1040, margin: "0 auto" }}>
+          <Reveal delay={1} style={{ maxWidth: 1040, margin: "0 auto" }}>
             <MarketMainChart height={260} />
-          </div>
+          </Reveal>
         </section>
 
-        {/* Top Traded Scrips Table Section - Dynamic API Data */}
-        <section
-          id="markets"
-          style={{
-            background: "#f8fafc",
-            borderTop: "1px solid #e2e8f0",
-            borderBottom: "1px solid #e2e8f0",
-            padding: "54px 24px",
-          }}
-        >
-          <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#00E599", letterSpacing: "0.08em", fontFamily: "var(--font-body)" }}>
-                  LIVE MARKET HIGHLIGHTS (API STREAM)
-                </div>
-                <h2 className="stake-section-title" style={{ margin: "4px 0 0" }}>
-                  Active Market Scrips
-                </h2>
+        {/* Market table */}
+        <section id="markets" className="stake-section">
+          <Reveal
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 14,
+              marginBottom: 26,
+            }}
+          >
+            <div>
+              <div className="stake-eyebrow">
+                <Activity size={13} /> Live market highlights
               </div>
-              <button
-                onClick={handleEnter}
-                style={{
-                  padding: "8px 18px",
-                  borderRadius: 10,
-                  border: "1px solid #cbd5e1",
-                  background: "#ffffff",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "#191c1e",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                View Full Market Grid <ChevronRight size={15} />
-              </button>
+              <h2 className="stake-section-title">Active market scrips</h2>
             </div>
+            <button className="stake-btn-light" onClick={handleEnter}>
+              View full market grid <ChevronRight size={15} />
+            </button>
+          </Reveal>
 
-            <div
-              style={{
-                background: "#ffffff",
-                borderRadius: 18,
-                border: "1px solid #e2e8f0",
-                overflowX: "auto",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.03)",
-              }}
-            >
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5, textAlign: "left", fontFamily: "var(--font-body)" }}>
+          <Reveal delay={1} className="stake-table-wrap">
+            <div className="stake-table-scroll">
+              <table className="stake-table">
                 <thead>
-                  <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#64748b", fontWeight: 700 }}>
-                    <th style={{ padding: "14px 20px" }}>SCRIP / COMPANY</th>
-                    <th style={{ padding: "14px 20px" }}>SECTOR</th>
-                    <th style={{ padding: "14px 20px" }}>LTP ($)</th>
-                    <th style={{ padding: "14px 20px" }}>24H CHANGE</th>
-                    <th style={{ padding: "14px 20px" }}>VOLUME</th>
-                    <th style={{ padding: "14px 20px", textAlign: "right" }}>ACTION</th>
+                  <tr>
+                    <th>Scrip / company</th>
+                    <th>Sector</th>
+                    <th>LTP</th>
+                    <th>24h change</th>
+                    <th>Volume</th>
+                    <th style={{ textAlign: "right" }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {liveStocks.slice(0, 10).map((s) => (
-                    <tr key={s.ticker} style={{ borderBottom: "1px solid #f1f5f9" }} className="hover:bg-slate-50 transition-colors">
-                      <td style={{ padding: "14px 20px" }}>
-                        <div style={{ fontWeight: 800, color: "#191c1e", fontFamily: "var(--font-mono)" }}>{s.ticker}</div>
-                        <div style={{ fontSize: 12, color: "#64748b" }}>{s.name}</div>
+                    <tr key={s.ticker}>
+                      <td>
+                        <div className="stake-cell-sym">{s.ticker}</div>
+                        <div className="stake-cell-name">{s.name}</div>
                       </td>
-                      <td style={{ padding: "14px 20px", color: "#475569", fontWeight: 500 }}>{s.sector}</td>
-                      <td style={{ padding: "14px 20px", fontWeight: 700, fontFamily: "var(--font-mono)" }}>
-                        $ {fmt(s.price)}
+                      <td>{s.sector}</td>
+                      <td className="stake-num" style={{ fontWeight: 700, color: "var(--text-1)" }}>
+                        ${fmt(s.price)}
                       </td>
-                      <td style={{ padding: "14px 20px" }}>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            padding: "4px 8px",
-                            borderRadius: 6,
-                            fontWeight: 700,
-                            fontSize: 12,
-                            background: s.change >= 0 ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
-                            color: s.change >= 0 ? "#00E599" : "#b61722",
-                            fontFamily: "var(--font-mono)",
-                          }}
-                        >
+                      <td>
+                        <span className={`stake-chip ${s.change >= 0 ? "up" : "down"}`}>
                           {s.change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                          {s.change >= 0 ? "+" : ""}{s.change}%
+                          {s.change >= 0 ? "+" : ""}
+                          {pct(s.change)}%
                         </span>
                       </td>
-                      <td style={{ padding: "14px 20px", color: "#64748b", fontFamily: "var(--font-mono)" }}>
-                        {s.volume}
-                      </td>
-                      <td style={{ padding: "14px 20px", textAlign: "right" }}>
-                        <button
-                          onClick={handleEnter}
-                          style={{
-                            padding: "6px 14px",
-                            borderRadius: 8,
-                            border: "none",
-                            background: "rgba(16,185,129,0.12)",
-                            color: "#00E599",
-                            fontWeight: 700,
-                            fontSize: 12,
-                            cursor: "pointer",
-                            fontFamily: "var(--font-body)",
-                          }}
-                        >
+                      <td className="stake-num">{s.volume}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="stake-trade-btn" onClick={handleEnter}>
                           Trade
                         </button>
                       </td>
@@ -672,250 +722,165 @@ export function LandingPage({
                 </tbody>
               </table>
             </div>
+          </Reveal>
+        </section>
+
+        {/* Onboarding — a genuine sequence, so the numbering carries meaning */}
+        <section className="stake-section stake-band">
+          <Reveal className="stake-section-head stake-section-head-center">
+            <div className="stake-eyebrow" style={{ justifyContent: "center" }}>
+              Onboarding
+            </div>
+            <h2 className="stake-section-title">From signup to first fill</h2>
+            <p className="stake-section-lede">Three steps, in order. Most accounts clear step three the same day.</p>
+          </Reveal>
+
+          <div className="stake-steps">
+            {[
+              [
+                "Step 01",
+                "Open your account",
+                "Sign up with an email address and get a simulated balance wired to live market data — no deposit needed to look around.",
+              ],
+              [
+                "Step 02",
+                "Fund the wallet",
+                "Move cash in through the unified wallet. Every deposit, fill, and fee lands on one ledger you can audit line by line.",
+              ],
+              [
+                "Step 03",
+                "Trade, or delegate",
+                "Place market and limit orders yourself, or allocate capital to an agent strategy and set the ceiling it cannot cross.",
+              ],
+            ].map(([n, h, p], i) => (
+              <Reveal key={n} delay={i}>
+                <div className="stake-step">
+                  <div className="stake-step-n">{n}</div>
+                  <h3>{h}</h3>
+                  <p>{p}</p>
+                </div>
+              </Reveal>
+            ))}
           </div>
         </section>
 
-        {/* 3 Step Onboarding */}
-        <section
-          style={{
-            maxWidth: 1080,
-            margin: "0 auto",
-            padding: "60px 24px",
-            width: "100%",
-            boxSizing: "border-box",
-          }}
-        >
-          <div style={{ textAlign: "center", marginBottom: 40 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#00E599", letterSpacing: "0.08em", fontFamily: "var(--font-body)" }}>
-              SIMPLE ONBOARDING
-            </div>
-            <h2 className="stake-section-title" style={{ textAlign: "center" }}>
-              Get Started in 3 Easy Steps
-            </h2>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 24 }}>
-            <div style={{ background: "#ffffff", padding: 28, borderRadius: 20, border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "#00E599", fontFamily: "var(--font-mono)", marginBottom: 12 }}>
-                01
-              </div>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: "#191c1e", margin: "0 0 8px", fontFamily: "var(--font-display)" }}>
-                Create Your Account
-              </h3>
-              <p style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.6, margin: 0, fontFamily: "var(--font-body)" }}>
-                Sign up with your email or username and access instant simulated trading balances with live market data feeds.
-              </p>
-            </div>
-
-            <div style={{ background: "#ffffff", padding: 28, borderRadius: 20, border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "#00E599", fontFamily: "var(--font-mono)", marginBottom: 12 }}>
-                02
-              </div>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: "#191c1e", margin: "0 0 8px", fontFamily: "var(--font-display)" }}>
-                Fund Unified Wallet
-              </h3>
-              <p style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.6, margin: 0, fontFamily: "var(--font-body)" }}>
-                Deposit cash with our dedicated wallet portal supporting instant transfers and simulated ledger tracking.
-              </p>
-            </div>
-
-            <div style={{ background: "#ffffff", padding: 28, borderRadius: 20, border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: "#00E599", fontFamily: "var(--font-mono)", marginBottom: 12 }}>
-                03
-              </div>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: "#191c1e", margin: "0 0 8px", fontFamily: "var(--font-display)" }}>
-                Trade & Automate
-              </h3>
-              <p style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.6, margin: 0, fontFamily: "var(--font-body)" }}>
-                Place direct Limit and Market orders or activate the AI Agent to continuously capture price momentum.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Final CTA Banner */}
-        <section
-          style={{
-            maxWidth: 1080,
-            margin: "20px auto 60px",
-            padding: "0 24px",
-          }}
-        >
-          <div
-            style={{
-              background: "linear-gradient(135deg, #04140b 0%, #062315 100%)",
-              border: "1px solid rgba(0, 229, 153, 0.35)",
-              borderRadius: 24,
-              padding: "48px 40px",
-              color: "#ffffff",
-              textAlign: "center",
-              position: "relative",
-              overflow: "hidden",
-              boxShadow: "0 20px 50px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 229, 153, 0.15)",
-            }}
-          >
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "6px 14px",
-                borderRadius: 999,
-                background: "rgba(0, 229, 153, 0.15)",
-                color: "#00E599",
-                fontSize: 12,
-                fontWeight: 800,
-                marginBottom: 16,
-                letterSpacing: "0.06em",
-                fontFamily: "var(--font-body)",
-              }}
-            >
-              <Shield size={14} /> ZERO COMMISSIONS • INSTITUTIONAL SPEED
-            </div>
-
-            <h2 style={{ fontSize: 34, fontWeight: 800, margin: "0 0 14px", letterSpacing: "-0.02em", fontFamily: "var(--font-display)" }}>
-              Ready to take control of your financial future?
-            </h2>
-
-            <p style={{ fontSize: 15.5, color: "#94a3b8", lineHeight: 1.6, maxWidth: 620, margin: "0 auto 28px", fontFamily: "var(--font-body)" }}>
-              Join traders using Stake to trade US equities with sub-second execution, autonomous intelligence, and zero commissions.
+        {/* Closing CTA */}
+        <section className="stake-section stake-section-tight">
+          <Reveal className="stake-cta">
+            <span className="stake-pill">
+              <Shield size={13} /> Zero commission · institutional speed
+            </span>
+            <h2 className="stake-cta-title">Ready to take control of your financial future?</h2>
+            <p className="stake-cta-lede">
+              Join traders running US equities on Stake with sub-second execution, autonomous
+              strategies, and no commission on the trade.
             </p>
-
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-              <button
-                onClick={handleOpenSignup}
-                className="stake-btn-mint"
-              >
-                Create Account in 2 Minutes <ArrowRight size={18} />
+            <div className="stake-cta-actions">
+              <button className="stake-btn-mint" onClick={handleOpenSignup}>
+                Create your account <ArrowRight size={18} />
               </button>
-
               <button
-                onClick={() => setActiveModal("faq")}
                 className="stake-glass-button stake-glass-button-quiet"
+                onClick={() => setActiveModal("faq")}
               >
-                <HelpCircle size={16} color="#00E599" /> Frequently Asked Questions
+                <HelpCircle size={16} /> Common questions
               </button>
             </div>
-          </div>
+          </Reveal>
         </section>
 
-        {/* Institutional Dark Footer */}
-        <footer
-          style={{
-            background: "#030a07",
-            color: "#94a3b8",
-            borderTop: "1px solid rgba(255,255,255,0.08)",
-            padding: "48px 36px 40px",
-            textAlign: "left",
-            fontSize: 13,
-            fontFamily: "var(--font-body)",
-            width: "100%",
-            boxSizing: "border-box",
-          }}
-        >
-          <div style={{ width: "100%" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 20,
-                paddingBottom: 24,
-                borderBottom: "1px solid rgba(255,255,255,0.08)",
-              }}
-            >
-              <div style={{ cursor: "pointer" }} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} title="Stake Global Equities">
-                <Logo size={28} textSize={20} dark={true} />
-              </div>
+        {/* Footer */}
+        <footer className="stake-footer">
+          <div className="stake-footer-inner">
+            <div className="stake-footer-top">
+              <button
+                type="button"
+                className="stake-nav-mark"
+                onClick={() => window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" })}
+                title="Stake Global Equities"
+              >
+                <Logo size={28} textSize={20} dark />
+              </button>
 
-              <div style={{ display: "flex", gap: 24, fontSize: 13.5, fontWeight: 600, color: "#cbd5e1", flexWrap: "wrap" }}>
-                <span style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }} onClick={() => setActiveModal("faq")}><HelpCircle size={14} /> FAQ</span>
-                <span style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }} onClick={() => setActiveModal("privacy")}><FileText size={14} /> Privacy Policy</span>
-                <span style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }} onClick={() => setActiveModal("terms")}><Scale size={14} /> Terms of Service</span>
-                <span style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }} onClick={() => setActiveModal("risks")}><AlertTriangle size={14} /> Risk Disclosures</span>
-                <span style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }} onClick={() => setActiveModal("support")}><MessageCircle size={14} /> Support</span>
-              </div>
+              <nav className="stake-footer-links">
+                {[
+                  ["faq", <HelpCircle size={14} key="i" />, "Questions"],
+                  ["privacy", <FileText size={14} key="i" />, "Privacy"],
+                  ["terms", <Scale size={14} key="i" />, "Terms"],
+                  ["risks", <AlertTriangle size={14} key="i" />, "Risk disclosures"],
+                  ["support", <MessageCircle size={14} key="i" />, "Support"],
+                ].map(([key, icon, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className="stake-footer-link"
+                    onClick={() => setActiveModal(key)}
+                  >
+                    {icon}
+                    {label}
+                  </button>
+                ))}
+              </nav>
             </div>
 
-            {/* Regulatory Disclaimer Text */}
-            <div style={{ marginTop: 20, fontSize: 12, lineHeight: 1.7, color: "#64748b" }}>
-              <p style={{ margin: "0 0 8px" }}>
-                © 2026 Stake Global Inc. All rights reserved. Self-directed equities trading platform.
-              </p>
-              <p style={{ margin: 0 }}>
-                Fractional share trading allows customers to buy fractional stock amounts. System response and execution times may vary based on market conditions, volatility, and order routing parameters.
+            <div className="stake-footer-fine">
+              <p>© 2026 Stake Global Inc. All rights reserved. Self-directed equities trading platform.</p>
+              <p>
+                Fractional share trading lets you buy part of a share. System response and execution
+                times vary with market conditions, volatility, and order routing.
               </p>
             </div>
           </div>
         </footer>
       </div>
 
-      {/* =========================================================================
-          MODAL DIALOG (Shared for FAQ, Privacy, Terms, Risks, Support)
-          ========================================================================= */}
+      {/* ===================================================================
+          MODAL — shared by FAQ, privacy, terms, risks and support
+          =================================================================== */}
       {activeModal && currentModal && (
-        <div className="stake-faq-drawer-overlay" onClick={() => setActiveModal(null)}>
-          <div className="stake-faq-drawer" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, borderBottom: "1px solid #e2e8f0", paddingBottom: 16 }}>
+        <div className="stake-modal-overlay" onClick={() => setActiveModal(null)}>
+          <div
+            className="stake-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="stake-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="stake-modal-head">
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 {currentModal.icon}
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#00E599", letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-body)" }}>
-                    {currentModal.subtitle}
-                  </div>
-                  <h3 style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 0", color: "#191c1e", fontFamily: "var(--font-display)" }}>
+                  <div className="stake-modal-eyebrow">{currentModal.subtitle}</div>
+                  <h3 className="stake-modal-title" id="stake-modal-title">
                     {currentModal.title}
                   </h3>
                 </div>
               </div>
               <button
+                ref={closeRef}
+                type="button"
+                className="stake-modal-close"
+                aria-label="Close"
                 onClick={() => setActiveModal(null)}
-                style={{
-                  background: "#f1f5f9",
-                  border: "none",
-                  borderRadius: "50%",
-                  width: 36,
-                  height: 36,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  color: "#64748b",
-                }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div style={{ flex: 1, overflowY: "auto" }}>
-              {currentModal.content}
-            </div>
+            <div className="stake-modal-body">{currentModal.content}</div>
 
             {activeModal === "faq" && (
-              <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #e2e8f0", textAlign: "center" }}>
-                <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 12px", fontFamily: "var(--font-body)" }}>
-                  Still have questions? Jump straight into the live terminal.
-                </p>
+              <div className="stake-modal-foot">
+                <p>Still stuck? Open the terminal and the live chat is bottom right.</p>
                 <button
+                  className="stake-btn-mint"
+                  style={{ width: "100%" }}
                   onClick={() => {
                     setActiveModal(null);
                     handleEnter();
                   }}
-                  style={{
-                    width: "100%",
-                    padding: "12px",
-                    borderRadius: 12,
-                    border: "none",
-                    background: "#00E599",
-                    color: "#ffffff",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-body)",
-                  }}
                 >
-                  Launch Terminal
+                  Open the terminal <ArrowRight size={17} />
                 </button>
               </div>
             )}

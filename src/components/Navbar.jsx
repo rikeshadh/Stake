@@ -18,7 +18,6 @@ import {
   BellRing,
   ArrowLeft,
   Sparkles,
-  SlidersHorizontal,
 } from "lucide-react";
 import { Logo } from "./Charts";
 
@@ -34,7 +33,6 @@ export function Navbar({
   onOpenSettings,
   onOpenAiInsights,
   alerts = [],
-  alertsCount = 0,
   onLogout,
   onExitGuest,
   kycStatus = "UNVERIFIED",

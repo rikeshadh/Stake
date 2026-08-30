@@ -318,11 +318,13 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
           <form onSubmit={handleSubmit} noValidate className={`stake-auth-form ${isShaking ? "stake-form-shake" : ""}`}>
             {mode === "signup" && (
               <div className="stake-form-group">
-                <label className="stake-label">Full Legal Name</label>
+                <label className="stake-label" htmlFor="stake-full-name">Full Legal Name</label>
                 <div className="stake-input-wrapper">
                   <User size={16} className="stake-input-icon" />
                   <input
+                    id="stake-full-name"
                     type="text"
+                    autoComplete="name"
                     className={`stake-input ${touched.name && !isNameValid ? "error" : ""}`}
                     placeholder="e.g. Alex Rivera"
                     value={fullName}
@@ -335,11 +337,13 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
 
             {mode === "signup" && (
               <div className="stake-form-group">
-                <label className="stake-label">Username</label>
+                <label className="stake-label" htmlFor="stake-username">Username</label>
                 <div className="stake-input-wrapper">
                   <span className="stake-input-icon" style={{ fontSize: 13, fontWeight: 800, color: "#64748b" }}>@</span>
                   <input
+                    id="stake-username"
                     type="text"
+                    autoComplete="username"
                     className={`stake-input ${touched.username && !isUsernameValid ? "error" : ""}`}
                     placeholder="e.g. alex_rivera"
                     value={username}
@@ -351,13 +355,15 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
             )}
 
             <div className="stake-form-group">
-              <label className="stake-label">
+              <label className="stake-label" htmlFor="stake-identifier">
                 {mode === "signup" ? "Email Address" : "Username or Email"}
               </label>
               <div className="stake-input-wrapper">
                 <Mail size={16} className="stake-input-icon" />
                 <input
+                  id="stake-identifier"
                   type={mode === "signup" ? "email" : "text"}
+                  autoComplete={mode === "signup" ? "email" : "username"}
                   className={`stake-input ${touched.identifier && !isInputValid ? "error" : ""}`}
                   placeholder={mode === "signup" ? "trader@stake.com" : "Username or email address"}
                   value={usernameOrEmail}
@@ -369,7 +375,7 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
 
             <div className="stake-form-group">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <label className="stake-label" style={{ marginBottom: 0 }}>Password</label>
+                <label className="stake-label" style={{ marginBottom: 0 }} htmlFor="stake-password">Password</label>
                 {mode === "login" && (
                   <button
                     type="button"
@@ -383,14 +389,22 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
               <div className="stake-input-wrapper">
                 <Lock size={16} className="stake-input-icon" />
                 <input
+                  id="stake-password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
                   className={`stake-input ${touched.password && !isPasswordValid ? "error" : ""}`}
                   placeholder="At least 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onBlur={() => handleBlur("password")}
                 />
-                <button type="button" className="stake-eye-btn" onClick={() => setShowPassword(!showPassword)}>
+                <button
+                  type="button"
+                  className="stake-eye-btn"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
@@ -411,18 +425,26 @@ export function AuthPage({ initialMode = "login", onLoginSuccess, onBackToLandin
 
             {mode === "signup" && (
               <div className="stake-form-group">
-                <label className="stake-label">Confirm Password</label>
+                <label className="stake-label" htmlFor="stake-confirm-password">Confirm Password</label>
                 <div className="stake-input-wrapper">
                   <Lock size={16} className="stake-input-icon" />
                   <input
+                    id="stake-confirm-password"
                     type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
                     className={`stake-input ${touched.confirmPassword && !doPasswordsMatch ? "error" : ""}`}
                     placeholder="Re-enter your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     onBlur={() => handleBlur("confirmPassword")}
                   />
-                  <button type="button" className="stake-eye-btn" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                  <button
+                    type="button"
+                    className="stake-eye-btn"
+                    aria-label={showConfirmPassword ? "Hide confirmed password" : "Show confirmed password"}
+                    aria-pressed={showConfirmPassword}
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
                     {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>

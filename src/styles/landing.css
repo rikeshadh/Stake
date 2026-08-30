@@ -1,159 +1,172 @@
 /* ==========================================================================
-   Stake Global Exchange - Liquid Glass #00E599 Green Theme Landing Page
-   - Cyber-mesh green animated energy field & glowing nodes (brand-new animation)
-   - Improved Liquid Glass buttons with specular highlights & tactile click feedback
-   - Interactive Live Floating Stock Bubbles
+   Stake Global Exchange — Landing page
+   ---------------------------------------------------------------------------
+   Direction: a light, high-legibility page with a dark trading-floor hero at
+   the top. Mint (#00E599) glows on the dark surfaces; on white it steps down to
+   a darker mint (--mint-text) that actually passes contrast. Dark panels inside
+   the light body read as product screenshots.
+   Signature element: the hero's live order-book depth ladder.
+   All numeric type is monospace + tabular so ticking prices never jitter.
    ========================================================================== */
 
 .stake-landing-root {
-  min-height: 100vh;
-  background: #030a07;
-  color: #f0fdf7;
-  font-family: var(--font-body);
-  overflow-x: hidden;
-  text-align: left;
+  /* --- Dark surfaces (hero, product panels, CTA, footer) --- */
+  --ink-950: #030a07;
+  --ink-900: #05120c;
+  --ink-850: #071a11;
+  --ink-800: #0a2417;
+
+  /* --- Light surfaces (page body) --- */
+  --paper-0: #ffffff;
+  --paper-1: #f6faf8;
+  --paper-2: #edf4f0;
+  --line-l: #e3ebe7;
+  --line-l-soft: #eef3f1;
+
+  /* --- Brand --- */
+  --mint: #00e599;          /* on dark only */
+  --mint-bright: #5bffc4;
+  --mint-deep: #00b87a;
+  --mint-ink: #04140b;
+  /* On white, mint has to step down hard — #00E599 on white is 1.66:1. This is
+     the same accent the rest of the app uses (--accent in index.css), so the
+     landing and the product read as one thing. */
+  --mint-text: #006c49;     /* on white — 6.5:1 */
+  --mint-text-bg: rgba(0, 108, 73, 0.09);
+
+  /* --- Direction --- */
+  --rose: #ff6b85;          /* on dark */
+  --rose-text: #c81e3a;     /* on white — 5.7:1 */
+  --rose-text-bg: rgba(200, 30, 58, 0.09);
+  --rose-dim: rgba(255, 107, 133, 0.14);
+  --mint-dim: rgba(0, 229, 153, 0.13);
+  --sky: #56ccf2;
+
+  /* --- Text on dark --- */
+  --paper: #f0fdf7;
+  --mist: #c3d6ce;
+  --fog: #8fa8a0;
+  --fog-dim: #7a8f85;
+
+  /* --- Text on light --- */
+  --text-1: #0c1a14;
+  --text-2: #4a5c55;
+  --text-3: #5c6e66;
+
+  /* --- Lines & glow --- */
+  --line: rgba(0, 229, 153, 0.14);
+  --line-soft: rgba(255, 255, 255, 0.07);
+  --glow-sm: 0 0 18px rgba(0, 229, 153, 0.22);
+  --glow-md: 0 0 34px rgba(0, 229, 153, 0.28);
+
+  /* --- Rhythm --- */
+  --shell: 1240px;
+  --gut: 24px;
+
   position: relative;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  min-height: 100vh;
+  background: var(--paper-0);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  text-align: left;
+  overflow-x: hidden;
 }
 
-.stake-landing-root::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
+/* Numeric type: monospace + tabular so prices don't shift width as they tick. */
+.stake-landing-root .stake-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.stake-landing-root ::selection {
+  background: rgba(0, 229, 153, 0.28);
+  color: var(--text-1);
+}
+
+/* Visible keyboard focus everywhere on the page. */
+.stake-landing-root :focus-visible {
+  outline: 2px solid var(--mint-text);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.stake-hero-section :focus-visible,
+.stake-term :focus-visible,
+.stake-cta :focus-visible,
+.stake-footer :focus-visible,
+.stake-showcase-panel :focus-visible {
+  outline-color: var(--mint);
+}
+
+/* Direction colours, resolved per surface. */
+.stake-up { color: var(--mint-text); }
+.stake-down { color: var(--rose-text); }
+.stake-term .stake-up,
+.stake-hero-section .stake-up { color: var(--mint); }
+.stake-term .stake-down,
+.stake-hero-section .stake-down { color: var(--rose); }
+
+/* ==========================================================================
+   SCROLL REVEAL
+   Sections rise once as they enter the viewport. --i staggers children.
+   ========================================================================== */
+.stake-reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.72s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.72s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--i, 0) * 85ms);
+  will-change: opacity, transform;
+}
+
+.stake-reveal.is-visible {
+  opacity: 1;
+  transform: none;
 }
 
 /* ==========================================================================
-   HERO SECTION - Cyber Neon Mint #00E599 Animated Atmosphere
+   HERO — dark trading floor
    ========================================================================== */
 .stake-hero-section {
   position: relative;
-  min-height: 100vh;
-  background: 
-    radial-gradient(ellipse 90% 60% at 50% -15%, rgba(0, 229, 153, 0.16), transparent 65%),
-    radial-gradient(ellipse 70% 50% at 85% 55%, rgba(0, 200, 130, 0.1), transparent 60%),
-    radial-gradient(ellipse 60% 40% at 15% 75%, rgba(0, 229, 153, 0.08), transparent 55%),
-    linear-gradient(180deg, #030b07 0%, #061910 45%, #030a07 100%);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 0 0 20px;
+  min-height: min(88svh, 820px);
+  padding-bottom: 0;
+  color: var(--paper);
+  background:
+    radial-gradient(ellipse 76% 52% at 22% 8%, rgba(0, 229, 153, 0.15), transparent 62%),
+    radial-gradient(ellipse 62% 46% at 88% 66%, rgba(0, 184, 122, 0.1), transparent 60%),
+    linear-gradient(180deg, #041209 0%, #061a11 46%, var(--ink-950) 100%);
   overflow: hidden;
   box-sizing: border-box;
 }
 
-/* Brand New Cyber-Mesh Green Grid */
+/* Trading-floor grid, drifting slowly upward. The only ambient decoration. */
 .stake-hero-section::before {
-  content: '';
+  content: "";
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: 
-    linear-gradient(rgba(0, 229, 153, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 229, 153, 0.07) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 20%, transparent 80%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 20%, transparent 80%);
-  pointer-events: none;
-  opacity: 0.85;
-  z-index: 1;
-  animation: cyberGridDrift 24s linear infinite;
-}
-
-@keyframes cyberGridDrift {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(48px); }
-}
-
-/* Ambient Radial Cyber Pulse */
-.stake-hero-section::after {
-  content: '';
-  position: absolute;
-  top: 45%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 900px;
-  height: 900px;
-  background: radial-gradient(circle, rgba(0, 229, 153, 0.12) 0%, rgba(0, 229, 153, 0.03) 45%, transparent 70%);
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 229, 153, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 153, 0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 60% 55% at 26% 30%, #000 8%, transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 55% at 26% 30%, #000 8%, transparent 72%);
+  animation: stakeGridDrift 30s linear infinite;
   pointer-events: none;
   z-index: 1;
-  animation: cyberEnergyPulse 6s ease-in-out infinite alternate;
 }
 
-@keyframes cyberEnergyPulse {
-  0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.5; }
-  100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.9; }
-}
-
-/* New Animated Green Energy Beams */
-.stake-hero-bg-animation {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.stake-hero-energy-beam {
-  position: absolute;
-  width: 2px;
-  height: 180px;
-  background: linear-gradient(180deg, transparent, #00E599, transparent);
-  opacity: 0.4;
-  filter: drop-shadow(0 0 8px #00E599);
-  animation: energyBeamDown 5s ease-in-out infinite;
-}
-
-.beam-1 { left: 18%; top: -10%; animation-delay: 0s; animation-duration: 6s; }
-.beam-2 { left: 42%; top: -10%; animation-delay: 1.8s; animation-duration: 7.2s; }
-.beam-3 { left: 74%; top: -10%; animation-delay: 0.9s; animation-duration: 5.5s; }
-.beam-4 { left: 88%; top: -10%; animation-delay: 3.2s; animation-duration: 6.8s; }
-
-@keyframes energyBeamDown {
-  0% { transform: translateY(-100px); opacity: 0; }
-  20% { opacity: 0.7; }
-  80% { opacity: 0.7; }
-  100% { transform: translateY(120vh); opacity: 0; }
-}
-
-/* Cyber Nodes / Glowing Particle Radar */
-.stake-hero-radar-nodes {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.stake-radar-circle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 229, 153, 0.18);
-  transform: translate(-50%, -50%);
-  animation: radarExpand 8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
-}
-
-.radar-1 { width: 300px; height: 300px; animation-delay: 0s; }
-.radar-2 { width: 600px; height: 600px; animation-delay: 2.5s; }
-.radar-3 { width: 900px; height: 900px; animation-delay: 5s; }
-
-@keyframes radarExpand {
-  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0.6; }
-  80% { opacity: 0.2; }
-  100% { transform: translate(-50%, -50%) scale(1.3); opacity: 0; }
+@keyframes stakeGridDrift {
+  from { transform: translateY(0); }
+  to { transform: translateY(60px); }
 }
 
 /* ==========================================================================
-   LANDING PAGE TOP NAVBAR - Liquid Glass #00E599 Style
+   TOP NAV
    ========================================================================== */
 .stake-landing-nav {
   position: relative;
@@ -163,38 +176,26 @@
   justify-content: space-between;
   gap: 24px;
   width: 100%;
-  max-width: 1380px;
-  min-height: 72px;
+  max-width: var(--shell);
+  min-height: 76px;
   margin: 0 auto;
-  padding: 16px 32px;
+  padding: 18px var(--gut);
   box-sizing: border-box;
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border-bottom: none;
-  box-shadow: none;
+  animation: stakeNavIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.stake-landing-nav-links {
+@keyframes stakeNavIn {
+  from { opacity: 0; transform: translateY(-14px); }
+  to { opacity: 1; transform: none; }
+}
+
+.stake-nav-mark {
   display: flex;
   align-items: center;
-  gap: 24px;
-}
-
-.stake-landing-nav-links button {
-  padding: 6px 0;
+  background: none;
   border: 0;
-  background: transparent;
-  color: #94a3b8;
-  font: 700 13.5px var(--font-body);
+  padding: 0;
   cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.stake-landing-nav-links button:hover {
-  color: #00E599;
-  text-shadow: 0 0 14px rgba(0, 229, 153, 0.6);
 }
 
 .stake-landing-nav-actions {
@@ -204,326 +205,1341 @@
 }
 
 /* ==========================================================================
-   IMPROVED LIQUID GLASS BUTTONS
+   BUTTONS — glass variants for dark surfaces
    ========================================================================== */
 .stake-glass-button {
-  min-height: 42px;
-  padding: 0 22px;
-  border-radius: 9999px;
-  color: #f1f5f9;
-  font: 800 13.5px var(--font-body);
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: 
-    linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 100%),
-    rgba(10, 30, 20, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 6px 18px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
-  position: relative;
+  min-height: 42px;
+  padding: 0 22px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.02) 100%),
+    rgba(10, 30, 20, 0.55);
+  color: var(--paper);
+  font: 700 13.5px var(--font-body);
+  cursor: pointer;
   overflow: hidden;
   user-select: none;
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 6px 18px rgba(0, 0, 0, 0.34);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
-/* Specular Gleam Sheen on Hover */
+/* Specular sweep on hover. */
 .stake-glass-button::before {
-  content: '';
+  content: "";
   position: absolute;
-  top: 0;
-  left: -120%;
+  inset: 0 auto 0 -120%;
   width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
   transition: left 0.6s ease;
   pointer-events: none;
 }
 
-.stake-glass-button:hover::before {
-  left: 120%;
-}
+.stake-glass-button:hover::before { left: 120%; }
 
 .stake-glass-button:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 229, 153, 0.4);
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 10px 24px rgba(0, 0, 0, 0.45),
-    0 0 16px rgba(0, 229, 153, 0.2);
+  border-color: rgba(0, 229, 153, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 24px rgba(0, 0, 0, 0.44),
+    var(--glow-sm);
 }
 
-.stake-glass-button:active {
-  transform: translateY(1px) scale(0.98);
-  box-shadow: 
-    inset 0 2px 4px rgba(0, 0, 0, 0.3),
-    0 2px 8px rgba(0, 0, 0, 0.3);
-}
+.stake-glass-button:active { transform: translateY(1px) scale(0.985); }
 
-/* Quiet Glass Button Variant */
 .stake-glass-button-quiet {
-  color: #ffffff;
+  border-color: rgba(0, 229, 153, 0.3);
+  background: rgba(8, 25, 17, 0.72);
   font-size: 14px;
-  font-weight: 700;
-  border-color: rgba(0, 229, 153, 0.35);
-  background: rgba(8, 25, 17, 0.75);
 }
 
-.stake-glass-button-quiet:hover {
-  color: #ffffff;
-  border-color: #00E599;
-  background: rgba(14, 40, 28, 0.9);
-}
+.stake-glass-button-quiet:hover { border-color: var(--mint); }
 
-/* Primary Glass Button Variant - Neon #00E599 */
 .stake-glass-button-primary {
-  color: #04140b;
-  border-color: #00E599;
-  background: linear-gradient(135deg, #00E599 0%, #00b87a 100%);
+  border-color: rgba(255, 255, 255, 0.34);
+  background: linear-gradient(135deg, var(--mint) 0%, var(--mint-deep) 100%);
+  color: var(--mint-ink);
   font-weight: 800;
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 6px 20px rgba(0, 229, 153, 0.45),
-    0 0 24px rgba(0, 229, 153, 0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 6px 20px rgba(0, 229, 153, 0.4);
 }
 
 .stake-glass-button-primary:hover {
-  background: linear-gradient(135deg, #33f0b0 0%, #00E599 100%);
-  border-color: #ffffff;
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 10px 28px rgba(0, 229, 153, 0.6),
-    0 0 36px rgba(0, 229, 153, 0.35);
-  transform: translateY(-2px);
+  background: linear-gradient(135deg, var(--mint-bright) 0%, var(--mint) 100%);
+  border-color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 10px 28px rgba(0, 229, 153, 0.52),
+    var(--glow-md);
 }
 
-/* Big Hero Primary CTA Button */
+/* Outline button for the light body */
+.stake-btn-light {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 20px;
+  border: 1px solid var(--line-l);
+  border-radius: 9999px;
+  background: var(--paper-0);
+  color: var(--text-1);
+  font: 700 13.5px var(--font-body);
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(12, 26, 20, 0.05);
+  transition: border-color 0.22s ease, color 0.22s ease, background 0.22s ease,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease;
+}
+
+.stake-btn-light:hover {
+  border-color: var(--mint-text);
+  color: var(--mint-text);
+  background: var(--mint-text-bg);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(12, 26, 20, 0.08);
+}
+
+.stake-btn-light:active { transform: translateY(1px) scale(0.985); }
+
+/* Primary CTA — works on either surface */
 .stake-btn-mint {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-height: 52px;
+  min-height: 54px;
   padding: 0 32px;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: linear-gradient(135deg, #00E599 0%, #00b87a 100%);
-  color: #031109;
-  font-size: 15.5px;
-  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: linear-gradient(135deg, var(--mint) 0%, var(--mint-deep) 100%);
+  color: var(--mint-ink);
+  font: 800 15.5px var(--font-body);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 8px 24px rgba(0, 229, 153, 0.45),
-    0 0 32px rgba(0, 229, 153, 0.25);
-  position: relative;
   overflow: hidden;
   user-select: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 8px 26px rgba(0, 229, 153, 0.4);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, background 0.25s ease;
 }
+
+.stake-btn-mint::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 -120%;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.34), transparent);
+  transition: left 0.65s ease;
+  pointer-events: none;
+}
+
+.stake-btn-mint:hover::before { left: 120%; }
 
 .stake-btn-mint:hover {
-  background: linear-gradient(135deg, #33f0b0 0%, #00E599 100%);
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 12px 32px rgba(0, 229, 153, 0.6),
-    0 0 44px rgba(0, 229, 153, 0.4);
+  background: linear-gradient(135deg, var(--mint-bright) 0%, var(--mint) 100%);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 14px 34px rgba(0, 229, 153, 0.54),
+    var(--glow-md);
 }
 
-.stake-btn-mint:active {
-  transform: translateY(1px) scale(0.98);
-}
+.stake-btn-mint:active { transform: translateY(1px) scale(0.985); }
 
-/* ==========================================================================
-   HERO TYPOGRAPHY & COPY
-   ========================================================================== */
-.stake-hero-center {
-  position: relative;
-  z-index: 10;
-  max-width: 900px;
-  margin: 40px auto 20px;
-  padding: 0 24px;
-  text-align: center;
-}
-
-.stake-hero-tag {
+/* Quiet text button (hero) */
+.stake-btn-ghost {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px;
+  min-height: 54px;
+  padding: 0 14px;
+  border: 0;
+  background: none;
+  color: var(--mist);
+  font: 700 14.5px var(--font-body);
+  cursor: pointer;
   border-radius: 9999px;
-  background: rgba(0, 229, 153, 0.12);
-  border: 1px solid rgba(0, 229, 153, 0.35);
-  color: #00E599;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  margin-bottom: 20px;
-  box-shadow: 0 0 20px rgba(0, 229, 153, 0.2);
+  transition: color 0.2s ease, gap 0.2s ease;
 }
+
+.stake-btn-ghost:hover { color: var(--mint); gap: 12px; }
+
+/* ==========================================================================
+   HERO LAYOUT — asymmetric: argument left, live market right
+   ========================================================================== */
+.stake-hero-grid {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  align-items: center;
+  gap: 56px;
+  width: 100%;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 20px var(--gut) 64px;
+  box-sizing: border-box;
+  flex: 1;
+}
+
+.stake-hero-copy { max-width: 560px; }
 
 .stake-hero-title {
-  font-family: var(--font-display);
-  font-size: clamp(38px, 5.5vw, 68px);
-  font-weight: 800;
-  line-height: 1.06;
-  letter-spacing: -0.03em;
-  color: #ffffff;
   margin: 0 0 20px;
-  text-shadow: 0 6px 32px rgba(0, 0, 0, 0.6);
+  font-family: var(--font-display);
+  font-size: clamp(40px, 4.9vw, 70px);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.032em;
+  color: #fff;
 }
 
+/* Each line rises in sequence on load. */
+.stake-hero-title .stake-line {
+  display: block;
+  animation: stakeRise 0.95s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.stake-hero-title .stake-line:nth-child(1) { animation-delay: 0.12s; }
+.stake-hero-title .stake-line:nth-child(2) { animation-delay: 0.24s; }
+
 .stake-hero-title em {
-  font-style: normal;
-  color: #00E599;
-  text-shadow: 0 0 28px rgba(0, 229, 153, 0.4);
+  font-style: italic;
+  color: var(--mint);
+  text-shadow: 0 0 40px rgba(0, 229, 153, 0.34);
+}
+
+@keyframes stakeRise {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: none; }
 }
 
 .stake-hero-subtitle {
-  font-family: var(--font-body);
-  font-size: clamp(15px, 1.8vw, 18px);
-  color: #94a3b8;
-  max-width: 640px;
-  margin: 0 auto 32px;
-  line-height: 1.6;
+  max-width: 500px;
+  margin: 0 0 34px;
+  font-size: clamp(15px, 1.6vw, 17.5px);
+  line-height: 1.62;
+  color: var(--fog);
+  animation: stakeRise 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+.stake-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  animation: stakeRise 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
 }
 
 /* ==========================================================================
-   LIVE INSTITUTIONAL FLOW MATRIX IN HERO (REPLACES FLOATING BUBBLES)
+   SIGNATURE — live order-book depth ladder
+   One panel, deliberately. It is the only thing competing with the headline.
    ========================================================================== */
-.stake-hero-matrix-wrapper {
-  position: relative;
-  z-index: 12;
-  max-width: 960px;
+.stake-book-stack {
   width: 100%;
-  margin: 32px auto 0;
-  padding: 0 16px;
+  max-width: 400px;
+  margin-left: auto;
+  animation: stakeBookIn 1s cubic-bezier(0.16, 1, 0.3, 1) 0.26s both;
 }
 
-.stake-hero-matrix-card {
-  background: rgba(4, 20, 14, 0.78);
-  border: 1px solid rgba(0, 229, 153, 0.28);
-  border-radius: 20px;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.15), 0 0 30px rgba(0, 229, 153, 0.08);
-  padding: 14px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: all 0.3s ease;
+@keyframes stakeBookIn {
+  from { opacity: 0; transform: translateY(28px) scale(0.97); }
+  to { opacity: 1; transform: none; }
 }
 
-.stake-hero-matrix-card:hover {
-  border-color: rgba(0, 229, 153, 0.45);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.25), 0 0 40px rgba(0, 229, 153, 0.15);
+.stake-panel {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(10, 36, 23, 0.82) 0%, rgba(5, 18, 12, 0.9) 100%);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  overflow: hidden;
 }
 
-.stake-hero-matrix-header {
+.stake-panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 8px;
+  gap: 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(0, 0, 0, 0.26);
   font-family: var(--font-mono);
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fog);
 }
 
-.stake-matrix-live-badge {
+.stake-panel-head strong {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.stake-live {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #00E599;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  color: var(--mint);
+  white-space: nowrap;
 }
 
-.stake-matrix-live-dot {
-  width: 7px;
-  height: 7px;
+.stake-live-dot {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: #00E599;
-  box-shadow: 0 0 10px #00E599;
-  animation: radarPing 1.8s infinite;
+  background: var(--mint);
+  box-shadow: 0 0 9px var(--mint);
+  animation: stakePing 1.8s ease-in-out infinite;
+  flex-shrink: 0;
 }
 
-.stake-matrix-scrips-row {
+@keyframes stakePing {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.7); }
+}
+
+/* --- Depth ladder --- */
+.stake-book-rows { padding: 6px 0; }
+
+.stake-book-row {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: 1fr auto 62px;
+  align-items: center;
   gap: 10px;
+  padding: 5px 16px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  isolation: isolate;
+  animation: stakeRowIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(0.42s + var(--i, 0) * 45ms);
 }
 
-.stake-matrix-scrip-item {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 8px 12px;
+@keyframes stakeRowIn {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Resting size drawn as a depth bar behind the row. */
+.stake-book-row::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  right: 0;
+  z-index: -1;
+  width: var(--d, 0%);
+  border-radius: 3px 0 0 3px;
+  transition: width 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stake-book-row.ask::before { background: linear-gradient(90deg, transparent, var(--rose-dim)); }
+.stake-book-row.bid::before { background: linear-gradient(90deg, transparent, var(--mint-dim)); }
+
+.stake-book-px { font-weight: 700; }
+.stake-book-row.ask .stake-book-px { color: var(--rose); }
+.stake-book-row.bid .stake-book-px { color: var(--mint); }
+
+.stake-book-sz {
+  text-align: right;
+  color: var(--fog);
+  font-size: 11.5px;
+}
+
+.stake-book-mkt {
+  text-align: right;
+  color: var(--fog-dim);
+  font-size: 10.5px;
+}
+
+/* Spread divider between best bid and best ask. */
+.stake-book-spread {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 16px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: rgba(0, 229, 153, 0.05);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--fog);
+  text-transform: uppercase;
+}
+
+.stake-book-last {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  transition: color 0.25s ease;
+}
+
+/* Last-trade price flashes in the direction of the tick. */
+.stake-book-last.tick-up { animation: stakeFlashUp 0.6s ease-out; }
+.stake-book-last.tick-down { animation: stakeFlashDown 0.6s ease-out; }
+
+@keyframes stakeFlashUp {
+  0% { color: var(--mint); text-shadow: 0 0 16px rgba(0, 229, 153, 0.8); }
+  100% { color: #fff; text-shadow: none; }
+}
+
+@keyframes stakeFlashDown {
+  0% { color: var(--rose); text-shadow: 0 0 16px rgba(255, 107, 133, 0.8); }
+  100% { color: #fff; text-shadow: none; }
+}
+
+/* --- Last print: one line, replacing what was a whole second panel --- */
+.stake-book-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line-soft);
+  background: rgba(0, 0, 0, 0.22);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--fog-dim);
+  text-transform: uppercase;
+}
+
+.stake-book-print {
+  margin-left: auto;
+  color: var(--mist);
+  text-transform: none;
+  letter-spacing: 0;
+  animation: stakePrint 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.stake-book-print.up { color: var(--mint); }
+.stake-book-print.down { color: var(--rose); }
+
+@keyframes stakePrint {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ==========================================================================
+   PAGE BODY — light
+   ========================================================================== */
+.stake-content-section {
+  position: relative;
+  z-index: 10;
+  background: var(--paper-0);
+  color: var(--text-1);
+}
+
+/* Mint hairline marks the seam where the dark hero hands off to the page. */
+.stake-content-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 229, 153, 0.55), transparent);
+}
+
+/* Proof figures, moved out of the hero so the top stays quiet. A slim strip
+   is also the first thing the white body says, which suits it better. */
+.stake-proof-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  width: 100%;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 0 var(--gut);
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--line-l);
+}
+
+/* Definition list carries the semantics; strip the UA indent. */
+.stake-proof-strip dt,
+.stake-proof-strip dd { margin: 0; }
+
+.stake-proof-item {
+  padding: 26px 20px;
+  border-left: 1px solid var(--line-l);
+}
+
+.stake-proof-item:first-child { border-left: 0; padding-left: 0; }
+
+.stake-proof-val {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(20px, 2.2vw, 25px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+}
+
+.stake-proof-key {
+  margin-top: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.stake-section {
+  position: relative;
+  width: 100%;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 84px var(--gut);
+  box-sizing: border-box;
+}
+
+.stake-section-tight { padding-top: 40px; }
+
+/* Tinted band to separate major movements. Full-bleed, so it breaks the shell. */
+.stake-band {
+  max-width: none;
+  border-top: 1px solid var(--line-l);
+  border-bottom: 1px solid var(--line-l);
+  background:
+    radial-gradient(ellipse 60% 100% at 50% 0%, rgba(0, 108, 73, 0.04), transparent 70%),
+    var(--paper-1);
+}
+
+/* Keep band contents on the same measure as unbanded sections. The band is
+   full-bleed, so subtract the gutters the shell would otherwise absorb. */
+.stake-band > * {
+  max-width: calc(var(--shell) - var(--gut) * 2);
+  margin-inline: auto;
+}
+
+.stake-section-head { margin-bottom: 40px; max-width: 660px; }
+.stake-section-head-center { margin-inline: auto; text-align: center; }
+
+.stake-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--mint-text);
+}
+
+.stake-section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.3vw, 42px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  color: var(--text-1);
+}
+
+.stake-section-lede {
+  margin: 14px 0 0;
+  font-size: 15.5px;
+  line-height: 1.62;
+  color: var(--text-2);
+}
+
+/* ==========================================================================
+   TERMINAL CARD — a dark product panel sitting on the light page
+   ========================================================================== */
+.stake-term {
+  border: 1px solid rgba(0, 229, 153, 0.2);
+  border-radius: 22px;
+  background: linear-gradient(180deg, var(--ink-850) 0%, var(--ink-900) 100%);
+  box-shadow: 0 30px 70px rgba(12, 26, 20, 0.28), 0 2px 6px rgba(12, 26, 20, 0.06);
+  color: var(--paper);
+  overflow: hidden;
+}
+
+.stake-term-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(0, 0, 0, 0.3);
   font-family: var(--font-mono);
-  user-select: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--fog);
 }
 
-.stake-matrix-scrip-item:hover {
-  background: rgba(0, 229, 153, 0.12);
-  border-color: rgba(0, 229, 153, 0.4);
+.stake-term-dots { display: flex; align-items: center; gap: 7px; margin-right: 8px; }
+.stake-term-dot { width: 11px; height: 11px; border-radius: 50%; }
+
+.stake-term-body { padding: 30px 28px 32px; }
+
+.stake-term-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 26px;
+  margin-bottom: 28px;
+}
+
+.stake-index-val {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(32px, 4vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #fff;
+}
+
+.stake-index-val span {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--fog-dim);
+}
+
+.stake-index-move {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--mint);
+}
+
+.stake-stat-row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+.stake-stat {
+  min-width: 148px;
+  padding: 12px 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.035);
+  transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease;
+}
+
+.stake-stat:hover {
+  border-color: var(--line);
+  background: rgba(0, 229, 153, 0.06);
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
 }
 
-.stake-matrix-scrip-sym {
-  font-size: 13px;
-  font-weight: 800;
-  color: #ffffff;
+.stake-stat-key {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fog-dim);
 }
 
-.stake-matrix-scrip-price {
+.stake-stat-val {
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Live quote tiles. The reveal wrapper owns entry motion so the button below is
+   free to own hover motion — merging both onto one element loses the fade. */
+.stake-quote-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 14px;
+}
+
+.stake-quote-grid > .stake-reveal { display: flex; }
+
+.stake-quote {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 18px;
+  border: 1px solid var(--line-soft);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.035);
+  color: inherit;
+  font-family: var(--font-body);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.stake-quote:hover {
+  border-color: rgba(0, 229, 153, 0.42);
+  background: rgba(0, 229, 153, 0.07);
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
+}
+
+.stake-quote-sym {
+  font-family: var(--font-mono);
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.stake-quote-name {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--fog-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 130px;
+}
+
+.stake-quote-px {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  text-align: right;
+}
+
+.stake-quote-chg {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* ==========================================================================
+   MARKET TABLE — light, this is data to read rather than a screenshot
+   ========================================================================== */
+.stake-table-wrap {
+  border: 1px solid var(--line-l);
+  border-radius: 18px;
+  background: var(--paper-0);
+  box-shadow: 0 4px 18px rgba(12, 26, 20, 0.04);
+  overflow: hidden;
+}
+
+.stake-table-scroll { overflow-x: auto; }
+
+.stake-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  text-align: left;
+  min-width: 720px;
+}
+
+.stake-table thead th {
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--line-l);
+  background: var(--paper-1);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.stake-table tbody tr {
+  border-bottom: 1px solid var(--line-l-soft);
+  transition: background 0.18s ease;
+}
+
+.stake-table tbody tr:last-child { border-bottom: 0; }
+.stake-table tbody tr:hover { background: var(--paper-1); }
+.stake-table td { padding: 13px 20px; color: var(--text-2); vertical-align: middle; }
+
+.stake-cell-sym {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.stake-cell-name { margin-top: 2px; font-size: 12px; color: var(--text-3); }
+
+.stake-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 7px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 700;
-  color: #cbd5e1;
 }
 
-.stake-matrix-scrip-tag {
-  font-size: 10.5px;
-  font-weight: 800;
-  padding: 2px 6px;
+.stake-chip.up { background: var(--mint-text-bg); color: var(--mint-text); }
+.stake-chip.down { background: var(--rose-text-bg); color: var(--rose-text); }
+
+.stake-trade-btn {
+  padding: 7px 15px;
+  border: 1px solid rgba(0, 108, 73, 0.24);
+  border-radius: 9px;
+  background: var(--mint-text-bg);
+  color: var(--mint-text);
+  font: 700 12.5px var(--font-body);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.stake-trade-btn:hover {
+  background: var(--mint-text);
+  border-color: var(--mint-text);
+  color: #fff;
+}
+
+/* ==========================================================================
+   PROCESS STEPS — a real ordered sequence, so numbering earns its place
+   ========================================================================== */
+.stake-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(258px, 1fr));
+  gap: 20px;
+}
+
+.stake-steps > .stake-reveal { display: flex; }
+
+.stake-step {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 28px 26px 26px;
+  border: 1px solid var(--line-l);
+  border-radius: 18px;
+  background: var(--paper-0);
+  box-shadow: 0 2px 10px rgba(12, 26, 20, 0.03);
+  overflow: hidden;
+  transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stake-step::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 26px;
+  right: 26px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--mint-text), transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stake-step:hover {
+  border-color: rgba(0, 108, 73, 0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px rgba(12, 26, 20, 0.1);
+}
+
+.stake-step:hover::after { transform: scaleX(1); }
+
+.stake-step-n {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mint-text);
+}
+
+.stake-step h3 {
+  margin: 12px 0 9px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-1);
+}
+
+.stake-step p { margin: 0; font-size: 13.5px; line-height: 1.62; color: var(--text-2); }
+
+/* ==========================================================================
+   AGENTIC SHOWCASE CARDS — white card, dark product panel beneath
+   ========================================================================== */
+.stake-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 26px;
+}
+
+.agentic-feature-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid var(--line-l);
+  border-radius: 26px;
+  background: var(--paper-0);
+  box-shadow: 0 4px 20px rgba(12, 26, 20, 0.04);
+  overflow: hidden;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+.agentic-feature-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(0, 108, 73, 0.28);
+  box-shadow: 0 24px 54px rgba(12, 26, 20, 0.12);
+}
+
+.stake-showcase-copy { padding: 38px 32px 26px; }
+
+.stake-showcase-title {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: clamp(24px, 2.6vw, 30px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+}
+
+.stake-showcase-lede {
+  margin: 0 0 24px;
+  max-width: 400px;
+  font-size: 14.5px;
+  line-height: 1.62;
+  color: var(--text-2);
+}
+
+.stake-showcase-panel {
+  margin: 0 18px 18px;
+  border: 1px solid rgba(0, 229, 153, 0.2);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--ink-850) 0%, var(--ink-900) 100%);
+  box-shadow: 0 16px 36px rgba(12, 26, 20, 0.22);
+  color: var(--paper);
+  overflow: hidden;
+}
+
+/* Agent decision trace */
+.stake-trace { margin: 0; padding: 10px 0; list-style: none; }
+
+.stake-trace-row {
+  display: grid;
+  grid-template-columns: 62px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  animation: stakeRowIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+.stake-trace-time { color: var(--fog-dim); }
+.stake-trace-label { color: var(--mist); }
+
+.stake-trace-tag {
+  padding: 2px 7px;
   border-radius: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--fog);
 }
 
-.stake-matrix-scrip-tag.up {
-  color: #00E599;
-  background: rgba(0, 229, 153, 0.18);
+.stake-trace-tag.signal { background: rgba(86, 204, 242, 0.16); color: var(--sky); }
+.stake-trace-tag.risk { background: rgba(255, 107, 133, 0.16); color: var(--rose); }
+.stake-trace-tag.fill { background: var(--mint-dim); color: var(--mint); }
+
+/* Risk rails readout */
+.stake-rails { margin: 0; padding: 12px 16px 4px; }
+
+.stake-rail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
 }
 
-.stake-matrix-scrip-tag.down {
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.18);
+.stake-rail-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--mist);
 }
 
-.stake-matrix-scrip-tag.down {
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.18);
+.stake-rail-val {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
 }
 
-/* Alert List Trigger Pulse Animation */
+.stake-rail-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 11px 16px 14px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--fog);
+}
+
+/* ==========================================================================
+   CLOSING CTA — dark banner
+   ========================================================================== */
+.stake-cta {
+  position: relative;
+  padding: 62px 40px;
+  border: 1px solid rgba(0, 229, 153, 0.3);
+  border-radius: 26px;
+  background:
+    radial-gradient(ellipse 70% 130% at 50% 0%, rgba(0, 229, 153, 0.14), transparent 66%),
+    linear-gradient(160deg, var(--ink-800) 0%, var(--ink-950) 100%);
+  box-shadow: 0 30px 70px rgba(12, 26, 20, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  color: var(--paper);
+  text-align: center;
+  overflow: hidden;
+}
+
+.stake-cta-title {
+  max-width: 700px;
+  margin: 16px auto 14px;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.6vw, 42px);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.026em;
+  color: #fff;
+}
+
+.stake-cta-lede {
+  max-width: 580px;
+  margin: 0 auto 30px;
+  font-size: 15.5px;
+  line-height: 1.62;
+  color: var(--fog);
+}
+
+.stake-cta-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stake-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 229, 153, 0.28);
+  background: rgba(0, 229, 153, 0.1);
+  color: var(--mint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   FOOTER — dark, bookending the hero
+   ========================================================================== */
+.stake-footer {
+  border-top: 1px solid var(--line-l);
+  background: #020806;
+  color: var(--fog);
+  font-size: 13px;
+}
+
+.stake-footer-inner {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 46px var(--gut) 40px;
+  box-sizing: border-box;
+}
+
+.stake-footer-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 22px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.stake-footer-links { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.stake-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--mist);
+  font: 600 13px var(--font-body);
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.stake-footer-link:hover { color: var(--mint); background: rgba(0, 229, 153, 0.08); }
+
+.stake-footer-fine { margin-top: 22px; font-size: 12px; line-height: 1.7; color: var(--fog-dim); }
+.stake-footer-fine p { margin: 0 0 8px; }
+.stake-footer-fine p:last-child { margin: 0; }
+
+/* ==========================================================================
+   MODAL — was referenced but never defined; now a real light dialog
+   ========================================================================== */
+.stake-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 18, 13, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: stakeFade 0.25s ease both;
+}
+
+@keyframes stakeFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.stake-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 620px;
+  max-height: min(84vh, 760px);
+  border: 1px solid var(--line-l);
+  border-radius: 22px;
+  background: var(--paper-0);
+  box-shadow: 0 40px 90px rgba(12, 26, 20, 0.3);
+  color: var(--text-1);
+  overflow: hidden;
+  animation: stakeModalIn 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes stakeModalIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+.stake-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--line-l);
+  background: var(--paper-1);
+}
+
+.stake-modal-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mint-text);
+}
+
+.stake-modal-title {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+}
+
+.stake-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line-l);
+  border-radius: 50%;
+  background: var(--paper-0);
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.stake-modal-close:hover {
+  background: var(--rose-text-bg);
+  color: var(--rose-text);
+  transform: rotate(90deg);
+}
+
+.stake-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 24px;
+  font-size: 13.8px;
+  line-height: 1.72;
+  color: var(--text-2);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 108, 73, 0.3) transparent;
+}
+
+.stake-modal-body::-webkit-scrollbar { width: 8px; }
+.stake-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 108, 73, 0.26);
+  border-radius: 99px;
+}
+
+.stake-modal-body h4 {
+  margin: 22px 0 7px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mint-text);
+}
+
+.stake-modal-body h4:first-child { margin-top: 0; }
+.stake-modal-body p { margin: 0 0 12px; }
+.stake-modal-body strong { color: var(--text-1); }
+.stake-modal-body ul { margin: 0 0 12px; padding-left: 20px; }
+.stake-modal-body li { margin-bottom: 6px; }
+.stake-modal-body li::marker { color: var(--mint-text); }
+
+.stake-modal-foot {
+  padding: 18px 24px 22px;
+  border-top: 1px solid var(--line-l);
+  background: var(--paper-1);
+  text-align: center;
+}
+
+.stake-modal-foot p { margin: 0 0 12px; font-size: 13px; color: var(--text-2); }
+
+/* ==========================================================================
+   FAQ ACCORDION — animated open/close via grid-template-rows
+   ========================================================================== */
+.stake-faq { display: flex; flex-direction: column; gap: 10px; }
+
+.stake-faq-item {
+  border: 1px solid var(--line-l);
+  border-radius: 13px;
+  background: var(--paper-0);
+  overflow: hidden;
+  transition: border-color 0.25s ease, background 0.25s ease;
+}
+
+.stake-faq-item.is-open {
+  border-color: rgba(0, 108, 73, 0.3);
+  background: var(--paper-1);
+}
+
+.stake-faq-q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 15px 17px;
+  border: 0;
+  background: none;
+  color: var(--text-1);
+  font: 700 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.stake-faq-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--mint-text);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stake-faq-a {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stake-faq-item.is-open .stake-faq-a { grid-template-rows: 1fr; }
+
+.stake-faq-a > div { overflow: hidden; }
+
+.stake-faq-a p {
+  margin: 0;
+  padding: 0 17px 16px;
+  font-size: 13.4px;
+  line-height: 1.68;
+  color: var(--text-2);
+}
+
+/* ==========================================================================
+   ALERTS — consumed by AlertsManager.jsx and AlertsManagerDrawer.jsx.
+   Keep in sync with those components before editing.
+   ========================================================================== */
 @keyframes alertTriggerPulse {
-  0% {
+  0%, 100% {
     box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6), 0 4px 12px rgba(0, 0, 0, 0.05);
     border-color: rgba(245, 158, 11, 0.9);
     background-color: rgba(254, 243, 199, 0.5);
@@ -534,11 +1550,6 @@
     background-color: rgba(254, 243, 199, 0.9);
     transform: scale(1.008);
   }
-  100% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6), 0 4px 12px rgba(0, 0, 0, 0.05);
-    border-color: rgba(245, 158, 11, 0.9);
-    background-color: rgba(254, 243, 199, 0.5);
-  }
 }
 
 .stake-alert-triggered-pulse {
@@ -548,32 +1559,68 @@
 }
 
 /* ==========================================================================
-   CONTENT SECTION & CARDS
+   RESPONSIVE
    ========================================================================== */
-.stake-content-section {
-  position: relative;
-  background: #ffffff;
-  color: #0f172a;
-  z-index: 10;
+@media (max-width: 1080px) {
+  .stake-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 44px;
+    padding-top: 8px;
+  }
+
+  .stake-hero-copy { max-width: none; }
+  .stake-book-stack { margin-inline: 0; max-width: 480px; }
 }
 
-.stake-section-title {
-  font-family: var(--font-display);
-  font-size: clamp(24px, 3.2vw, 36px);
-  font-weight: 800;
-  color: #0f172a;
-  letter-spacing: -0.02em;
-}
-
-/* Responsive Nav & Mobile Rules */
 @media (max-width: 860px) {
-  .stake-hero-section { min-height: 800px; height: auto; }
-  .stake-landing-nav { min-height: 68px; padding: 0 20px; }
-  .stake-landing-nav-links { display: none; }
-  .stake-glass-button { min-height: 38px; padding: 0 16px; font-size: 12.5px; }
-  .bubble-pos-5, .bubble-pos-6 { display: none; }
-  .bubble-pos-1 { top: 12%; left: 3%; }
-  .bubble-pos-2 { top: 12%; right: 3%; }
-  .bubble-pos-3 { top: 78%; left: 3%; }
-  .bubble-pos-4 { top: 78%; right: 3%; }
+  .stake-proof-strip { grid-template-columns: repeat(2, 1fr); }
+
+  /* With two columns, the third item starts a new row and must lose the rule
+     that only makes sense mid-row. */
+  .stake-proof-item:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .stake-proof-item:nth-child(n + 3) { border-top: 1px solid var(--line-l); }
+}
+
+@media (max-width: 720px) {
+  .stake-landing-root { --gut: 18px; }
+  .stake-landing-nav { min-height: 66px; padding: 14px var(--gut); }
+  .stake-glass-button { min-height: 38px; padding: 0 15px; font-size: 12.5px; }
+  .stake-hero-section { min-height: auto; }
+  .stake-hero-grid { padding: 24px var(--gut) 48px; }
+  .stake-section { padding: 58px var(--gut); }
+  .stake-term-body { padding: 22px 18px 24px; }
+  .stake-showcase-copy { padding: 30px 22px 22px; }
+  .stake-cta { padding: 44px 22px; }
+  .stake-proof-item { padding: 20px 16px; }
+
+  .stake-modal-overlay { padding: 0; align-items: flex-end; }
+
+  .stake-modal {
+    max-width: none;
+    max-height: 92vh;
+    border-radius: 22px 22px 0 0;
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION — hold every animated element at its resting state
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .stake-landing-root *,
+  .stake-landing-root *::before,
+  .stake-landing-root *::after,
+  .stake-modal-overlay,
+  .stake-modal,
+  .stake-modal * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .stake-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
