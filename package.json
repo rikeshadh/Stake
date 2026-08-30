@@ -21,6 +21,7 @@
     "esbuild": "^0.28.2",
     "express": "^5.2.1",
     "lucide-react": "^1.31.0",
+    "mongodb": "^7.6.0",
     "mongoose": "^9.9.4",
     "motion": "^13.1.0",
     "react": "^19.2.8",

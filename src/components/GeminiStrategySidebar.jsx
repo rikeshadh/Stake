@@ -67,7 +67,7 @@ export function GeminiStrategySidebar({
     <aside
       id="ai-insights-split-sidebar"
       aria-label="Stake AI Split Screen Panel"
-      className="fixed top-14 right-0 bottom-0 w-full sm:w-[400px] md:w-[420px] bg-white text-slate-900 z-40 shadow-xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200"
+      className="fixed top-14 right-0 bottom-0 w-full md:w-[420px] bg-white text-slate-900 z-40 shadow-xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200"
     >
       <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
         <div className="flex items-center gap-2.5">

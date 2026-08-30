@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   Zap,
   Bell,
-  Loader2,
   Check,
   Scale,
   Activity,
@@ -42,13 +41,12 @@ export function StockDetail({
   alerts = [], // <-- NEW: accept alerts prop
 }) {
   const [chartType, setChartType] = useState("line");
-  const [showVolume, setShowVolume] = useState(true);
+  const [showVolume, setShowVolume] = useState(false);
   const [range, setRange] = useState("1M");
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [liveQuote, setLiveQuote] = useState(null);
   const [liveHistory, setLiveHistory] = useState(null);
   const [liveCandles, setLiveCandles] = useState(null);
-  const [isLoadingLive, setIsLoadingLive] = useState(false);
 
   // Fetch real-time live data via yfinance endpoint with in-memory caching for instant switching
   useEffect(() => {
@@ -62,8 +60,6 @@ export function StockDetail({
         if (cached.candles?.length > 0) setLiveCandles(cached.candles);
         if (cached.history?.length > 0) setLiveHistory(cached.history);
         if (cached.quote) setLiveQuote(cached.quote);
-      } else {
-        setIsLoadingLive(true);
       }
 
       try {
@@ -102,8 +98,6 @@ export function StockDetail({
         }
       } catch (e) {
         console.error("Live stock feed error:", e);
-      } finally {
-        if (isMounted) setIsLoadingLive(false);
       }
     }
 
@@ -134,9 +128,9 @@ export function StockDetail({
   const bgItem = darkMode ? "#1a2236" : "#f8fafc";
 
   return (
-    <div style={{ paddingTop: 16, textAlign: "left", maxWidth: 1200, margin: "0 auto", paddingBottom: 48 }}>
+    <div className="stock-detail-page" style={{ paddingTop: 16, textAlign: "left", maxWidth: 1200, margin: "0 auto", paddingBottom: 48 }}>
       {/* Back & Quick Actions Bar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div className="stock-detail-actions" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <button
           onClick={onBack}
           style={{
@@ -157,7 +151,7 @@ export function StockDetail({
           <ArrowLeft size={15} /> Back to Markets
         </button>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="stock-detail-action-buttons" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {/* Set Alert Button - Neutral when inactive, amber when active */}
 <button
   onClick={() => setIsAlertModalOpen(true)}
@@ -231,7 +225,7 @@ export function StockDetail({
           boxShadow: darkMode ? "0 10px 30px rgba(0,0,0,0.3)" : "0 10px 30px rgba(0,0,0,0.03)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div className="stock-detail-identity" style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div
             style={{
               width: 52,
@@ -254,23 +248,6 @@ export function StockDetail({
               <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.025em", margin: 0, color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>
                 {selected}
               </h1>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  color: "#10b981",
-                  background: "rgba(16,185,129,0.12)",
-                  padding: "2px 8px",
-                  borderRadius: 6,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                {isLoadingLive ? <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> : null}
-                {isLoadingLive ? "UPDATING..." : "LIVE FEED"}
-              </span>
             </div>
             <div style={{ fontSize: 14, color: textSecondary, marginTop: 3, fontWeight: 600 }}>
               {stockMeta.name} • {stockMeta.sector || "Equities"}
@@ -278,7 +255,7 @@ export function StockDetail({
           </div>
         </div>
 
-        <div style={{ textAlign: "right" }}>
+        <div className="stock-detail-price" style={{ textAlign: "right" }}>
           <div style={{ fontSize: 32, fontWeight: 900, fontFamily: "'JetBrains Mono', monospace", color: textPrimary }}>
             {formatStockPrice(currentPrice, currency)}
           </div>
@@ -303,6 +280,7 @@ export function StockDetail({
 
       {/* Full-width native SVG price chart */}
       <div
+        className="stock-detail-chart-card"
         style={{
           width: "100%",
           borderRadius: 22,
@@ -315,7 +293,7 @@ export function StockDetail({
         }}
       >
         {/* Chart Header Controls - Unified layout for Lines and Candlesticks */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+        <div className="stock-detail-chart-controls" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               {/* Chart Type Toggle: Lines vs Candlesticks */}
             <div className={`stake-pill-group ${darkMode ? "stake-pill-group-dark" : ""}`}>
@@ -465,6 +443,7 @@ export function StockDetail({
         {/* Position Card (if owned) */}
         {hasPosition ? (
           <div
+            className="stock-detail-position-card"
             style={{
               borderRadius: 22,
               padding: 22,
@@ -563,6 +542,7 @@ export function StockDetail({
 
         return (
           <div
+            className="stock-detail-key-metrics"
             style={{
               borderRadius: 24,
               padding: "24px 26px",
@@ -583,36 +563,6 @@ export function StockDetail({
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "4px 10px",
-                    borderRadius: 8,
-                    background: darkMode ? "rgba(16,185,129,0.12)" : "#f0fdf4",
-                    border: `1px solid ${darkMode ? "rgba(16,185,129,0.25)" : "#bbf7d0"}`,
-                    color: "#10b981",
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}
-                >
-                  LIVE DATA
-                </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "4px 10px",
-                    borderRadius: 8,
-                    background: bgItem,
-                    border: `1px solid ${borderCol}`,
-                    color: textSecondary,
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}
-                >
-                  {stockMeta.sector || "Equities"}
-                </span>
-              </div>
             </div>
 
             {/* 4 Hero Highlight Bento Cards */}

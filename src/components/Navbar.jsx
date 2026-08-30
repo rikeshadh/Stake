@@ -440,7 +440,7 @@ export function Navbar({
                         }}
                         className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
                       >
-                        <Sliders size={14} className="text-emerald-600" /> Settings & Cluster
+                        <Sliders size={14} className="text-emerald-600" /> Settings
                       </button>
 
                       <button

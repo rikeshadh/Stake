@@ -266,4 +266,58 @@ code {
   .market-grid {
     grid-template-columns: 1fr;
   }
+
+  .stock-detail-page {
+    padding-top: 8px !important;
+    padding-bottom: 28px !important;
+  }
+
+  .stock-detail-actions,
+  .stock-detail-action-buttons,
+  .stock-detail-chart-controls {
+    align-items: stretch !important;
+  }
+
+  .stock-detail-actions {
+    flex-direction: column !important;
+    gap: 10px;
+  }
+
+  .stock-detail-action-buttons {
+    width: 100%;
+  }
+
+  .stock-detail-action-buttons > button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .stock-detail-identity {
+    width: 100%;
+  }
+
+  .stock-detail-price {
+    width: 100%;
+    text-align: left !important;
+  }
+
+  .stock-detail-price > div:last-child {
+    justify-content: flex-start !important;
+  }
+
+  .stock-detail-chart-card,
+  .stock-detail-position-card,
+  .stock-detail-key-metrics {
+    padding: 16px !important;
+    border-radius: 16px !important;
+  }
+
+  .stock-detail-chart-controls {
+    flex-direction: column;
+  }
+
+  .stock-detail-chart-controls > div {
+    width: 100%;
+    overflow-x: auto;
+  }
 }
