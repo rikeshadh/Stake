@@ -11,7 +11,7 @@ import {
   Check,
 } from "lucide-react";
 import { Sparkline } from "./Charts";
-import { fmt, fmtShares, initials, formatMoney } from "../utils";
+import { fmt, formatMoney } from "../utils";
 
 const COLOR_THEMES = {
   emerald: {
@@ -516,11 +516,11 @@ export function DashboardOverview({
 
         {/* Right Info: Concentration & Diversification Summary */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Spectrum Bar Distribution */}
+          {/* Position Breakdown & 24h Trends */}
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color: textPrimary, fontSize: 13, fontWeight: 800 }}>Portfolio Distribution</span>
+                <span style={{ color: textPrimary, fontSize: 13, fontWeight: 800 }}>Position Breakdown &amp; 24h Trends</span>
                 <span
                   style={{
                     fontSize: 10.5,
@@ -531,7 +531,7 @@ export function DashboardOverview({
                     color: hasCapital ? "#059669" : textSecondary,
                   }}
                 >
-                  {activeItems.length > 0 ? `${activeItems.length} ${activeItems.length === 1 ? "Position Category" : "Position Categories"}` : "Unallocated"}
+                  {activeItems.length > 0 ? `${activeItems.length} positions` : "Unallocated"}
                 </span>
               </div>
               <span style={{ color: textSecondary, fontSize: 11.5, fontFamily: "'JetBrains Mono', monospace" }}>
@@ -539,31 +539,16 @@ export function DashboardOverview({
               </span>
             </div>
 
-            {/* Spectrum Bar */}
-            <div
-              style={{
-                display: "flex",
-                height: 10,
-                borderRadius: 999,
-                overflow: "hidden",
-                background: darkMode ? "#334155" : "#e2e8f0",
-                boxShadow: "inset 0 1px 3px rgba(0,0,0,0.06)",
-              }}
-            >
-              {activeItems.length > 0 ? (
-                activeItems.map((item, idx) => (
-                  <div
-                    key={`bar-${item.id}-${idx}`}
-                    style={{
-                      width: `${item.pct}%`,
-                      background: item.color,
-                      transition: "all 0.3s ease",
-                    }}
-                    title={`${item.name}: ${item.pct}%`}
-                  />
-                ))
-              ) : (
-                <div style={{ width: "100%", background: darkMode ? "#475569" : "#cbd5e1", opacity: 0.6 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {activeItems.length > 0 ? activeItems.slice(0, 3).map((item, idx) => (
+                <div key={`trend-${item.id}-${idx}`} onMouseEnter={() => setActiveIndex(idx)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 9px", borderRadius: 10, background: activeIndex === idx ? bgItemHover : bgCard, border: `1px solid ${activeIndex === idx ? item.color : borderCol}`, cursor: "default" }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
+                  <span style={{ minWidth: 42, fontSize: 11, fontWeight: 800, color: textPrimary }}>{item.symbol}</span>
+                  {!item.isCash && item.sparkline ? <Sparkline history={item.sparkline} color={item.gain >= 0 ? "#10b981" : "#ef4444"} w={72} h={24} /> : <span style={{ flex: 1, height: 2, background: item.color, opacity: 0.55 }} />}
+                  <span style={{ marginLeft: "auto", fontSize: 10.5, fontWeight: 800, color: item.isCash ? textSecondary : item.gain >= 0 ? "#10b981" : "#ef4444", fontFamily: "'JetBrains Mono', monospace" }}>{item.isCash ? `${item.pct}%` : `${item.gain >= 0 ? "+" : ""}${fmt(item.gainPct)}%`}</span>
+                </div>
+              )) : (
+                <div style={{ padding: "14px", borderRadius: 10, background: bgRow, color: textSecondary, fontSize: 11.5 }}>Deposit funds to create your first position.</div>
               )}
             </div>
           </div>
@@ -625,164 +610,6 @@ export function DashboardOverview({
         </div>
       </div>
 
-      {/* Position Matrix Breakdown with Sparklines */}
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 800, color: textPrimary, marginBottom: 12 }}>
-          {viewMode === "assets" ? "Position Breakdown & 24h Trends" : "Sector Exposures"}
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {activeItems.length > 0 ? (
-            activeItems.map((item, idx) => {
-              const isSelected = activeIndex === idx;
-
-              return (
-                <div
-                  key={item.id}
-                  onMouseEnter={() => setActiveIndex(idx)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "12px 16px",
-                    borderRadius: 14,
-                    background: isSelected ? bgItemHover : bgRow,
-                    border: `1px solid ${isSelected ? item.color : borderCol}`,
-                    transition: "all 0.15s ease",
-                    flexWrap: "wrap",
-                    gap: 12,
-                  }}
-                >
-                  {/* Symbol & Name */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 180 }}>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 10,
-                        background: `${item.color}22`,
-                        color: item.color,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontWeight: 800,
-                        fontSize: 13,
-                        border: `1px solid ${item.color}44`,
-                      }}
-                    >
-                      {item.isCash ? "$" : initials(item.name || item.symbol)}
-                    </div>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: textPrimary }}>
-                          {item.symbol || item.name}
-                        </span>
-                        {item.category && (
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: textSecondary,
-                              padding: "1px 6px",
-                              borderRadius: 4,
-                              background: darkMode ? "#1e293b" : "#e2e8f0",
-                            }}
-                          >
-                            {item.category}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 11.5, color: textSecondary, marginTop: 2 }}>
-                        {item.isCash
-                          ? "Available for trading or AI agent"
-                          : item.shares !== null && item.shares !== undefined
-                          ? `${fmtShares(item.shares)} shares @ $${fmt(item.price)}`
-                          : `${item.count || 1} asset positions`}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 24-Hour Mini-Sparkline */}
-                  {!item.isCash && item.sparkline && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 6px" }}>
-                      <div style={{ width: 80, height: 28 }}>
-                        <Sparkline
-                          history={item.sparkline}
-                          color={item.gain >= 0 ? "#10b981" : "#ef4444"}
-                          w={80}
-                          h={28}
-                        />
-                      </div>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: item.gain >= 0 ? "#10b981" : "#ef4444",
-                          fontFamily: "'JetBrains Mono', monospace",
-                        }}
-                      >
-                        {item.gain >= 0 ? "+" : ""}{fmt(item.gainPct)}%
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Weight Indicator */}
-                  <div style={{ flex: "1 1 100px", maxWidth: 160, padding: "0 10px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
-                      <span style={{ color: textSecondary }}>Weight</span>
-                      <span style={{ color: item.color, fontFamily: "'JetBrains Mono', monospace" }}>{item.pct}%</span>
-                    </div>
-                    <div style={{ height: 6, width: "100%", borderRadius: 999, background: darkMode ? "#334155" : "#e2e8f0", overflow: "hidden" }}>
-                      <div
-                        style={{
-                          height: "100%",
-                          width: `${item.pct}%`,
-                          background: item.color,
-                          borderRadius: 999,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Valuation & Gain/Loss */}
-                  <div style={{ textAlign: "right", minWidth: 90 }}>
-                    <div style={{ fontSize: 14.5, fontWeight: 800, color: textPrimary, fontFamily: "'JetBrains Mono', monospace" }}>
-                      {privacyMode ? "••••••••" : formatMoney(item.value, currency)}
-                    </div>
-                    {item.gain !== undefined && !item.isCash && (
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: item.gain >= 0 ? "#10b981" : "#ef4444",
-                          fontFamily: "'JetBrains Mono', monospace",
-                          marginTop: 1,
-                        }}
-                      >
-                        {item.gain >= 0 ? "+" : ""}${fmt(item.gain)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div
-              style={{
-                padding: "24px 20px",
-                borderRadius: 14,
-                background: bgRow,
-                border: `1px dashed ${borderCol}`,
-                textAlign: "center",
-                color: textSecondary,
-                fontSize: 13,
-              }}
-            >
-              No active positions or funds yet. Deposit capital or explore markets to start building your portfolio.
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

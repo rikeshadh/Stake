@@ -17,7 +17,6 @@ import {
   Globe,
 } from "lucide-react";
 import { CandlestickChart } from "./Charts";
-import { RechartsStockTrend } from "./RechartsStockTrend";
 import { SetAlertModal } from "./SetAlertModal";
 import { fetchYFinanceQuote, fetchYFinanceChart } from "../api";
 import { fmt, fmtShares, initials, formatStockPrice, formatMoney, getCurrencySymbol } from "../utils";
@@ -42,7 +41,7 @@ export function StockDetail({
   orders = [],
   alerts = [], // <-- NEW: accept alerts prop
 }) {
-  const [chartType, setChartType] = useState("lines");
+  const [chartType, setChartType] = useState("line");
   const [showVolume, setShowVolume] = useState(true);
   const [range, setRange] = useState("1M");
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
@@ -302,7 +301,7 @@ export function StockDetail({
         </div>
       </div>
 
-      {/* 1. FULL WIDTH STOCK TREND & CANDLESTICK CHART (Recharts Integrated) */}
+      {/* Full-width native SVG price chart */}
       <div
         style={{
           width: "100%",
@@ -318,12 +317,12 @@ export function StockDetail({
         {/* Chart Header Controls - Unified layout for Lines and Candlesticks */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            {/* Chart Type Toggle: Lines vs Candlesticks */}
+              {/* Chart Type Toggle: Lines vs Candlesticks */}
             <div className={`stake-pill-group ${darkMode ? "stake-pill-group-dark" : ""}`}>
               <button
                 id="stock-chart-type-lines"
-                onClick={() => setChartType("lines")}
-                className={`stake-pill-btn ${darkMode ? "stake-pill-btn-dark" : ""} ${chartType === "lines" ? "stake-pill-btn-active" : ""}`}
+                onClick={() => setChartType("line")}
+                className={`stake-pill-btn ${darkMode ? "stake-pill-btn-dark" : ""} ${chartType === "line" ? "stake-pill-btn-active" : ""}`}
               >
                 <TrendingUp size={14} /> Lines
               </button>
@@ -366,35 +365,19 @@ export function StockDetail({
         </div>
 
         <div style={{ width: "100%", marginTop: 8 }}>
-          {chartType === "lines" ? (
-            <RechartsStockTrend
-              ticker={selected}
-              basePrice={currentPrice}
-              currency={currency}
-              liveQuote={liveQuote}
-              liveHistory={liveHistory}
-              liveCandles={liveCandles}
-              height={350}
-              darkMode={darkMode}
-              showVolume={showVolume}
-              range={range}
-              orders={orders}
-            />
-          ) : (
-            <CandlestickChart
-              history={chartDataHistory}
-              candles={liveCandles}
-              height={340}
-              currency={currency}
-              darkMode={darkMode}
-              showVolume={showVolume}
-              chartType={chartType}
-              range={range}
-              onChartTypeChange={setChartType}
-              orders={orders}
-              ticker={selected}
-            />
-          )}
+          <CandlestickChart
+            history={chartDataHistory}
+            candles={liveCandles}
+            height={340}
+            currency={currency}
+            darkMode={darkMode}
+            showVolume={showVolume}
+            chartType={chartType}
+            range={range}
+            onChartTypeChange={setChartType}
+            orders={orders}
+            ticker={selected}
+          />
         </div>
       </div>
 

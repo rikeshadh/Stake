@@ -323,11 +323,6 @@ export function LandingPage({ onOpenLogin, onOpenSignup, onOpenAuth }) {
 
   const handleEnter = handleOpenSignup;
 
-  const scrollTo = (id) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
-  };
-
   /* Modal: close on Escape, lock the page behind it, and return focus on exit. */
   useEffect(() => {
     if (!activeModal) return;

@@ -129,6 +129,7 @@ export function AgentTab({
   const [scanLoading, setScanLoading] = useState(false);
   const [stakeAiOpen, setStakeAiOpen] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState("radar");
+  const [strategyFlow, setStrategyFlow] = useState(user?.agentStrategy ? "summary" : "picker");
 
   // Backtest Simulator State
   const [btStrategy, setBtStrategy] = useState("dip_buyer");
@@ -335,9 +336,11 @@ export function AgentTab({
       await refreshAgentFeed();
 
       showToast?.(`✅ ${selectedStrategy?.name || "Strategy"} successfully deployed and armed.`);
+      setStrategyFlow("summary");
     } catch (err) {
       console.warn("Deploy error:", err);
       showToast?.("Strategy settings configured locally.");
+      setStrategyFlow("summary");
     } finally {
       setLoading(false);
     }
@@ -502,10 +505,10 @@ export function AgentTab({
               id="agent-master-toggle-btn"
               type="button"
               onClick={handleToggleAgent}
-              className={`inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-black transition-all cursor-pointer shadow-md backdrop-blur-sm border ${
+              className={`stake-agent-primary-action inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-black transition-all cursor-pointer shadow-md border ${
                 agentEnabled
-                  ? "bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 border-rose-500/40"
-                  : "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border-emerald-500/40"
+                  ? "stake-agent-pause-action bg-rose-600 hover:bg-rose-700 border-rose-700"
+                  : "bg-emerald-600 hover:bg-emerald-700 border-emerald-700"
               }`}
             >
               {agentEnabled ? <Pause size={15} /> : <Play size={15} />}
@@ -569,7 +572,7 @@ export function AgentTab({
       <div className="stake-agent-tabs flex items-center gap-2 border-b border-emerald-500/15 pb-3 overflow-x-auto">
         {[
           { id: "radar", label: "Signal Radar", icon: Activity },
-          { id: "rules", label: "Strategy Settings", icon: SlidersHorizontal },
+          { id: "rules", label: "Strategies", icon: SlidersHorizontal },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = activeSubTab === tab.id;
@@ -577,10 +580,10 @@ export function AgentTab({
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap backdrop-blur-md border ${
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap border ${
                 active
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shadow-lg shadow-emerald-500/10"
-                  : "bg-slate-900/40 text-slate-400 hover:text-emerald-300 hover:bg-slate-900/60 border-emerald-500/10"
+                  ? "stake-agent-tab-active bg-emerald-600 text-white border-emerald-700 shadow-md"
+                  : "bg-white text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 border-slate-200"
               }`}
             >
               <Icon size={14} />
@@ -1110,45 +1113,46 @@ export function AgentTab({
                 <ShieldCheck className="text-emerald-500" size={22} />
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {STRATEGIES.map((item) => {
-                  const isSel = strategyId === item.id;
-                  return (
+              {strategyFlow === "picker" && (
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 animate-in slide-in-from-left-4 duration-300">
+                  {STRATEGIES.map((item) => (
                     <button
                       key={item.id}
-                      onClick={() => setStrategyId(item.id)}
-                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        isSel
-                          ? "border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-500/20 shadow-xs"
-                          : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white"
-                      }`}
+                      onClick={() => {
+                        setStrategyId(item.id);
+                        setAllocation(String(item.allocationPreset));
+                        setMaxSpend(String(item.maxSpendPreset));
+                        setRiskLevel(item.profile === "conservative" ? "Conservative" : item.profile === "growth" ? "Growth" : "Balanced");
+                        setStrategyFlow("risk");
+                      }}
+                      className="p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:border-emerald-400 hover:bg-emerald-50/50 text-left transition-all cursor-pointer flex flex-col justify-between"
                     >
                       <div>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-black text-slate-900">
-                            {item.name}
-                          </span>
-                          {isSel && <Check size={15} className="text-emerald-600" />}
+                          <span className="text-xs font-black text-slate-900">{item.name}</span>
+                          <ArrowUpRight size={15} className="text-emerald-600" />
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                          {item.description}
-                        </p>
+                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{item.description}</p>
                       </div>
-
                       <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[10.5px] font-bold text-slate-600">
                         <span>APY: <strong className="text-emerald-700">{item.expectedReturn}</strong></span>
                         <span>Win: <strong className="text-slate-800">{item.winRate}</strong></span>
                       </div>
                     </button>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
 
-              {/* Dynamic Parameter Settings */}
-              <div className="mt-6 pt-6 border-t border-slate-100">
-                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider mb-4">
-                  Quantitative Risk Parameters
-                </h4>
+              {strategyFlow === "risk" && (
+              <div className="mt-5 animate-in slide-in-from-right-6 duration-300">
+                <button onClick={() => setStrategyFlow("picker")} className="text-xs font-bold text-slate-500 hover:text-emerald-700 cursor-pointer mb-5">← Choose a different strategy</button>
+                <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4 mb-5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Selected strategy</p>
+                  <p className="mt-1 text-base font-black text-slate-900">{selectedStrategy?.name}</p>
+                  <p className="mt-1 text-xs text-slate-600">{selectedStrategy?.tagline}</p>
+                </div>
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider mb-1">Quantitative Risk Parameters</h4>
+                <p className="text-xs text-slate-500 mb-4">Set a hard spending ceiling, automatic stop-losses, and a five-minute window to revert any order the agent placed.</p>
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div>
                     <label className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 block mb-1">
@@ -1218,21 +1222,38 @@ export function AgentTab({
                   </div>
                 </div>
 
-                <div className="mt-6 flex items-center justify-between">
-                  <span className="text-xs text-slate-500 font-medium">
-                    Active: <strong className="text-slate-900">{selectedStrategy?.name || "No strategy selected"}</strong>
-                  </span>
-
+                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 flex items-start gap-3">
+                  <RotateCcw size={17} className="mt-0.5 text-emerald-600 shrink-0" />
+                  <div><p className="text-xs font-black text-slate-900">Five-minute order reversal</p><p className="mt-1 text-[11px] leading-relaxed text-slate-500">Every agent order remains available to reverse for five minutes after placement.</p></div>
+                </div>
+                <div className="mt-6 flex items-center justify-end">
                   <button
                     onClick={handleDeployStrategy}
                     disabled={loading}
                     className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-black cursor-pointer transition-all shadow-xs flex items-center gap-2"
                   >
                     <Zap size={14} />
-                    <span>{loading ? "Arming Engine..." : "Save & Arm Strategy"}</span>
+                    <span>{loading ? "Saving..." : "Save Strategy"}</span>
                   </button>
                 </div>
               </div>
+              )}
+
+              {strategyFlow === "summary" && (
+                <div className="mt-5 animate-in slide-in-from-right-6 duration-300">
+                  <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div><p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Current strategy</p><h3 className="mt-1 text-xl font-black text-slate-900">{selectedStrategy?.name || "No strategy selected"}</h3><p className="mt-1 text-xs text-slate-600">{selectedStrategy?.tagline || "Choose a strategy to begin."}</p></div>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-black text-white"><Check size={12} /> SAVED</span>
+                    </div>
+                    <div className="mt-5 grid grid-cols-2 gap-3 text-xs">
+                      <div className="rounded-xl bg-white border border-emerald-100 p-3"><p className="text-slate-500">Spend ceiling</p><strong className="mt-1 block text-slate-900">{fmtMoney(maxSpend)} / order</strong></div>
+                      <div className="rounded-xl bg-white border border-emerald-100 p-3"><p className="text-slate-500">Stop-loss</p><strong className="mt-1 block text-slate-900">{stopLossPct}% automatic</strong></div>
+                    </div>
+                  </div>
+                  <button onClick={() => setStrategyFlow("risk")} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-2.5 text-xs font-black text-white transition-all cursor-pointer"><SlidersHorizontal size={14} /> Edit strategy</button>
+                </div>
+              )}
             </div>
 
             {/* Capital Allocation & Drawdown Defense */}

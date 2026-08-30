@@ -148,6 +148,7 @@ export function clearAuthSession() {
   try {
     localStorage.removeItem("stake_auth_token");
     localStorage.removeItem("stake_active_user");
+    sessionStorage.removeItem("stake_guest_session");
   } catch (e) {
     console.warn("Storage clear error:", e);
   }

@@ -231,6 +231,21 @@ code {
   border-color: #cfe9db !important;
 }
 
+/* These controls sit on the light Agent surface, so they need an opaque color
+   treatment instead of the translucent dark-hero treatment used previously. */
+.stake-agent-primary-action {
+  background: #059669 !important;
+  border-color: #047857 !important;
+  color: #ffffff !important;
+}
+.stake-agent-primary-action:hover { background: #047857 !important; }
+.stake-agent-primary-action.stake-agent-pause-action {
+  background: #e11d48 !important;
+  border-color: #be123c !important;
+}
+.stake-agent-primary-action.stake-agent-pause-action:hover { background: #be123c !important; }
+.stake-agent-tab-active { color: #ffffff !important; }
+
 .stake-agent-workspace .text-slate-300,
 .stake-agent-workspace .text-slate-200 {
   color: #475569 !important;

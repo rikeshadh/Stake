@@ -66,7 +66,13 @@ export default function App() {
   // Navigation & Authentication
   // =========================================================
 
-  const [tab, setTab] = useState("home");
+  const [tab, setTab] = useState(() => {
+    try {
+      return localStorage.getItem("stake_active_tab") || "home";
+    } catch {
+      return "home";
+    }
+  });
   const [selectedStock, setSelectedStock] =
     useState(null);
 
@@ -83,13 +89,26 @@ export default function App() {
           return parsed;
         }
       }
+      const guestSession = sessionStorage.getItem("stake_guest_session");
+      if (guestSession) {
+        const parsedGuest = JSON.parse(guestSession);
+        if (parsedGuest?.email && (parsedGuest.isGuest || parsedGuest.isDemo)) {
+          return parsedGuest;
+        }
+      }
       return null;
     } catch {
       return null;
     }
   });
 
-  const [guestMode, setGuestMode] = useState(false);
+  const [guestMode, setGuestMode] = useState(() => {
+    try {
+      return Boolean(sessionStorage.getItem("stake_guest_session"));
+    } catch {
+      return false;
+    }
+  });
   const [authModal, setAuthModal] =
     useState(null);
 
@@ -171,6 +190,14 @@ export default function App() {
     useState(
       () => user?.orders || []
     );
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("stake_active_tab", tab);
+    } catch {
+      // Navigation persistence is optional.
+    }
+  }, [tab]);
 
   const [alerts, setAlerts] =
     useState(

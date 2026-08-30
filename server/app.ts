@@ -324,7 +324,7 @@ const userSchema = new mongoose.Schema({
   passwordSalt: { type: String },
   accountNumber: { type: String, default: () => `STK-${Math.floor(1000000000 + Math.random() * 9000000000)}` },
   currency: { type: String, default: "USD" },
-  cash: { type: Number, default: 50000 },
+  cash: { type: Number, default: 0 },
   holdings: { type: mongoose.Schema.Types.Mixed, default: {} },
   watchlist: { type: [String], default: [] },
   agentEnabled: { type: Boolean, default: false },
@@ -1855,12 +1855,10 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
     }
 
     if ((user.cash || 0) < amountToDeploy) {
-      if ((user.cash || 0) === 0) {
-        user.cash = 25000;
-      }
+      return res.status(400).json({ success: false, message: "Deposit funds into your wallet before allocating capital to an agent strategy." });
     }
 
-    const finalAllocated = Math.min(amountToDeploy, user.cash || 25000);
+    const finalAllocated = amountToDeploy;
     user.agentEnabled = true;
     user.agentStrategy = strategy;
     user.agentDeployedCapital = finalAllocated;
@@ -2120,7 +2118,7 @@ app.post("/api/agent/scan-and-execute", async (req, res) => {
 
   if (triggeredStock) {
     if ((user.cash || 0) < 50) {
-      user.cash = 25000;
+      return res.status(400).json({ success: false, message: "Insufficient wallet balance. Deposit funds before the agent can place an order." });
     }
     const targetSpend = Math.max(50, Math.min(activeSpend, Math.min(user.cash, 1000)));
     const sharesToBuy = Number((targetSpend / (triggeredStock.price || 150)).toFixed(3));
