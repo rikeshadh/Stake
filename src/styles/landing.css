@@ -1,14 +1,3 @@
-/* ==========================================================================
-   Stake Global Exchange — Landing page
-   ---------------------------------------------------------------------------
-   Direction: a light, high-legibility page with a dark trading-floor hero at
-   the top. Mint (#00E599) glows on the dark surfaces; on white it steps down to
-   a darker mint (--mint-text) that actually passes contrast. Dark panels inside
-   the light body read as product screenshots.
-   Signature element: the hero's live order-book depth ladder.
-   All numeric type is monospace + tabular so ticking prices never jitter.
-   ========================================================================== */
-
 .stake-landing-root {
   /* --- Dark surfaces (hero, product panels, CTA, footer) --- */
   --ink-950: #030a07;
@@ -89,6 +78,19 @@
   outline: 2px solid var(--mint-text);
   outline-offset: 3px;
   border-radius: 6px;
+}
+
+html,
+body {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* old Edge / IE */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;               /* Chrome, Safari, new Edge */
+  width: 0;
+  height: 0;
 }
 
 .stake-hero-section :focus-visible,
