@@ -190,6 +190,7 @@ export function StockDetail({
   />
   {hasActiveAlert ? "Alert Active" : "Set Alert"}
 </button>
+
           {/* Watchlist Star Toggle */}
           <button
             onClick={() => onToggleWatch(selected)}
