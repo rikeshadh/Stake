@@ -13,11 +13,14 @@ export function StakeOrderDeskDrawer({
   onExecuteTrade,
   user,
   darkMode = false,
+  currency: displayCurrency = "$",
 }) {
   const [mode, setMode] = useState(() => (initialMode ? initialMode.toUpperCase() : "BUY"));
   const [prevModeProp, setPrevModeProp] = useState(initialMode);
   const [validity, setValidity] = useState("DAY");
   const [qty, setQty] = useState("");
+  const [entryMode, setEntryMode] = useState("shares");
+  const [cashAmount, setCashAmount] = useState("");
 
   // Adjust state during render when initialMode changes (recommended React pattern)
   if (initialMode !== prevModeProp) {
@@ -33,13 +36,15 @@ export function StakeOrderDeskDrawer({
   const effectivePrice = basePrice;
 
   const parsedQty = parseFloat(qty) || 0;
-  const estimatedTotal = parsedQty * effectivePrice;
+  const parsedCashAmount = parseFloat(cashAmount) || 0;
+  const effectiveQty = entryMode === "cash" ? parsedCashAmount / effectivePrice : parsedQty;
+  const estimatedTotal = effectiveQty * effectivePrice;
   const totalWithBrokerage = estimatedTotal * 1.004;
 
   // Validation Checks
-  const isInvalidQty = parsedQty <= 0;
-  const isInsufficientCollateral = isBuy && parsedQty > 0 && totalWithBrokerage > cashBalance;
-  const isInsufficientHoldings = !isBuy && parsedQty > 0 && parsedQty > holdingShares;
+  const isInvalidQty = effectiveQty <= 0;
+  const isInsufficientCollateral = isBuy && effectiveQty > 0 && totalWithBrokerage > cashBalance;
+  const isInsufficientHoldings = !isBuy && effectiveQty > 0 && effectiveQty > holdingShares;
   const maxBuyableShares = effectivePrice > 0 ? Math.floor(cashBalance / (effectivePrice * 1.004)) : 0;
 
   const top5Buy = [
@@ -82,7 +87,7 @@ export function StakeOrderDeskDrawer({
       onExecuteTrade({
         ticker: selectedStock || "NVDA",
         side: mode ? mode.toUpperCase() : "BUY",
-        shares: parsedQty,
+        shares: effectiveQty,
         price: effectivePrice,
         total: estimatedTotal,
         orderType: "MKT",
@@ -94,6 +99,7 @@ export function StakeOrderDeskDrawer({
 
   const handleReset = () => {
     setQty("");
+    setCashAmount("");
     setValidity("DAY");
   };
 
@@ -207,7 +213,7 @@ export function StakeOrderDeskDrawer({
           </div>
           <div style={{ color: textSecondary, fontWeight: 600 }}>
             {isBuy ? (
-              <span>Collateral: <strong style={{ color: textPrimary }}>{currency} {fmt(cashBalance)}</strong></span>
+              <span>Collateral: <strong style={{ color: textPrimary }}>              {displayCurrency} {fmt(cashBalance)}</strong></span>
             ) : (
               <span>Holding: <strong style={{ color: textPrimary }}>{fmtShares(holdingShares)} Shares</strong></span>
             )}
@@ -271,11 +277,20 @@ export function StakeOrderDeskDrawer({
             </button>
           </div>
 
-          {/* Quantity Input */}
+          {/* Order entry mode */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {["shares", "cash"].map((modeName) => (
+              <button key={modeName} type="button" onClick={() => { setEntryMode(modeName); setQty(""); setCashAmount(""); }} style={{ padding: "9px", borderRadius: 10, border: `1px solid ${borderCol}`, background: entryMode === modeName ? "#e0f7ef" : inputBg, color: entryMode === modeName ? "#006c49" : textSecondary, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                {modeName === "shares" ? "By quantity" : "By money"}
+              </button>
+            ))}
+          </div>
+
+          {/* Quantity / money input */}
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <label style={{ fontSize: 12, fontWeight: 800, color: textSecondary }}>
-                QUANTITY (SHARES)
+                {entryMode === "shares" ? "QUANTITY (SHARES)" : "AMOUNT TO INVEST"}
               </label>
               {isBuy ? (
                 <button
@@ -296,10 +311,11 @@ export function StakeOrderDeskDrawer({
 
             <input
               type="number"
-              min="1"
-              placeholder="Enter quantity..."
-              value={qty}
-              onChange={(e) => setQty(e.target.value === "" ? "" : Math.max(0, parseFloat(e.target.value) || 0))}
+              min="0"
+              step="0.01"
+              placeholder={entryMode === "shares" ? "Enter quantity..." : "Enter dollar amount..."}
+              value={entryMode === "shares" ? qty : cashAmount}
+              onChange={(e) => entryMode === "shares" ? setQty(e.target.value) : setCashAmount(e.target.value)}
               style={{
                 width: "100%",
                 padding: "12px 14px",
@@ -317,9 +333,9 @@ export function StakeOrderDeskDrawer({
           </div>
 
           {/* Inline Validation Banner */}
-          {qty !== "" && isInvalidQty && (
+          {(entryMode === "shares" ? qty : cashAmount) !== "" && isInvalidQty && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, color: "#ef4444", fontSize: 12, fontWeight: 700 }}>
-              <AlertTriangle size={14} /> Please enter a valid share quantity greater than 0.
+              <AlertTriangle size={14} /> Please enter a valid {entryMode === "shares" ? "share quantity" : "money amount"} greater than 0.
             </div>
           )}
 
@@ -426,7 +442,7 @@ export function StakeOrderDeskDrawer({
                 transition: "all 0.15s ease",
               }}
             >
-              {isBuy ? (parsedQty > 0 ? `Buy ${parsedQty} ${selectedStock}` : "Buy") : (parsedQty > 0 ? `Sell ${parsedQty} ${selectedStock}` : "Sell")}
+              {isBuy ? (effectiveQty > 0 ? `Buy ${effectiveQty.toFixed(4)} ${selectedStock}` : "Buy") : (effectiveQty > 0 ? `Sell ${effectiveQty.toFixed(4)} ${selectedStock}` : "Sell")}
             </button>
           </div>
 

@@ -19,16 +19,22 @@ import {
   RotateCcw,
   ShieldAlert,
   SlidersHorizontal,
+  Settings,
+  PieChart as PieIcon,
+  LineChart,
 } from "lucide-react";
 import {
   deployAgentStrategy,
   pauseAgentStrategy,
   resumeAgentStrategy,
-  scanAndExecuteStrategy,
   updateAgentWatchlist,
+  confirmAgentTrade,
 } from "../api";
 import { STRATEGIES } from "../strategies";
 import { GeminiStrategySidebar } from "./GeminiStrategySidebar";
+import { AgentVisualDashboard } from "./AgentVisualDashboard";
+import { AgentTriggerEngine } from "./AgentTriggerEngine";
+import { AgentTradeConfirmationModal } from "./AgentTradeConfirmationModal";
 
 const API_URL = import.meta.env.VITE_API_URL || "";
 
@@ -103,10 +109,12 @@ export function AgentTab({
   cashBalance = 0,
   holdings = {},
   stocks = {},
+  stockMetaList = [],
   user,
   onRefreshUserData,
   showToast,
   onOpenOrderDesk,
+  onGoToMarket,
 }) {
   const targetEmail = user?.email || "guestTrader67@stake.com";
 
@@ -128,8 +136,12 @@ export function AgentTab({
   const [loading, setLoading] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [stakeAiOpen, setStakeAiOpen] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState("radar");
+  const [activeSubTab, setActiveSubTab] = useState("overview");
   const [strategyFlow, setStrategyFlow] = useState(user?.agentStrategy ? "summary" : "picker");
+
+  // High-Value Trade Mandatory Oversight State (> $1,000 threshold)
+  const [pendingConfirmationTrade, setPendingConfirmationTrade] = useState(null);
+  const [isExecutingConfirmedTrade, setIsExecutingConfirmedTrade] = useState(false);
 
   // Backtest Simulator State
   const [btStrategy, setBtStrategy] = useState("dip_buyer");
@@ -138,6 +150,9 @@ export function AgentTab({
   const [btCapital] = useState(10000);
   const [btRunning, setBtRunning] = useState(false);
   const [btResult, setBtResult] = useState(null);
+  const [forecastPrompt, setForecastPrompt] = useState("");
+  const [forecastResult, setForecastResult] = useState("");
+  const [forecastRunning, setForecastRunning] = useState(false);
 
   const selectedStrategy = useMemo(
     () => STRATEGIES.find((s) => s.id === strategyId) || null,
@@ -178,11 +193,6 @@ export function AgentTab({
 
   // Load signals & activity from API
   const refreshAgentFeed = useCallback(async () => {
-    if (!watchlist.length || !strategyId) {
-      setSignals([]);
-      setActivity([]);
-      return;
-    }
     try {
       const encoded = encodeURIComponent(targetEmail);
       const [sigData, actData] = await Promise.all([
@@ -190,10 +200,10 @@ export function AgentTab({
         fetchJsonSafe(`${API_URL}/api/agent/actions?userId=${encoded}`),
       ]);
 
-      if (sigData?.signals) {
+      if (sigData?.signals?.length) {
         setSignals(sigData.signals);
       } else {
-        generateLocalSignals(watchlist);
+        generateLocalSignals(watchlist.length ? watchlist : Object.keys(stocks).slice(0, 10));
       }
 
       if (actData?.actions) {
@@ -201,19 +211,14 @@ export function AgentTab({
       }
     } catch (e) {
       console.warn("Signal refresh error:", e);
-      generateLocalSignals(watchlist);
+      generateLocalSignals(watchlist.length ? watchlist : Object.keys(stocks).slice(0, 10));
     }
-  }, [targetEmail, watchlist, strategyId, generateLocalSignals]);
+  }, [targetEmail, watchlist, stocks, generateLocalSignals]);
 
   useEffect(() => {
     let active = true;
 
     async function loadData() {
-      if (!watchlist.length || !strategyId) {
-        setSignals([]);
-        setActivity([]);
-        return;
-      }
       try {
         const encoded = encodeURIComponent(targetEmail);
         const [sigData, actData] = await Promise.all([
@@ -223,10 +228,10 @@ export function AgentTab({
 
         if (!active) return;
 
-        if (sigData?.signals) {
+        if (sigData?.signals?.length) {
           setSignals(sigData.signals);
         } else {
-          generateLocalSignals(watchlist);
+          generateLocalSignals(watchlist.length ? watchlist : Object.keys(stocks).slice(0, 10));
         }
 
         if (actData?.actions) {
@@ -235,7 +240,7 @@ export function AgentTab({
       } catch (e) {
         if (active) {
           console.warn("Signal refresh error:", e);
-          generateLocalSignals(watchlist);
+          generateLocalSignals(watchlist.length ? watchlist : Object.keys(stocks).slice(0, 10));
         }
       }
     }
@@ -245,7 +250,7 @@ export function AgentTab({
     return () => {
       active = false;
     };
-  }, [targetEmail, watchlist, strategyId, generateLocalSignals]);
+  }, [targetEmail, watchlist, stocks, generateLocalSignals]);
 
   // Run Backtest Simulator
   const handleRunBacktest = async () => {
@@ -271,17 +276,59 @@ export function AgentTab({
         }
       }
 
-      setBtResult(computeInitialBacktest(btStrategy, btTicker, btDays, btCapital));
+      setBtResult(null);
+      showToast?.("Historical price data is unavailable for this backtest.");
     } catch (err) {
-      console.warn("Backtest simulation fallback:", err);
-      setBtResult(computeInitialBacktest(btStrategy, btTicker, btDays, btCapital));
+      console.warn("Historical backtest error:", err);
+      setBtResult(null);
+      showToast?.("Unable to load historical price data. Try again later.");
     } finally {
       setBtRunning(false);
     }
   };
 
+  const handleForecast = async () => {
+    const ticker = btTicker.trim().toUpperCase();
+    if (!ticker) {
+      showToast?.("Enter a stock symbol first.");
+      return;
+    }
+    setForecastRunning(true);
+    try {
+      const response = await fetch(`${API_URL}/api/agent/forecast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker,
+          years: btDays >= 365 ? Math.round(btDays / 365) : 1,
+          question: forecastPrompt,
+        }),
+      });
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error("The AI outlook service returned an invalid response.");
+      }
+      if (!response.ok || !data.success) throw new Error(data.message);
+      setForecastResult(data.forecast);
+    } catch (error) {
+      showToast?.(error.message || "Unable to generate the AI outlook.");
+    } finally {
+      setForecastRunning(false);
+    }
+  };
+
   // Toggle Master Agent Status
   const handleToggleAgent = async () => {
+    if (!agentEnabled && !strategyId) {
+      setActiveSubTab("rules");
+      setStrategyFlow("picker");
+      showToast?.("Choose a strategy before activating the engine.");
+      return;
+    }
+
     const nextState = !agentEnabled;
     try {
       if (nextState) {
@@ -299,6 +346,47 @@ export function AgentTab({
         : "⏸️ Stake Autonomous Agent paused"
     );
   };
+
+  const runAutonomousScan = useCallback(async () => {
+    if (!agentEnabled || !strategyId) return;
+    const response = await fetchJsonSafe(`${API_URL}/api/agent/scan-and-execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: targetEmail,
+        strategy: strategyId,
+        maxSpend: Number(maxSpend) || agentMaxSpend,
+      }),
+    });
+
+    if (response?.requiresConfirmation) {
+      setPendingConfirmationTrade(response.pendingTrade);
+      return;
+    }
+
+    if (response?.success) {
+      await onRefreshUserData?.();
+      await refreshAgentFeed();
+    }
+  }, [
+    agentEnabled,
+    strategyId,
+    targetEmail,
+    maxSpend,
+    agentMaxSpend,
+    onRefreshUserData,
+    refreshAgentFeed,
+  ]);
+
+  useEffect(() => {
+    if (!agentEnabled || !strategyId) return undefined;
+    const intervalId = window.setInterval(() => {
+      runAutonomousScan().catch((error) => {
+        console.warn("Autonomous strategy scan error:", error);
+      });
+    }, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [agentEnabled, strategyId, runAutonomousScan]);
 
   // Deploy Strategy & Save Rules
   const handleDeployStrategy = async () => {
@@ -339,74 +427,57 @@ export function AgentTab({
       setStrategyFlow("summary");
     } catch (err) {
       console.warn("Deploy error:", err);
-      showToast?.("Strategy settings configured locally.");
-      setStrategyFlow("summary");
+      showToast?.(err.message || "Unable to deploy strategy.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Scan and Execute Strategy Now
+  // Scan the configured universe for recommendations. Execution remains
+  // limited to the selected strategy budget and the explicit order desk.
   const handleScanAndExecute = async () => {
     setScanLoading(true);
     try {
-      const res = await scanAndExecuteStrategy({
-        email: targetEmail,
-        strategy: strategyId,
-        maxSpend: Number(maxSpend) || 500,
-      });
-
-      if (onRefreshUserData) await onRefreshUserData();
       await refreshAgentFeed();
-
-      if (res?.executedTrades && res.executedTrades.length > 0) {
-        showToast?.(
-          `⚡ Scan filled ${res.executedTrades.length} automated trade(s) based on your rules.`
-        );
-      } else {
-        showToast?.("🔍 Market scan completed. Risk conditions verified.");
-      }
+      showToast?.("Signal Radar refreshed with the best available opportunities. No budget was used.");
     } catch (err) {
       console.warn("Scan error:", err);
-      showToast?.("Scan complete. Signals evaluated.");
+      showToast?.(err.message || "Unable to refresh Signal Radar.");
     } finally {
       setScanLoading(false);
     }
   };
 
-  // One-click trade execution directly from Signal Radar
-  const handleExecuteSignal = async (signal) => {
+  // Authorize & Execute Confirmed High-Value Agent Trade
+  const handleConfirmTradeExecution = async (tradeToExecute) => {
+    if (!tradeToExecute) return;
+    setIsExecutingConfirmedTrade(true);
     try {
-      const stock = stocks[signal.ticker] || { price: signal.price || 150 };
-      const curPrice = stock.price || signal.price || 150;
-      const spend = Math.min(Number(maxSpend) || 500, curPrice);
-      const shares = Number((spend / curPrice).toFixed(4));
-
-      const res = await fetch(`${API_URL}/api/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: targetEmail,
-          ticker: signal.ticker,
-          side: signal.side || "BUY",
-          shares,
-          price: curPrice,
-          orderType: "MKT",
-          reason: `One-click AI Radar execution (${signal.signalType})`,
-        }),
+      const res = await confirmAgentTrade({
+        email: targetEmail,
+        userId: targetEmail,
+        ticker: tradeToExecute.ticker,
+        side: tradeToExecute.side,
+        shares: tradeToExecute.shares,
+        price: tradeToExecute.price,
+        orderType: tradeToExecute.orderType || "MKT",
+        strategy: tradeToExecute.strategy,
+        reason: tradeToExecute.reason,
       });
 
-      if (res.ok) {
-        showToast?.(`🎯 Order executed: ${signal.side || "BUY"} ${shares} ${signal.ticker}`);
+      if (res.success) {
+        showToast?.(`✅ High-value trade authorized & executed: ${tradeToExecute.shares}x ${tradeToExecute.ticker} ($${Number(tradeToExecute.total).toLocaleString()})`);
+        setPendingConfirmationTrade(null);
         if (onRefreshUserData) await onRefreshUserData();
         await refreshAgentFeed();
       } else {
-        const data = await res.json();
-        showToast?.(data.message || "Could not fill order. Check cash balance.");
+        showToast?.(res.message || "Failed to execute authorized trade.");
       }
     } catch (err) {
-      console.warn("Order execution error:", err);
-      showToast?.("Order executed in sandbox ledger.");
+      console.error("Authorize trade error:", err);
+      showToast?.("Communication error executing authorized order.");
+    } finally {
+      setIsExecutingConfirmedTrade(false);
     }
   };
 
@@ -465,6 +536,7 @@ export function AgentTab({
     showToast?.(`Loaded ${preset.label} into universe.`);
   };
 
+
   return (
     <div className="stake-agent-workspace min-h-screen bg-[#06110c] text-white px-3 sm:px-6 py-6 pb-28 font-sans max-w-7xl mx-auto space-y-6">
       {/* ============================================================
@@ -491,11 +563,11 @@ export function AgentTab({
             </div>
 
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white m-0 leading-tight">
-              Autonomous Trading.<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">Powered by AI Intelligence.</span>
+              AI Trade.<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">Algorithmic Execution & Market Intelligence.</span>
             </h1>
             <p className="mt-3 text-sm sm:text-base leading-relaxed text-slate-300 max-w-xl">
-              Deploy quantitative strategies with real-time signal detection, automated execution, and intelligent risk guardrails. Every decision is transparent and under your control.
+              Deploy quantitative strategies with real-time signal detection, automated execution, and intelligent risk guardrails. In a new account, this desk starts clean and dynamically populates as AI executes.
             </p>
           </div>
 
@@ -513,6 +585,18 @@ export function AgentTab({
             >
               {agentEnabled ? <Pause size={15} /> : <Play size={15} />}
               <span>{agentEnabled ? "Pause Engine" : "Activate Engine"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSubTab("rules");
+                setStrategyFlow("picker");
+              }}
+              aria-label="Open strategies and risk settings"
+              title="Strategies & Risk"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-500/30 bg-slate-900/70 text-emerald-300 transition-all hover:bg-emerald-500/15 hover:text-emerald-200 cursor-pointer"
+            >
+              <Settings size={17} />
             </button>
           </div>
         </div>
@@ -571,8 +655,9 @@ export function AgentTab({
          ============================================================ */}
       <div className="stake-agent-tabs flex items-center gap-2 border-b border-emerald-500/15 pb-3 overflow-x-auto">
         {[
+          { id: "overview", label: "Visual Dashboard & Risk", icon: PieIcon },
           { id: "radar", label: "Signal Radar", icon: Activity },
-          { id: "rules", label: "Strategies", icon: SlidersHorizontal },
+          { id: "backtest", label: "Simulator", icon: LineChart },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = activeSubTab === tab.id;
@@ -594,6 +679,26 @@ export function AgentTab({
       </div>
 
       {/* ============================================================
+          SUB-TAB 0: VISUAL DASHBOARD & RISK EXPOSURE
+         ============================================================ */}
+      {activeSubTab === "overview" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <AgentVisualDashboard
+            holdings={holdings}
+            stocks={stocks}
+            stockMetaList={stockMetaList}
+            cashBalance={cashBalance}
+            user={user}
+            agentMaxSpend={agentMaxSpend}
+            onOpenOrderDesk={onOpenOrderDesk}
+            onGoToMarket={onGoToMarket}
+            showToast={showToast}
+          />
+
+        </div>
+      )}
+
+      {/* ============================================================
           SUB-TAB 1: SIGNAL RADAR & LIVE OPPORTUNITY STREAM
          ============================================================ */}
       {activeSubTab === "radar" && (
@@ -607,8 +712,11 @@ export function AgentTab({
                     Live Algorithmic Radar
                   </span>
                   <h2 className="text-lg font-black text-white mt-0.5">
-                    Real-time Trading Signals
+                    Best Opportunities Outside Agent Budget
                   </h2>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Recommendations only. Signal Radar never spends the strategy allocation; use the Order Desk if you want to place a separate manual trade.
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -618,7 +726,7 @@ export function AgentTab({
                     className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-[#06110c] text-xs font-black cursor-pointer transition-all shadow-lg shadow-emerald-500/30 backdrop-blur-sm border border-emerald-400/30"
                   >
                     <RefreshCw size={13} className={scanLoading ? "animate-spin" : ""} />
-                    <span>{scanLoading ? "Scanning Market..." : "Scan Market Now"}</span>
+                    <span>{scanLoading ? "Finding Opportunities..." : "Find Best Opportunities"}</span>
                   </button>
                 </div>
               </div>
@@ -694,15 +802,6 @@ export function AgentTab({
 
                         {/* Action buttons */}
                         <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                          <button
-                            onClick={() => handleExecuteSignal(sig)}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-[#06110c] text-xs font-black cursor-pointer transition-all shadow-lg shadow-emerald-500/30 backdrop-blur-sm border border-emerald-400/30"
-                            title="Execute strategy order directly"
-                          >
-                            <Zap size={13} />
-                            <span>Fill Trade</span>
-                          </button>
-
                           <button
                             onClick={() => onOpenOrderDesk?.(sig.ticker, sig.side || "BUY")}
                             className="p-2 rounded-xl border border-emerald-500/15 hover:bg-slate-900/80 text-emerald-400 cursor-pointer transition-all backdrop-blur-md"
@@ -895,13 +994,13 @@ export function AgentTab({
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
               <div>
                 <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-400">
-                  Quantitative Simulator
+                  Historical Performance
                 </span>
                 <h2 className="text-xl font-black text-slate-900 mt-0.5">
                   Historical Strategy Backtester
                 </h2>
                 <p className="text-xs text-slate-500 mt-1 max-w-xl">
-                  Simulate your quantitative strategy across historical market tick data with realistic slippage, commission models, and max drawdown boundaries.
+                      Review actual historical daily prices for the selected stock over the chosen period. This does not change your portfolio or agent budget.
                 </p>
               </div>
 
@@ -919,17 +1018,13 @@ export function AgentTab({
                   ))}
                 </select>
 
-                <select
+                <input
                   value={btTicker}
-                  onChange={(e) => setBtTicker(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                >
-                  {["NVDA", "TSLA", "AAPL", "MSFT", "COIN", "AMZN", "PLTR", "AMD"].map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(e) => setBtTicker(e.target.value.toUpperCase())}
+                  placeholder="Any ticker"
+                  aria-label="Stock ticker"
+                  className="w-28 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                />
 
                 <select
                   value={btDays}
@@ -948,8 +1043,39 @@ export function AgentTab({
                   className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black cursor-pointer transition-all shadow-xs flex items-center gap-1.5"
                 >
                   <RefreshCw size={13} className={btRunning ? "animate-spin" : ""} />
-                  <span>{btRunning ? "Simulating..." : "Run Simulation"}</span>
+                  <span>{btRunning ? "Loading History..." : "Run Historical Backtest"}</span>
                 </button>
+              </div>
+            </div>
+
+            <div className="mt-6 border-t border-slate-100 pt-6">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">AI multi-year outlook</h3>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Ask Gemini about any ticker you imported or enter a new symbol. This is an AI scenario, not a guaranteed price.
+                  </p>
+                </div>
+                <textarea
+                  value={forecastPrompt}
+                  onChange={(event) => setForecastPrompt(event.target.value)}
+                  placeholder="What could drive this stock over the next 3–5 years?"
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-cyan-500 resize-y"
+                />
+                <button
+                  type="button"
+                  onClick={handleForecast}
+                  disabled={forecastRunning}
+                  className="self-start rounded-xl bg-cyan-600 px-4 py-2.5 text-xs font-black text-white hover:bg-cyan-700 disabled:opacity-50 cursor-pointer"
+                >
+                  {forecastRunning ? "Generating outlook..." : `Generate ${btTicker || "stock"} outlook`}
+                </button>
+                {forecastResult && (
+                  <div className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-700">
+                    {forecastResult}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1132,7 +1258,28 @@ export function AgentTab({
                           <span className="text-xs font-black text-slate-900">{item.name}</span>
                           <ArrowUpRight size={15} className="text-emerald-600" />
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{item.description}</p>
+                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                          {item.simpleDescription || item.description}
+                        </p>
+                        <div className="mt-4">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                            <span>Signal strength</span>
+                            <span className="text-emerald-700">{item.signalIntensity}%</span>
+                          </div>
+                          <div
+                            className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-200"
+                            role="meter"
+                            aria-label={`${item.name} signal strength`}
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow={item.signalIntensity}
+                          >
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan-500 transition-all"
+                              style={{ width: `${item.signalIntensity}%` }}
+                            />
+                          </div>
+                        </div>
                       </div>
                       <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-[10.5px] font-bold text-slate-600">
                         <span>APY: <strong className="text-emerald-700">{item.expectedReturn}</strong></span>
@@ -1226,6 +1373,21 @@ export function AgentTab({
                   <RotateCcw size={17} className="mt-0.5 text-emerald-600 shrink-0" />
                   <div><p className="text-xs font-black text-slate-900">Five-minute order reversal</p><p className="mt-1 text-[11px] leading-relaxed text-slate-500">Every agent order remains available to reverse for five minutes after placement.</p></div>
                 </div>
+
+                <div className="mt-3 rounded-2xl border border-amber-300 bg-amber-50/80 p-4 flex items-start gap-3">
+                  <ShieldAlert size={17} className="mt-0.5 text-amber-600 shrink-0" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-black text-slate-900">Mandatory High-Value Trade Oversight</p>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 border border-amber-300">
+                        &gt; $1,000 Threshold
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                      All agent-initiated orders exceeding $1,000 require manual human approval via the mandatory confirmation dialog before execution.
+                    </p>
+                  </div>
+                </div>
                 <div className="mt-6 flex items-center justify-end">
                   <button
                     onClick={handleDeployStrategy}
@@ -1298,6 +1460,12 @@ export function AgentTab({
               </div>
             </div>
           </div>
+
+          <AgentTriggerEngine
+            stocks={stocks}
+            showToast={showToast}
+            onOpenOrderDesk={onOpenOrderDesk}
+          />
         </div>
       )}
 
@@ -1307,6 +1475,16 @@ export function AgentTab({
         onClose={() => setStakeAiOpen(false)}
         user={user}
         onRefreshUserData={onRefreshUserData}
+      />
+
+      {/* Mandatory Confirmation Modal for High-Value Agent Trades (> $1,000) */}
+      <AgentTradeConfirmationModal
+        isOpen={Boolean(pendingConfirmationTrade)}
+        onClose={() => setPendingConfirmationTrade(null)}
+        onConfirm={handleConfirmTradeExecution}
+        trade={pendingConfirmationTrade}
+        cashBalance={Number(cashBalance ?? user?.cash ?? 0)}
+        isExecuting={isExecutingConfirmedTrade}
       />
     </div>
   );

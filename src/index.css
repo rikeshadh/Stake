@@ -217,14 +217,44 @@ code {
 }
 
 .stake-agent-workspace .stake-agent-hero .text-white,
-.stake-agent-workspace [class*="bg-slate-900"] .text-white {
+.stake-agent-workspace [class*="bg-slate-900"] .text-white:not(button *):not([class*="bg-emerald-"]):not([class*="bg-rose-"]) {
   color: #0f172a !important;
+}
+
+/* Ensure vibrant action buttons, solid heatmap outcome cells, and badges preserve crisp white text */
+.stake-agent-workspace button.bg-emerald-600,
+.stake-agent-workspace button.bg-rose-600,
+.stake-agent-workspace .bg-emerald-600,
+.stake-agent-workspace .bg-rose-600,
+.stake-agent-workspace .bg-emerald-700,
+.stake-agent-workspace .bg-rose-700,
+.stake-agent-workspace .bg-emerald-800,
+.stake-agent-workspace .bg-rose-800 {
+  color: #ffffff !important;
+}
+
+.stake-agent-workspace .bg-emerald-600 .text-white,
+.stake-agent-workspace .bg-rose-600 .text-white,
+.stake-agent-workspace .bg-emerald-700 .text-white,
+.stake-agent-workspace .bg-rose-700 .text-white,
+.stake-agent-workspace .bg-emerald-800 .text-white,
+.stake-agent-workspace .bg-rose-800 .text-white {
+  color: #ffffff !important;
 }
 
 .stake-agent-workspace [class*="bg-slate-900"] {
   background: #ffffff !important;
   border-color: #dce3ec !important;
   box-shadow: 0 8px 22px rgba(15, 23, 42, .035) !important;
+}
+
+/* Keep translucent dark utility surfaces from becoming muddy gray on the
+   light Agent dashboard. */
+.stake-agent-workspace [class*="bg-slate-800\\/40"] {
+  background: #f8fafc !important;
+}
+.stake-agent-workspace [class*="bg-slate-800\\/80"] {
+  background: #e2e8f0 !important;
 }
 
 .stake-agent-workspace [class*="border-emerald-500"] {
@@ -254,6 +284,28 @@ code {
 .stake-agent-workspace .text-slate-400,
 .stake-agent-workspace .text-slate-500 {
   color: #64748b !important;
+}
+
+/* Consistent, readable dropdowns across Market, Stock, and Agent surfaces. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #64748b 50%),
+    linear-gradient(135deg, #64748b 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 2.25rem !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+select:hover {
+  border-color: #34d399;
+  background-color: #f8fffb;
+}
+
+select:focus {
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
 }
 
 .market-grid {

@@ -191,7 +191,7 @@ function OrderBookPanel({ stock, reduced }) {
       <div className="stake-panel">
         <div className="stake-panel-head">
           <span>
-            Order book · <strong>{stock?.ticker || "NVDA"}</strong>
+            Order book · <strong>{stock?.ticker || "selected market"}</strong>
           </span>
           <span className="stake-live">
             <span className="stake-live-dot" aria-hidden="true" />

@@ -344,16 +344,30 @@ export async function adjustAgentCapital({ email, deployedCapital, maxSpend }) {
   }
 }
 
-export async function scanAndExecuteStrategy({ email, strategy, maxSpend }) {
+export async function scanAndExecuteStrategy({ email, strategy, maxSpend, confirmed = false }) {
   try {
     const res = await fetch(`${API_URL}/api/agent/scan-and-execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, strategy, maxSpend }),
+      body: JSON.stringify({ email, strategy, maxSpend, confirmed }),
     });
     return await res.json();
   } catch (err) {
     console.warn("Scan & execute error:", err.message);
+    return { success: false, message: err.message };
+  }
+}
+
+export async function confirmAgentTrade(tradeDetails) {
+  try {
+    const res = await fetch(`${API_URL}/api/agent/confirm-trade`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(tradeDetails),
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn("Confirm trade error:", err.message);
     return { success: false, message: err.message };
   }
 }
@@ -372,11 +386,11 @@ export async function updateAgentWatchlist({ email, watchlist }) {
   }
 }
 
-export async function sendAgentChat({ email, message, history = [] }) {
+export async function sendAgentChat({ email, message, history = [], confirmed = false }) {
   const res = await fetch(`${API_URL}/api/agent/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, message, history }),
+    body: JSON.stringify({ email, message, history, confirmed }),
   });
   const raw = await res.text();
   let data;
@@ -431,3 +445,19 @@ export async function deleteAccount(email) {
     return { success: true };
   }
 }
+
+// ===== Automated Morning Briefing =====
+export async function fetchMorningBriefing(email) {
+  try {
+    const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
+    const res = await fetch(`${API_URL}/api/agent/morning-briefing?email=${encodeURIComponent(targetEmail)}`);
+    if (!res.ok) {
+      throw new Error(`Server returned ${res.status}`);
+    }
+    return await res.json();
+  } catch (err) {
+    console.warn("fetchMorningBriefing error:", err.message);
+    throw err;
+  }
+}
+

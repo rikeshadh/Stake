@@ -1,4 +1,5 @@
 import { useId, useState, useRef, useEffect, useMemo } from "react";
+import { Bell, MoveHorizontal, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import logoImg from "../assets/logo.png";
 import { fmt, getSmoothSvgPath } from "../utils";
 import { fetchYFinanceChart } from "../api";
@@ -287,6 +288,8 @@ export function CandlestickChart({
   chartType: externalChartType = "candle",
   orders = [],
   ticker = "",
+  range = "1M",
+  alerts = [],
 }) {
   const [hoverIdx, setHoverIdx] = useState(null);
   const containerRef = useRef(null);
@@ -295,8 +298,8 @@ export function CandlestickChart({
   const activeMode = externalChartType === "candlestick" ? "candle" : externalChartType;
   const isLineMode = activeMode === "line" || activeMode === "smooth";
 
-  // Derive candlestick and volume series memoized
-  const candleList = useMemo(() => {
+  // Derive complete candlestick and volume series memoized
+  const rawCandleList = useMemo(() => {
     if (externalCandles && externalCandles.length > 0) {
       return externalCandles;
     }
@@ -328,6 +331,46 @@ export function CandlestickChart({
     return [];
   }, [externalCandles, history]);
 
+  // Mouse-drag interactivity state for panning across long horizons ('ALL', '5y', '1y', etc.)
+  const totalCount = rawCandleList.length;
+  const isLongHorizon =
+    range?.toLowerCase() === "all" ||
+    range?.toLowerCase() === "5y" ||
+    range?.toLowerCase() === "1y" ||
+    totalCount > 40;
+
+  const defaultWindow = isLongHorizon ? Math.min(50, totalCount) : totalCount;
+  const [visibleCount, setVisibleCount] = useState(defaultWindow);
+  const [panOffset, setPanOffset] = useState(0); // 0 = rightmost/latest candles
+  const [isDragging, setIsDragging] = useState(false);
+  const [prevScope, setPrevScope] = useState({ range, ticker });
+
+  // Reset panning offset when range or ticker changes (React recommended pattern)
+  if (prevScope.range !== range || prevScope.ticker !== ticker) {
+    setPrevScope({ range, ticker });
+    setVisibleCount(isLongHorizon ? Math.min(50, totalCount) : totalCount);
+    setPanOffset(0);
+  }
+
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const startOffsetRef = useRef(0);
+
+  // Compute sliced visible candleList
+  const effectiveWindow = Math.min(Math.max(15, visibleCount), totalCount || 1);
+  const maxOffset = Math.max(0, totalCount - effectiveWindow);
+  const clampedOffset = Math.max(0, Math.min(maxOffset, panOffset));
+  const startIdx = Math.max(0, totalCount - effectiveWindow - clampedOffset);
+  const endIdx = Math.min(totalCount, startIdx + effectiveWindow);
+
+  const candleList = useMemo(() => {
+    if (totalCount === 0) return [];
+    if (effectiveWindow >= totalCount) return rawCandleList;
+    return rawCandleList.slice(startIdx, endIdx);
+  }, [rawCandleList, startIdx, endIdx, effectiveWindow, totalCount]);
+
+  const canPan = totalCount > candleList.length;
+
   const w = 700;
   const padLeft = 14;
   const padRight = 85;
@@ -337,6 +380,19 @@ export function CandlestickChart({
   const volH = showVolume ? Math.max(64, height * 0.26) : 0;
   const padY = 20;
   const candleW = Math.max(4, candleList.length > 0 ? (chartW / candleList.length) * 0.65 : 10);
+
+  // Active price alerts filter for the selected stock
+  const activeAlerts = useMemo(() => {
+    if (!alerts || !Array.isArray(alerts)) return [];
+    const sym = (ticker || "").toUpperCase();
+    return alerts.filter((a) => {
+      const alertSym = (a.symbol || a.ticker || "").toUpperCase();
+      if (sym && alertSym !== sym) return false;
+      const isTriggered = a.triggered === true || a.status === "TRIGGERED" || a.active === false;
+      const target = Number(a.targetPrice || a.price || a.target);
+      return !isTriggered && !isNaN(target) && target > 0;
+    });
+  }, [alerts, ticker]);
 
   const { minPrice, priceRange, maxVolume, pts, linePath, areaPath } = useMemo(() => {
     if (candleList.length === 0) {
@@ -371,6 +427,54 @@ export function CandlestickChart({
     };
   }, [candleList, chartW, priceH, padLeft, padY]);
 
+  // Global mouse event listener for dragging pan
+  useEffect(() => {
+    const handleGlobalMouseMove = (e) => {
+      if (!isDraggingRef.current) return;
+      const deltaX = e.clientX - dragStartXRef.current;
+      const pxPerCandle = chartW / (candleList.length || 1) || 12;
+      const shift = Math.round(deltaX / pxPerCandle);
+      // Dragging right (deltaX > 0) -> view older data -> increase offset
+      // Dragging left (deltaX < 0) -> view newer data -> decrease offset
+      const targetOffset = Math.max(0, Math.min(maxOffset, startOffsetRef.current + shift));
+      setPanOffset(targetOffset);
+    };
+
+    const handleGlobalMouseUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+      }
+    };
+
+    window.addEventListener("mousemove", handleGlobalMouseMove);
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleGlobalMouseMove);
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [chartW, candleList.length, maxOffset]);
+
+  const handleMouseDown = (e) => {
+    // Only left click initiates drag
+    if (e.button !== 0 || !canPan) return;
+    isDraggingRef.current = true;
+    dragStartXRef.current = e.clientX;
+    startOffsetRef.current = clampedOffset;
+    setIsDragging(true);
+    setHoverIdx(null);
+  };
+
+  const handleMouseMove = (e) => {
+    if (isDraggingRef.current) return;
+    if (!containerRef.current || candleList.length === 0) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const pct = Math.max(0, Math.min(1, mouseX / rect.width));
+    const idx = Math.min(candleList.length - 1, Math.floor(pct * candleList.length));
+    setHoverIdx(idx);
+  };
+
   const tradeMarkers = useMemo(() => {
     const matchingOrders = orders.filter((order) => {
       const symbol = (order.ticker || order.scrip || order.symbol || "").toUpperCase();
@@ -392,15 +496,6 @@ export function CandlestickChart({
     return <div style={{ height, background: darkMode ? "#161d19" : "rgba(0,0,0,0.02)", borderRadius: 16 }} />;
   }
 
-  const handleMouseMove = (e) => {
-    if (!containerRef.current || candleList.length === 0) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const pct = Math.max(0, Math.min(1, mouseX / rect.width));
-    const idx = Math.min(candleList.length - 1, Math.floor(pct * candleList.length));
-    setHoverIdx(idx);
-  };
-
   const activeCandle = hoverIdx !== null ? candleList[hoverIdx] : candleList[candleList.length - 1];
   const firstCandle = candleList[0];
   const activeChange = activeCandle ? activeCandle.close - (activeCandle.open || firstCandle.open) : 0;
@@ -413,13 +508,17 @@ export function CandlestickChart({
   return (
     <div
       ref={containerRef}
+      onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
-      onMouseLeave={() => setHoverIdx(null)}
+      onMouseLeave={() => {
+        if (!isDraggingRef.current) setHoverIdx(null);
+      }}
       style={{
         position: "relative",
         width: "100%",
         userSelect: "none",
-        fontFamily: "'Hanken Grotesk', sans-serif"
+        fontFamily: "'Hanken Grotesk', sans-serif",
+        cursor: isDragging ? "grabbing" : (canPan ? "grab" : "crosshair"),
       }}
     >
       {/* Top HUD: OHLCV Bar */}
@@ -461,7 +560,89 @@ export function CandlestickChart({
               VOL: <strong style={{ color: textColor }}>{(activeCandle.volume > 1e6 ? `${(activeCandle.volume / 1e6).toFixed(2)}M` : `${(activeCandle.volume / 1e3).toFixed(1)}K`)}</strong>
             </span>
           )}
+          {activeAlerts.length > 0 && (
+            <span
+              style={{
+                color: "#f59e0b",
+                background: darkMode ? "rgba(245, 158, 11, 0.15)" : "rgba(245, 158, 11, 0.12)",
+                border: "1px solid rgba(245, 158, 11, 0.3)",
+                padding: "2px 8px",
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 800,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+              title={`${activeAlerts.length} active price alert level(s) shown on chart`}
+            >
+              <Bell size={11} fill="#f59e0b" />
+              {activeAlerts.length} ALERT LINE{activeAlerts.length > 1 ? "S" : ""}
+            </span>
+          )}
         </div>
+
+        {canPan && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                fontSize: 10.5,
+                fontWeight: 700,
+                color: isDragging ? "#10b981" : subTextColor,
+                fontFamily: "'JetBrains Mono', monospace",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <MoveHorizontal size={12} />
+              {isDragging ? "DRAGGING..." : "DRAG TO PAN"}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setVisibleCount(totalCount);
+                setPanOffset(0);
+              }}
+              style={{
+                padding: "3px 8px",
+                borderRadius: 6,
+                border: `1px solid ${bgBorder}`,
+                background: darkMode ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+                color: textColor,
+                fontSize: 10.5,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+              title="Fit all historical data on screen"
+            >
+              Fit All
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPanOffset(0);
+              }}
+              style={{
+                padding: "3px 8px",
+                borderRadius: 6,
+                border: `1px solid ${bgBorder}`,
+                background: clampedOffset === 0 ? "#006c49" : (darkMode ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"),
+                color: clampedOffset === 0 ? "#ffffff" : textColor,
+                fontSize: 10.5,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+              title="Jump to latest prices"
+            >
+              Latest
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Candlestick / Line SVG Canvas */}
@@ -548,6 +729,56 @@ export function CandlestickChart({
                 <text x={cx} y={cy + 3} fill={marker.isBuy ? "#062b1a" : "#ffffff"} fontSize="7" fontWeight="900" textAnchor="middle">
                   {marker.isBuy ? "B" : "S"}
                 </text>
+              </g>
+            );
+          })}
+
+          {/* Active Price Alerts Horizontal Dashed Lines */}
+          {activeAlerts.map((alert, idx) => {
+            const targetPrice = Number(alert.targetPrice || alert.price || alert.target);
+            if (isNaN(targetPrice) || targetPrice <= 0) return null;
+            const rawY = priceH - padY - ((targetPrice - minPrice) / priceRange) * (priceH - padY * 2);
+            const isWithinChart = rawY >= 4 && rawY <= priceH - 4;
+            const clampedY = Math.max(8, Math.min(priceH - 8, rawY));
+
+            return (
+              <g key={alert.id || `alert-line-${idx}`} className="stake-chart-alert-line">
+                {/* Horizontal dashed line across price chart */}
+                <line
+                  x1={padLeft}
+                  y1={clampedY}
+                  x2={padLeft + chartW}
+                  y2={clampedY}
+                  stroke="#f59e0b"
+                  strokeWidth="1.8"
+                  strokeDasharray="6 4"
+                  opacity={isWithinChart ? 0.95 : 0.45}
+                  vectorEffect="non-scaling-stroke"
+                />
+                {/* Alert price badge on the right price scale */}
+                <g transform={`translate(${padLeft + chartW + 3}, ${clampedY - 9})`}>
+                  <rect
+                    x="0"
+                    y="0"
+                    width="76"
+                    height="18"
+                    rx="4"
+                    fill="#f59e0b"
+                    stroke={darkMode ? "#0f172a" : "#ffffff"}
+                    strokeWidth="1"
+                  />
+                  <text
+                    x="38"
+                    y="12.5"
+                    fill="#ffffff"
+                    fontSize="9"
+                    fontWeight="900"
+                    fontFamily="'JetBrains Mono', monospace"
+                    textAnchor="middle"
+                  >
+                    🔔 {currency}{fmt(targetPrice, 1)}
+                  </text>
+                </g>
               </g>
             );
           })}
@@ -681,6 +912,133 @@ export function CandlestickChart({
                 />
               )}
             </svg>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Timeline Panning Bar for Long Horizons ('ALL', '5y', etc.) */}
+      {canPan && (
+        <div
+          style={{
+            marginTop: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
+            padding: "8px 12px",
+            background: darkMode ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+            borderRadius: 12,
+            border: `1px solid ${bgBorder}`,
+            fontSize: 11,
+            fontFamily: "'JetBrains Mono', monospace",
+            color: subTextColor,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setPanOffset((prev) => Math.min(maxOffset, prev + 15))}
+              disabled={clampedOffset >= maxOffset}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "3px 8px",
+                borderRadius: 6,
+                border: `1px solid ${bgBorder}`,
+                background: darkMode ? "#1a2420" : "#ffffff",
+                color: textColor,
+                cursor: clampedOffset >= maxOffset ? "not-allowed" : "pointer",
+                opacity: clampedOffset >= maxOffset ? 0.4 : 1,
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+              title="Pan further into history (earlier periods)"
+            >
+              <ChevronLeft size={13} /> Earlier
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPanOffset((prev) => Math.max(0, prev - 15))}
+              disabled={clampedOffset <= 0}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "3px 8px",
+                borderRadius: 6,
+                border: `1px solid ${bgBorder}`,
+                background: darkMode ? "#1a2420" : "#ffffff",
+                color: textColor,
+                cursor: clampedOffset <= 0 ? "not-allowed" : "pointer",
+                opacity: clampedOffset <= 0 ? 0.4 : 1,
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+              title="Pan forward toward present"
+            >
+              Recent <ChevronRight size={13} />
+            </button>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <MoveHorizontal size={13} style={{ color: "#10b981" }} />
+            <span>
+              Horizon: <strong style={{ color: textColor }}>{candleList[0]?.date || "Past"}</strong> →{" "}
+              <strong style={{ color: textColor }}>{candleList[candleList.length - 1]?.date || "Present"}</strong>
+              <span style={{ marginLeft: 6, opacity: 0.8 }}>
+                ({clampedOffset === 0 ? "Latest View" : `${clampedOffset} periods back`} • {candleList.length} of {totalCount} candles)
+              </span>
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setVisibleCount((v) => Math.max(15, v - 10))}
+              disabled={visibleCount <= 15}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                padding: "3px 8px",
+                borderRadius: 6,
+                border: `1px solid ${bgBorder}`,
+                background: darkMode ? "#1a2420" : "#ffffff",
+                color: textColor,
+                cursor: visibleCount <= 15 ? "not-allowed" : "pointer",
+                fontSize: 11,
+                fontWeight: 700,
+                opacity: visibleCount <= 15 ? 0.4 : 1,
+              }}
+              title="Zoom In (narrower horizon, larger candles)"
+            >
+              <ZoomIn size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisibleCount((v) => Math.min(totalCount, v + 15))}
+              disabled={visibleCount >= totalCount}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                padding: "3px 8px",
+                borderRadius: 6,
+                border: `1px solid ${bgBorder}`,
+                background: darkMode ? "#1a2420" : "#ffffff",
+                color: textColor,
+                cursor: visibleCount >= totalCount ? "not-allowed" : "pointer",
+                fontSize: 11,
+                fontWeight: 700,
+                opacity: visibleCount >= totalCount ? 0.4 : 1,
+              }}
+              title="Zoom Out (broader horizon, more candles)"
+            >
+              <ZoomOut size={12} />
+            </button>
           </div>
         </div>
       )}

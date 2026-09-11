@@ -22,6 +22,8 @@ export function SettingsModal({
   onDeleteAccount,
   kycStatus = "UNVERIFIED",
   user,
+  navLayout = "top",
+  setNavLayout,
 }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -117,6 +119,19 @@ export function SettingsModal({
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Privacy Mode Section */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+              <div className="text-xs font-bold text-slate-900">Navigation layout</div>
+              <p className="text-[11.5px] text-slate-500 mt-0.5">Choose a top navigation bar or a left sidebar.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {["top", "sidebar"].map((layout) => (
+                  <button key={layout} type="button" onClick={() => setNavLayout?.(layout)} className={`rounded-xl border px-3 py-2 text-xs font-bold cursor-pointer ${navLayout === layout ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600"}`}>
+                    {layout === "top" ? "Top bar" : "Left sidebar"}
+                  </button>
+                ))}
               </div>
             </div>
 

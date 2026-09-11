@@ -27,6 +27,7 @@ import {
   deletePriceAlert,
   fetchKycStatus,
   fetchUserData,
+  getStoredUser,
   deleteAccount,
   setStoredAuthToken,
   clearAuthSession,
@@ -141,6 +142,39 @@ export default function App() {
 
   const [settingsOpen, setSettingsOpen] =
     useState(false);
+  const [navLayout, setNavLayout] = useState(() => {
+    try {
+      return localStorage.getItem("stake_nav_layout") || "sidebar";
+    } catch {
+      return "sidebar";
+    }
+  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("stake_sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const handleToggleSidebarCollapse = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("stake_sidebar_collapsed", String(next));
+      } catch {
+        // Optional persistence
+      }
+      return next;
+    });
+  };
+  const handleNavLayoutChange = (layout) => {
+    setNavLayout(layout);
+    try {
+      localStorage.setItem("stake_nav_layout", layout);
+    } catch {
+      // Navigation preference persistence is optional.
+    }
+  };
 
   // =========================================================
   // Drawer & Modal States
@@ -292,7 +326,11 @@ export default function App() {
 
   const showToast = useCallback(
     (msg) => {
-      setToast(msg);
+      const professionalMessage = String(msg ?? "")
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+      setToast(professionalMessage);
 
       if (
         toastTimeoutRef.current
@@ -387,12 +425,34 @@ export default function App() {
         try {
           const liveUser = await fetchUserData(user.email);
           if (isMounted && liveUser) {
-            setUser((prev) => ({ ...(prev || {}), ...liveUser }));
-            if (liveUser.cash !== undefined) setCash(liveUser.cash);
-            if (liveUser.holdings) setHoldings(liveUser.holdings);
-            if (liveUser.watchlist) setWatchlist(liveUser.watchlist);
-            if (liveUser.orders) setOrders(liveUser.orders);
-            if (liveUser.agentEnabled !== undefined) setAgentEnabled(liveUser.agentEnabled);
+            const storedUser = getStoredUser();
+            const localHasPortfolio =
+              Number(storedUser?.cash || 0) > 0 ||
+              Object.keys(storedUser?.holdings || {}).length > 0 ||
+              (storedUser?.orders || []).length > 0;
+            const backendIsEmpty =
+              Number(liveUser.cash || 0) === 0 &&
+              Object.keys(liveUser.holdings || {}).length === 0 &&
+              (liveUser.orders || []).length === 0;
+
+            if (localHasPortfolio && backendIsEmpty) {
+              await syncUserState({
+                email: user.email,
+                cash: storedUser.cash,
+                holdings: storedUser.holdings,
+                watchlist: storedUser.watchlist,
+                orders: storedUser.orders,
+                transactions: storedUser.transactions,
+                agentEnabled: storedUser.agentEnabled,
+              });
+            } else {
+              setUser((prev) => ({ ...(prev || {}), ...liveUser }));
+              if (liveUser.cash !== undefined) setCash(liveUser.cash);
+              if (liveUser.holdings) setHoldings(liveUser.holdings);
+              if (liveUser.watchlist) setWatchlist(liveUser.watchlist);
+              if (liveUser.orders) setOrders(liveUser.orders);
+              if (liveUser.agentEnabled !== undefined) setAgentEnabled(liveUser.agentEnabled);
+            }
           }
         } catch (err) {
           console.warn("User data sync fallback:", err);
@@ -472,7 +532,15 @@ export default function App() {
           localStorage.setItem(
             "stake_active_user",
             JSON.stringify(
-              curUser
+              {
+                ...curUser,
+                email: curUser.email,
+                cash: curCash,
+                holdings: curHoldings,
+                watchlist: curWatchlist,
+                orders: curOrders,
+                agentEnabled: curAgentEnabled,
+              }
             )
           );
         } catch {
@@ -481,6 +549,7 @@ export default function App() {
 
         try {
           await syncUserState({
+            email: curUser.email,
             user: curUser,
             cash: curCash,
             holdings:
@@ -1804,28 +1873,34 @@ export default function App() {
             zIndex: 999,
 
             background:
-              "#ffffff",
-
-            color:
               "#0f172a",
 
+            color:
+              "#f8fafc",
+
             padding:
-              "12px 20px",
+              "13px 18px",
 
             borderRadius:
-              14,
+              12,
 
             boxShadow:
-              "0 10px 30px rgba(0, 0, 0, 0.12)",
+              "0 16px 36px rgba(15, 23, 42, 0.24)",
 
             border:
-              "1px solid #e2e8f0",
+              "1px solid rgba(148, 163, 184, 0.28)",
 
             fontWeight:
-              800,
+              650,
 
             fontSize:
               13,
+
+            lineHeight:
+              1.45,
+
+            maxWidth:
+              380,
 
             display:
               "flex",
@@ -1866,6 +1941,9 @@ export default function App() {
 
       {/* Navbar */}
       <Navbar
+        layout={navLayout}
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebarCollapse={handleToggleSidebarCollapse}
         tab={
           selectedStock
             ? "market"
@@ -1960,8 +2038,22 @@ export default function App() {
 
       {/* Main */}
       <main
-        className={`flex-1 w-full max-w-[1400px] mx-auto px-3 sm:px-6 py-5 pb-20 box-border transition-all duration-200 ${
-          aiInsightsOpen ? "xl:mr-[420px] xl:max-w-[calc(100vw-440px)]" : ""
+        className={`flex-1 w-full box-border transition-all duration-200 ${
+          navLayout === "sidebar"
+            ? `${
+                sidebarCollapsed
+                  ? "md:ml-16 md:w-[calc(100vw-4rem)] md:max-w-[calc(100vw-4rem)]"
+                  : "md:ml-52 md:w-[calc(100vw-13rem)] md:max-w-[calc(100vw-13rem)]"
+              } px-3 sm:px-6 py-5 pb-20 ${
+                aiInsightsOpen
+                  ? sidebarCollapsed
+                    ? "xl:max-w-[calc(100vw-4rem-390px)] xl:mr-[390px]"
+                    : "xl:max-w-[calc(100vw-13rem-390px)] xl:mr-[390px]"
+                  : ""
+              }`
+            : `max-w-[1400px] mx-auto px-3 sm:px-6 py-5 pb-20 ${
+                aiInsightsOpen ? "xl:max-w-[calc(100vw-420px)] xl:mr-[420px]" : ""
+              }`
         }`}
       >
         {/* Stock Detail */}
@@ -2562,6 +2654,11 @@ export default function App() {
                   );
                 }}
 
+                onGoToMarket={() => {
+                  setSelectedStock(null);
+                  setTab("market");
+                }}
+
                 showToast={
                   showToast
                 }
@@ -2576,6 +2673,7 @@ export default function App() {
          ===================================================== */}
 
       <StakeOrderDeskDrawer
+        key={`${selectedStock || "NVDA"}-${orderDeskMode}-${orderDeskOpen}`}
         isOpen={
           orderDeskOpen
         }
@@ -2684,6 +2782,8 @@ export default function App() {
          ===================================================== */}
 
       <SettingsModal
+        navLayout={navLayout}
+        setNavLayout={handleNavLayoutChange}
         isOpen={
           settingsOpen
         }
@@ -2735,6 +2835,14 @@ export default function App() {
         kycStatus={
           kycStatus
         }
+
+        navLayout={
+          navLayout
+        }
+
+        setNavLayout={
+          handleNavLayoutChange
+        }
       />
 
       {/* =====================================================
@@ -2744,6 +2852,10 @@ export default function App() {
       <GeminiStrategySidebar
         isOpen={
           aiInsightsOpen
+        }
+
+        layout={
+          navLayout
         }
 
         onClose={() =>

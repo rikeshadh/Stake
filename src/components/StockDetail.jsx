@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ArrowLeft,
   Star,
@@ -18,6 +18,7 @@ import {
 import { CandlestickChart } from "./Charts";
 import { SetAlertModal } from "./SetAlertModal";
 import { fetchYFinanceQuote, fetchYFinanceChart } from "../api";
+import { usePollYFinanceChart } from "../hooks/usePollYFinanceChart";
 import { fmt, fmtShares, initials, formatStockPrice, formatMoney, getCurrencySymbol } from "../utils";
 
 const RANGES = ["1D", "1W", "1M", "3M", "1Y", "ALL"];
@@ -106,6 +107,30 @@ export function StockDetail({
       isMounted = false;
     };
   }, [selected, range]);
+
+  // Hook to poll the /api/yfinance/chart/:symbol endpoint every 60 seconds if the time range is set to '1d', keeping the view live
+  const { isPolling, lastUpdated: lastPolledAt } = usePollYFinanceChart({
+    symbol: selected,
+    range,
+    intervalMs: 60000,
+    onUpdate: useCallback((chartData) => {
+      if (chartData?.candles?.length > 0) {
+        setLiveCandles(chartData.candles);
+      }
+      if (chartData?.history?.length > 0) {
+        setLiveHistory(chartData.history);
+      }
+      // Also update in-memory cache for instant switching
+      const cacheKey = `${selected}_1d`;
+      const existing = chartCache.get(cacheKey) || {};
+      chartCache.set(cacheKey, {
+        ...existing,
+        candles: chartData?.candles || existing.candles,
+        history: chartData?.history || existing.history,
+        timestamp: Date.now(),
+      });
+    }, [selected]),
+  });
 
   if (!selected || !stockData || !stockMeta) return null;
 
@@ -328,17 +353,42 @@ export function StockDetail({
           </div>
 
           {/* Time Range Selector - Always in the exact same spot regardless of chart mode */}
-          <div className={`stake-pill-group ${darkMode ? "stake-pill-group-dark" : ""}`}>
-            {RANGES.map((r) => (
-              <button
-                key={r}
-                id={`stock-range-btn-${r}`}
-                onClick={() => setRange(r)}
-                className={`stake-pill-btn ${darkMode ? "stake-pill-btn-dark" : ""} ${range === r ? "stake-pill-btn-active" : ""}`}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            {range === "1D" && isPolling && (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "#10b981",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 9px",
+                  borderRadius: 8,
+                  background: darkMode ? "rgba(16,185,129,0.14)" : "rgba(16,185,129,0.1)",
+                  border: "1px solid rgba(16,185,129,0.25)",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  letterSpacing: "0.02em",
+                }}
+                title={lastPolledAt ? `Last polled at ${new Date(lastPolledAt).toLocaleTimeString()}` : "Polling /api/yfinance/chart/:symbol every 60s"}
               >
-                {r}
-              </button>
-            ))}
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", display: "inline-block" }} className="animate-pulse" />
+                LIVE (60s POLL)
+              </span>
+            )}
+
+            <div className={`stake-pill-group ${darkMode ? "stake-pill-group-dark" : ""}`}>
+              {RANGES.map((r) => (
+                <button
+                  key={r}
+                  id={`stock-range-btn-${r}`}
+                  onClick={() => setRange(r)}
+                  className={`stake-pill-btn ${darkMode ? "stake-pill-btn-dark" : ""} ${range === r ? "stake-pill-btn-active" : ""}`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -355,6 +405,7 @@ export function StockDetail({
             onChartTypeChange={setChartType}
             orders={orders}
             ticker={selected}
+            alerts={alerts}
           />
         </div>
       </div>

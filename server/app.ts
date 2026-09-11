@@ -13,9 +13,20 @@ import {
   AgentAction,
   getAI,
   hasGeminiKey,
+  hasNvidiaKey,
+  generateNvidiaResponse,
+  GEMINI_MODEL,
+  GEMINI_FALLBACK_MODEL,
+  generateMorningBriefingWithAI,
 } from "./ai";   // <--- fixed: now relative to server/
 
 dotenv.config();
+
+if (!hasNvidiaKey() && !hasGeminiKey()) {
+  console.warn(
+    "No AI provider key loaded. Create .env in the project directory and set NVIDIA_API_KEY."
+  );
+}
 
 const yahooFinance = new YahooFinance();
 
@@ -331,6 +342,8 @@ const userSchema = new mongoose.Schema({
   agentDeployedCapital: { type: Number, default: 0 },
   agentMaxSpend: { type: Number, default: 500 },
   agentStrategy: { type: String, default: "" },
+  agentReversalWindow: { type: Number, default: 5 },
+  agentHistory: { type: [mongoose.Schema.Types.Mixed], default: [] },
   privacyMode: { type: Boolean, default: false },
   kycStatus: { type: String, enum: ["UNVERIFIED", "PENDING", "VERIFIED"], default: "UNVERIFIED" },
   kycData: { type: mongoose.Schema.Types.Mixed, default: {} },
@@ -447,12 +460,13 @@ const inMemoryUsers: Record<string, any> = {
 };
 
 async function connectDB(overrideUri?: string) {
-  const mongoUri = overrideUri || process.env.MONGODB_URI;
+  const configuredUri = overrideUri || process.env.MONGODB_DIRECT_URI || process.env.MONGODB_URI;
+  const mongoUri = configuredUri;
   
   if (!mongoUri) {
-    console.log("MONGODB_URI not configured. Operating in high-performance dual-resilient mode.");
+    console.log("MongoDB URI not configured. Operating in high-performance dual-resilient mode.");
     isMongoConnected = false;
-    mongoConnectionError = "MONGODB_URI environment variable not provided.";
+    mongoConnectionError = "Set MONGODB_URI in .env to enable MongoDB persistence.";
     return false;
   }
 
@@ -461,7 +475,7 @@ async function connectDB(overrideUri?: string) {
     if (mongoose.connection.readyState !== 0) {
       await mongoose.disconnect();
     }
-    await mongoose.connect(mongoUri, {
+    await mongoose.connect(mongoUri!, {
       family: 4,
       serverSelectionTimeoutMS: 10000,
       connectTimeoutMS: 8000,
@@ -474,8 +488,12 @@ async function connectDB(overrideUri?: string) {
     console.log("Connected successfully to MongoDB Atlas / Database");
     return true;
   } catch (err: any) {
-    mongoConnectionError = err.message;
-    console.log("MongoDB connection attempt fallback:", err.message);
+    const errorMessage = err?.message || "Unknown MongoDB connection error";
+    const isSrvDnsError = /querySrv|ECONNREFUSED.*_mongodb\._tcp/i.test(errorMessage);
+    mongoConnectionError = isSrvDnsError
+      ? `${errorMessage}. SRV DNS is unavailable; use a mongodb:// direct URI in MONGODB_DIRECT_URI or fix DNS/VPN/firewall settings.`
+      : errorMessage;
+    console.log("MongoDB connection attempt fallback:", mongoConnectionError);
     isMongoConnected = false;
     return false;
   }
@@ -515,7 +533,8 @@ app.get("/api/health", (_req, res) => {
     apis: {
       yahooFinanceMarketFeed: "OPERATIONAL",
       cachedSymbolsCount: quoteCache.size,
-      geminiAiEngine: hasGeminiKey() ? "ACTIVE" : "HEURISTIC_QUANT_ACTIVE",
+      geminiAiEngine: hasGeminiKey() ? "ACTIVE" : "INACTIVE",
+      nvidiaAiEngine: hasNvidiaKey() ? "ACTIVE" : "INACTIVE",
     },
   });
 });
@@ -536,7 +555,7 @@ app.get("/api/database/status", (_req, res) => {
     success: true,
     connected: isMongoConnected,
     error: mongoConnectionError,
-    uriConfigured: Boolean(process.env.MONGODB_URI),
+    uriConfigured: Boolean(process.env.MONGODB_URI || process.env.MONGODB_DIRECT_URI),
     mode: isMongoConnected ? "MongoDB Atlas Cluster" : "In-Memory Dual-State Engine",
   });
 });
@@ -927,14 +946,45 @@ app.post("/api/kyc", async (req, res) => {
 });
 
 app.post("/api/sync", async (req, res) => {
-  const { email, name, accountNumber, currency, cash, holdings, watchlist, agentEnabled, privacyMode, kycStatus, kycData, orders, transactions } = req.body;
-  const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
+  const nestedUser = req.body.user && typeof req.body.user === "object" ? req.body.user : {};
+  const {
+    email,
+    name,
+    accountNumber,
+    currency,
+    cash,
+    holdings,
+    watchlist,
+    agentEnabled,
+    privacyMode,
+    kycStatus,
+    kycData,
+    orders,
+    transactions,
+  } = { ...nestedUser, ...req.body };
+  const targetEmail = (email || nestedUser.email || "trader@stake.com").toLowerCase().trim();
+  const updates = Object.fromEntries(
+    Object.entries({
+      name,
+      accountNumber,
+      currency,
+      cash,
+      holdings,
+      watchlist,
+      agentEnabled,
+      privacyMode,
+      kycStatus,
+      kycData,
+      orders,
+      transactions,
+    }).filter(([, value]) => value !== undefined)
+  );
 
   if (isMongoConnected && UserModel) {
     try {
       const user = await UserModel.findOneAndUpdate(
         { email: targetEmail },
-        { name, accountNumber, currency, cash, holdings, watchlist, agentEnabled, privacyMode, kycStatus, kycData, orders, transactions },
+        { $set: updates, $setOnInsert: { email: targetEmail } },
         { new: true, upsert: true }
       );
       return res.json({ success: true, user });
@@ -945,18 +995,15 @@ app.post("/api/sync", async (req, res) => {
 
   inMemoryUsers[targetEmail] = {
     ...inMemoryUsers[targetEmail],
+    email: targetEmail,
+    ...updates,
     name: name || inMemoryUsers[targetEmail]?.name,
     accountNumber: accountNumber || inMemoryUsers[targetEmail]?.accountNumber,
     currency: currency || inMemoryUsers[targetEmail]?.currency || "USD",
-    cash,
-    holdings,
-    watchlist,
-    agentEnabled,
-    privacyMode,
     kycStatus: kycStatus || inMemoryUsers[targetEmail]?.kycStatus || "VERIFIED",
     kycData: kycData || inMemoryUsers[targetEmail]?.kycData || {},
-    orders: orders || inMemoryUsers[targetEmail]?.orders || [],
-    transactions: transactions || inMemoryUsers[targetEmail]?.transactions || []
+    orders: orders ?? inMemoryUsers[targetEmail]?.orders ?? [],
+    transactions: transactions ?? inMemoryUsers[targetEmail]?.transactions ?? []
   };
 
   res.json({ success: true, user: inMemoryUsers[targetEmail] });
@@ -1426,7 +1473,7 @@ async function persistUserToMongo(email: string, updates: any) {
 
 // 1. POST /api/agent/chat - Gemini function calling conversational endpoint
 app.post("/api/agent/chat", async (req, res) => {
-  const { message, email, history = [] } = req.body;
+  const { message, email, history = [], confirmed = false } = req.body;
   const targetEmail = (email || "trader@stake.com").toLowerCase().trim();
 
   if (!message || !message.trim()) {
@@ -1442,6 +1489,8 @@ app.post("/api/agent/chat", async (req, res) => {
       stocksMap[sym] = await fetchLiveQuoteFromAPI(sym);
     }
 
+    let pendingConfirmationTrade: any = null;
+
     // Execute order callback for tool
     const executeOrderFn = async ({ ticker, side, shares, price, orderType = "MKT", reason }: any) => {
       const sym = ticker.toUpperCase();
@@ -1449,6 +1498,28 @@ app.post("/api/agent/chat", async (req, res) => {
       const tradePrice = price ? Number(price) : (liveStock?.price || 150.0);
       const tradeTotal = Number((shares * tradePrice).toFixed(2));
       const isBuy = side === "BUY";
+
+      // Mandatory Confirmation Guardrail for High-Value Agent Trades (> $1000)
+      if (tradeTotal > 1000 && !confirmed) {
+        pendingConfirmationTrade = {
+          ticker: sym,
+          side: isBuy ? "BUY" : "SELL",
+          shares,
+          price: tradePrice,
+          total: tradeTotal,
+          strategy: "AI Agent Chat Execution",
+          reason: reason || `AI Agent proposed order for ${shares} shares of ${sym}`,
+          orderType,
+        };
+        return {
+          success: false,
+          requiresConfirmation: true,
+          status: "REQUIRES_CONFIRMATION",
+          threshold: 1000,
+          error: `High-value agent trade threshold exceeded ($${tradeTotal.toLocaleString()} > $1,000.00). User confirmation required before execution.`,
+          pendingTrade: pendingConfirmationTrade,
+        };
+      }
 
       if (isBuy) {
         if ((user.cash || 0) < tradeTotal) {
@@ -1559,23 +1630,35 @@ app.post("/api/agent/chat", async (req, res) => {
       return { success: true, alert: newAlert };
     };
 
-    const result = await processAgentChat({
-      message,
-      history,
-      context: {
-        user,
-        stocksMap,
-        executeOrderFn,
-        createAlertFn,
-        recentActions: globalAgentActions.filter((a) => a.userEmail === targetEmail).slice(0, 10),
-        agentMemory: globalAgentMemory.filter((m) => m.userEmail === targetEmail).map((m) => m.text),
-      },
-    });
+    let result;
+    try {
+      result = await processAgentChat({
+        message,
+        history,
+        context: {
+          user,
+          stocksMap,
+          executeOrderFn,
+          createAlertFn,
+          recentActions: globalAgentActions.filter((a) => a.userEmail === targetEmail).slice(0, 10),
+          agentMemory: globalAgentMemory.filter((m) => m.userEmail === targetEmail).map((m) => m.text),
+        },
+      });
+    } catch (aiError: any) {
+      console.error("Agent provider error:", aiError);
+      return res.status(503).json({
+        success: false,
+        message: aiError?.message || "AI provider is unavailable. Check the server environment configuration.",
+      });
+    }
 
     return res.json({
       success: true,
       reply: result.reply,
       toolCalls: result.toolCalls,
+      executedActions: result.executedActions || [],
+      requiresConfirmation: Boolean(pendingConfirmationTrade || result.requiresConfirmation),
+      pendingTrade: pendingConfirmationTrade || result.pendingTrade || null,
       userState: {
         cash: user.cash,
         holdings: user.holdings,
@@ -1585,6 +1668,125 @@ app.post("/api/agent/chat", async (req, res) => {
   } catch (err: any) {
     console.error("Agent chat error:", err);
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 1a. POST /api/agent/confirm-trade - Explicit user confirmation and execution for high-value agent trades (> $1,000)
+app.post("/api/agent/confirm-trade", async (req, res) => {
+  const { email, userId, ticker, side, shares, price, orderType = "MKT", strategy, reason } = req.body;
+  const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
+
+  try {
+    const user = await getUserRecord(targetEmail);
+    const sym = ((ticker || "NVDA") as string).toUpperCase().trim();
+    const liveStock = await fetchLiveQuoteFromAPI(sym);
+    const tradePrice = price ? Number(price) : (liveStock?.price || 150.0);
+    const tradeShares = Number(shares) || 1;
+    const tradeTotal = Number((tradeShares * tradePrice).toFixed(2));
+    const isBuy = ((side || "BUY") as string).toUpperCase() === "BUY";
+
+    if (isBuy) {
+      if ((user.cash || 0) < tradeTotal) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient cash collateral. Required $${tradeTotal.toLocaleString()}, available $${(user.cash || 0).toLocaleString()}`,
+        });
+      }
+      user.cash = Number(((user.cash || 0) - tradeTotal).toFixed(2));
+      if (!user.holdings) user.holdings = {};
+      const curHold = user.holdings[sym] || { shares: 0, costBasis: 0 };
+      user.holdings[sym] = {
+        shares: Number((curHold.shares + tradeShares).toFixed(4)),
+        costBasis: Number((curHold.costBasis + tradeTotal).toFixed(2)),
+      };
+    } else {
+      const curHold = user.holdings?.[sym]?.shares || 0;
+      if (curHold < tradeShares) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient shares. Owned: ${curHold}, requested: ${tradeShares}`,
+        });
+      }
+      user.cash = Number(((user.cash || 0) + tradeTotal).toFixed(2));
+      const remain = curHold - tradeShares;
+      if (remain <= 0.0001) {
+        delete user.holdings[sym];
+      } else {
+        user.holdings[sym] = {
+          shares: Number(remain.toFixed(4)),
+          costBasis: Number((user.holdings[sym].costBasis * (remain / curHold)).toFixed(2)),
+        };
+      }
+    }
+
+    const newOrder = {
+      id: `STK-HVC-${Math.floor(1000 + Math.random() * 9000)}`,
+      scrip: sym,
+      ticker: sym,
+      type: isBuy ? "BUY" : "SELL",
+      side: isBuy ? "BUY" : "SELL",
+      orderType,
+      validity: "DAY",
+      shares: tradeShares,
+      price: tradePrice,
+      total: tradeTotal,
+      status: "EXECUTED",
+      timestamp: new Date(),
+    };
+
+    if (!user.orders) user.orders = [];
+    user.orders.unshift(newOrder);
+
+    const actionRecord: AgentAction = {
+      id: `act-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      userEmail: targetEmail,
+      ticker: sym,
+      side: isBuy ? "BUY" : "SELL",
+      shares: tradeShares,
+      price: tradePrice,
+      total: tradeTotal,
+      strategy: (strategy || "high_value_authorized") as any,
+      reason: `[HIGH-VALUE AUTHORIZED > $1K] ${reason || `User confirmed execution for ${tradeShares}x ${sym} ($${tradeTotal})`}`,
+      timestamp: Date.now(),
+      status: "EXECUTED",
+      canRevertUntil: Date.now() + 300000,
+    };
+    globalAgentActions.unshift(actionRecord);
+
+    globalAgentMemory.unshift({
+      id: `mem-${Date.now()}`,
+      userEmail: targetEmail,
+      timestamp: Date.now(),
+      text: `Mandatory Oversight Approval: Confirmed and filled ${isBuy ? "BUY" : "SELL"} ${tradeShares}x ${sym} at $${tradePrice} ($${tradeTotal})`,
+      type: "EXECUTION",
+    });
+
+    await persistUserToMongo(targetEmail, {
+      cash: user.cash,
+      holdings: user.holdings,
+      orders: user.orders,
+    });
+
+    if (inMemoryUsers[targetEmail]) {
+      inMemoryUsers[targetEmail].cash = user.cash;
+      inMemoryUsers[targetEmail].holdings = user.holdings;
+      inMemoryUsers[targetEmail].orders = user.orders;
+    }
+
+    return res.json({
+      success: true,
+      message: `High-value order authorized & executed: ${isBuy ? "BUY" : "SELL"} ${tradeShares}x ${sym} for $${tradeTotal.toLocaleString()}`,
+      order: newOrder,
+      action: actionRecord,
+      userState: {
+        cash: user.cash,
+        holdings: user.holdings,
+        orders: user.orders,
+      },
+    });
+  } catch (err: any) {
+    console.error("Confirm trade execution error:", err);
+    return res.status(500).json({ success: false, message: err.message || "Failed to execute confirmed trade" });
   }
 });
 
@@ -1717,7 +1919,9 @@ app.get("/api/agent/actions", async (req, res) => {
 app.post("/api/agent/revert-trade", async (req, res) => {
   const { actionId, email, userId } = req.body;
   const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
-  const action = globalAgentActions.find((a) => a.id === actionId);
+  const action = globalAgentActions.find(
+    (candidate) => candidate.id === actionId && candidate.userEmail === targetEmail
+  );
 
   if (!action) {
     return res.status(404).json({ success: false, message: "Action not found" });
@@ -1828,13 +2032,92 @@ app.post("/api/agent/backtest", async (req, res) => {
   else days = 90;
 
   try {
-    await fetchLiveQuoteFromAPI(ticker);
-    const result = runStrategyBacktest(
-      strategy,
-      (ticker || "NVDA").toUpperCase(),
+    const symbol = (ticker || "NVDA").toUpperCase();
+    const endDate = new Date();
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - days);
+    const historical = await yahooFinance.chart(normalizeYahooSymbol(symbol), {
+      period1: startDate,
+      period2: endDate,
+      interval: "1d",
+    });
+
+    app.post("/api/agent/forecast", async (req, res) => {
+      const ticker = String(req.body?.ticker || "").toUpperCase().trim();
+      const years = Math.min(10, Math.max(1, Number(req.body?.years) || 5));
+      const question = String(req.body?.question || "What are the main long-term opportunities and risks?");
+
+      if (!ticker) {
+        return res.status(400).json({ success: false, message: "Enter a stock symbol." });
+      }
+      if (!hasGeminiKey()) {
+        return res.status(503).json({ success: false, message: "Gemini is not configured for AI outlooks." });
+      }
+
+      try {
+        const quote = await fetchLiveQuoteFromAPI(ticker);
+        const ai = getAI();
+        const response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: `Create a balanced multi-year outlook for ${ticker} over the next ${years} years.
+    Current quote: ${quote ? `$${quote.price}, daily change ${quote.changePercent}%` : "unavailable"}.
+    User question: ${question}
+    Use these headings: Business outlook, Growth drivers, Main risks, Scenario ranges, What to monitor.
+    Do not promise returns, invent precise future prices, or present this as financial advice. Clearly label uncertainty.`,
+        });
+        return res.json({ success: true, ticker, forecast: response.text || "No outlook was returned." });
+      } catch (error: any) {
+        console.error("AI forecast error:", error);
+        return res.status(502).json({ success: false, message: "Unable to generate the AI outlook right now." });
+      }
+    });
+    const candles = (historical?.quotes || []).filter((quote: any) => (
+      quote.close !== null && quote.close !== undefined
+    ));
+
+    if (candles.length < 2) {
+      return res.status(503).json({
+        success: false,
+        message: `Historical price data is unavailable for ${symbol}. Try again later.`,
+      });
+    }
+
+    const firstPrice = Number(candles[0].close);
+    const lastPrice = Number(candles[candles.length - 1].close);
+    const capital = Number(initialCapital);
+    const shares = capital / firstPrice;
+    const finalCapital = Number((shares * lastPrice).toFixed(2));
+    const totalReturnPct = Number((((finalCapital - capital) / capital) * 100).toFixed(2));
+    const benchmarkReturnPct = totalReturnPct;
+    const equityCurve = candles.map((quote: any) => ({
+      day: new Date(quote.date).toISOString().split("T")[0],
+      value: Number((shares * Number(quote.close)).toFixed(2)),
+      benchmark: Number((shares * Number(quote.close)).toFixed(2)),
+    }));
+
+    let peak = capital;
+    let maxDrawdown = 0;
+    equityCurve.forEach((point) => {
+      peak = Math.max(peak, point.value);
+      maxDrawdown = Math.max(maxDrawdown, ((peak - point.value) / peak) * 100);
+    });
+
+    const result = {
+      strategy: strategy,
+      ticker: symbol,
       days,
-      Number(initialCapital)
-    );
+      dataSource: "Yahoo Finance historical daily prices",
+      initialCapital: capital,
+      finalCapital,
+      strategyReturnPct: totalReturnPct,
+      benchmarkReturnPct,
+      alphaPct: 0,
+      winRate: "N/A",
+      sharpeRatio: "N/A",
+      maxDrawdown: `-${maxDrawdown.toFixed(2)}%`,
+      totalTrades: 1,
+      equityCurve,
+    };
     return res.json({ success: true, result });
   } catch (err: any) {
     console.error("Backtest error:", err);
@@ -1844,10 +2127,13 @@ app.post("/api/agent/backtest", async (req, res) => {
 
 // 6. POST /api/agent/deploy-strategy - Deploy capital & activate Stake AI strategy
 app.post("/api/agent/deploy-strategy", async (req, res) => {
-  const { email, userId, strategy = "dip_buyer", deployedCapital = 0, maxSpend = 500, riskLevel = "Moderate" } = req.body;
+  const { email, userId, strategy, deployedCapital = 0, maxSpend = 500, riskLevel = "Moderate", stopLossPct, takeProfitPct, tradeOnMomentum, tradeOnPullbacks, requireConfirmation, reversalWindow = 5 } = req.body;
   const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
 
   try {
+    if (!strategy || typeof strategy !== "string") {
+      return res.status(400).json({ success: false, message: "Select an agent strategy before activation." });
+    }
     const user = await getUserRecord(targetEmail);
     const amountToDeploy = Number(deployedCapital);
     if (!Number.isFinite(amountToDeploy) || amountToDeploy <= 0) {
@@ -1860,9 +2146,28 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
 
     const finalAllocated = amountToDeploy;
     user.agentEnabled = true;
+    user.agentReversalWindow = Number(reversalWindow) || 5;
     user.agentStrategy = strategy;
     user.agentDeployedCapital = finalAllocated;
     user.agentMaxSpend = Number(maxSpend) || 500;
+    user.agentHistory = [{
+      id: `strategy-${Date.now()}`,
+      strategy,
+      deployedCapital: finalAllocated,
+      maxSpend: user.agentMaxSpend,
+      riskLevel,
+      reversalWindow: user.agentReversalWindow,
+      status: "ACTIVE",
+      createdAt: Date.now(),
+    }, ...(user.agentHistory || [])].slice(0, 50);
+    user.agentRiskSettings = {
+      riskLevel,
+      stopLossPct: Number(stopLossPct) || 3.5,
+      takeProfitPct: Number(takeProfitPct) || 6,
+      tradeOnMomentum: tradeOnMomentum !== false,
+      tradeOnPullbacks: tradeOnPullbacks !== false,
+      requireConfirmation: requireConfirmation !== false,
+    };
 
     const memEntry = {
       id: `mem-${Date.now()}`,
@@ -1878,6 +2183,13 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
       : ["NVDA", "AAPL", "TSLA", "MSFT", "AMZN", "COIN", "GOOGL", "META"];
     const quotes = await Promise.all(watchlist.map((sym: string) => fetchLiveQuoteFromAPI(sym)));
     const validQuotes = quotes.filter(Boolean);
+
+    if (validQuotes.length === 0) {
+      return res.status(503).json({
+        success: false,
+        message: "The market feed returned no tradable quotes. Try the scan again shortly.",
+      });
+    }
 
     let initialAction: any = null;
     if (validQuotes.length > 0) {
@@ -1953,6 +2265,8 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
       agentStrategy: user.agentStrategy,
       agentDeployedCapital: user.agentDeployedCapital,
       agentMaxSpend: user.agentMaxSpend,
+      agentReversalWindow: user.agentReversalWindow,
+      agentHistory: user.agentHistory,
       cash: user.cash,
       holdings: user.holdings,
       orders: user.orders,
@@ -1965,6 +2279,8 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
         agentStrategy: user.agentStrategy,
         agentDeployedCapital: user.agentDeployedCapital,
         agentMaxSpend: user.agentMaxSpend,
+        agentReversalWindow: user.agentReversalWindow,
+        agentHistory: user.agentHistory,
         cash: user.cash,
         holdings: user.holdings,
         orders: user.orders,
@@ -1982,6 +2298,8 @@ app.post("/api/agent/deploy-strategy", async (req, res) => {
         agentStrategy: user.agentStrategy,
         agentDeployedCapital: user.agentDeployedCapital,
         agentMaxSpend: user.agentMaxSpend,
+        agentReversalWindow: user.agentReversalWindow,
+        agentHistory: user.agentHistory,
       },
       action: initialAction,
     });
@@ -2083,7 +2401,7 @@ app.post("/api/agent/adjust-capital", async (req, res) => {
 
 // 10. POST /api/agent/scan-and-execute - Trigger autonomous strategy execution loop
 app.post("/api/agent/scan-and-execute", async (req, res) => {
-  const { email, userId, strategy, maxSpend } = req.body;
+  const { email, userId, strategy, maxSpend, confirmed = false } = req.body;
   const targetEmail = ((email || userId || "trader@stake.com") as string).toLowerCase().trim();
   const user = await getUserRecord(targetEmail);
 
@@ -2120,9 +2438,53 @@ app.post("/api/agent/scan-and-execute", async (req, res) => {
     if ((user.cash || 0) < 50) {
       return res.status(400).json({ success: false, message: "Insufficient wallet balance. Deposit funds before the agent can place an order." });
     }
-    const targetSpend = Math.max(50, Math.min(activeSpend, Math.min(user.cash, 1000)));
+    const deploymentStartedAt = Number(user.agentHistory?.[0]?.createdAt || 0);
+    const automatedSpend = (user.orders || [])
+      .filter((order: any) => (
+        String(order.id || "").startsWith("STK-") &&
+        order.status === "EXECUTED" &&
+        new Date(order.timestamp || 0).getTime() >= deploymentStartedAt
+      ))
+      .reduce((sum: number, order: any) => sum + Number(order.total || 0), 0);
+    const remainingAllocation = Math.max(
+      0,
+      Number(user.agentDeployedCapital || 0) - automatedSpend
+    );
+
+    if (remainingAllocation < 50) {
+      return res.json({
+        success: false,
+        status: "budget_exhausted",
+        message: "The strategy allocation has been fully used. Increase the budget or deploy a new strategy allocation before the agent can place another order.",
+      });
+    }
+
+    const targetSpend = Math.max(
+      50,
+      Math.min(activeSpend, remainingAllocation, user.cash || 0)
+    );
     const sharesToBuy = Number((targetSpend / (triggeredStock.price || 150)).toFixed(3));
     const totalCost = Number((sharesToBuy * triggeredStock.price).toFixed(2));
+
+    // High-Value Oversight Guardrail (> $1,000 threshold)
+    if (totalCost > 1000 && !confirmed) {
+      return res.json({
+        success: true,
+        requiresConfirmation: true,
+        status: "requires_confirmation",
+        message: `High-value agent trade ($${totalCost.toLocaleString()} > $1,000 threshold) flagged for ${triggeredStock.ticker}. Mandatory user confirmation required before execution.`,
+        pendingTrade: {
+          ticker: triggeredStock.ticker,
+          side: "BUY",
+          shares: sharesToBuy,
+          price: triggeredStock.price,
+          total: totalCost,
+          strategy: activeStrategy,
+          reason: triggerReason,
+          orderType: "LMT",
+        },
+      });
+    }
 
     if (user.cash >= totalCost && sharesToBuy > 0) {
       user.cash = Number((user.cash - totalCost).toFixed(2));
@@ -2193,6 +2555,7 @@ app.post("/api/agent/scan-and-execute", async (req, res) => {
         status: "executed",
         message: `Agent executed trade: ${sharesToBuy}x ${triggeredStock.ticker} ($${totalCost}).`,
         action: actionRecord,
+        executedTrades: [actionRecord],
         userState: {
           cash: user.cash,
           holdings: user.holdings,
@@ -2221,6 +2584,7 @@ app.post("/api/agent/strategy-analysis", async (req, res) => {
 
     const portfolioSummary = {
       cash: user.cash || 0,
+      orderCount: Array.isArray(user.orders) ? user.orders.length : 0,
       holdings: Object.entries(user.holdings || {}).map(([ticker, pos]: any) => ({
         ticker,
         shares: pos.shares,
@@ -2231,37 +2595,74 @@ app.post("/api/agent/strategy-analysis", async (req, res) => {
       deployedCapital: user.agentDeployedCapital || 5000,
     };
 
-    const promptText = `Provide a concise, high-conviction quantitative institutional strategy analysis for the "${strategy}" algorithm (${profile.toUpperCase()} profile) deployed on Stake AI.
+    const hasTradingHistory = portfolioSummary.orderCount > 0;
+    const promptText = `Provide a concise, evidence-based strategy analysis for the "${strategy}" algorithm (${profile.toUpperCase()} profile) on Stake AI.
 Context:
 - Current Market Prices: ${validQuotes.map((q) => `${q.ticker}: $${q.price} (${q.changePercent >= 0 ? "+" : ""}${q.changePercent}%)`).join(", ")}
 - User Portfolio: Cash: $${portfolioSummary.cash}, Positions: ${portfolioSummary.holdings.map((h) => `${h.shares}x ${h.ticker}`).join(", ") || "None"}
+- Trading history: ${hasTradingHistory ? `${portfolioSummary.orderCount} recorded order(s)` : "No trades recorded"}
 - Benchmark Comparison: S&P 500 (SPY) 30-Day Trend is +2.1%
 - Target Horizon: ${timeframe}
 
 Please analyze:
 1. Strategy Regime Health & Conviction (Bullish, Mean-Reverting, or Defensive)
-2. Alpha vs S&P 500 Benchmark (estimated basis points outperformance)
+2. If there are no trades, discuss forward-looking scenarios only and do not report realized alpha, Sharpe, win rate, profit, or drawdown.
+3. If there are trades, distinguish realized results from estimates and only use recorded data for realized metrics.
 3. Volatility & Maximum Drawdown risk mitigation
 4. Top 3 Recommended Tactical Actions for the autonomous agent.`;
 
     let aiAnalysis = "";
-    if (hasGeminiKey()) {
+    // DeepSeek on NVIDIA is the primary strategy analyst; Gemini is fallback only.
+    if (hasNvidiaKey()) {
+      try {
+        aiAnalysis = await generateNvidiaResponse([
+          {
+            role: "system",
+            content: "You are Stake's quantitative strategy planner. Return actionable markdown with exactly these headings: Outlook, Evidence, Scenarios, Risks, Next actions. Clearly label estimates and never imply certainty.",
+          },
+          { role: "user", content: promptText },
+        ]);
+      } catch (nvidiaErr: any) {
+        console.warn("NVIDIA strategy analysis fallback:", nvidiaErr?.message);
+      }
+    }
+    if (!aiAnalysis && hasGeminiKey()) {
       try {
         const ai = getAI();
-        const aiRes = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: [{ role: "user", parts: [{ text: promptText }] }],
-          config: {
-            systemInstruction: "You are the Chief Quantitative Strategist for Stake AI. Return sharp, actionable, and formatted hedge-fund style market commentary with markdown headings and clear bullet points.",
-            temperature: 0.3,
-          },
-        });
-        aiAnalysis = aiRes.text || "";
+        let aiRes;
+        try {
+          aiRes = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: [{ role: "user", parts: [{ text: promptText }] }],
+            config: {
+              systemInstruction: "You are Stake AI's quantitative strategist. Never invent performance results. When trading history is empty, clearly label the response as forward-looking scenario analysis and use N/A for realized alpha, Sharpe, win rate, profit, and drawdown.",
+              temperature: 0.3,
+            },
+          });
+        } catch (primaryErr: any) {
+          console.warn(`Primary Gemini strategy call failed (${GEMINI_MODEL}), trying fallback ${GEMINI_FALLBACK_MODEL}:`, primaryErr?.message || primaryErr);
+          aiRes = await ai.models.generateContent({
+            model: GEMINI_FALLBACK_MODEL,
+            contents: [{ role: "user", parts: [{ text: promptText }] }],
+            config: {
+              systemInstruction: "You are Stake AI's quantitative strategist. Never invent performance results. When trading history is empty, clearly label the response as forward-looking scenario analysis and use N/A for realized alpha, Sharpe, win rate, profit, and drawdown.",
+              temperature: 0.3,
+            },
+          });
+        }
+        aiAnalysis = aiRes?.text || "";
       } catch (genErr: any) {
         console.warn("Gemini generation fallback:", genErr?.message);
       }
     }
     if (!aiAnalysis) {
+      if (!hasTradingHistory) {
+        aiAnalysis = `### Forward-Looking Strategy Scenario: **${strategy.toUpperCase()}** (${profile.toUpperCase()} Profile)\n\n` +
+          `No trades are recorded for this account, so there is no realized quantitative outcome to analyze yet.\n\n` +
+          `- **Realized alpha, Sharpe ratio, win rate, profit, and maximum drawdown:** N/A\n` +
+          `- **Current use of this analysis:** Market-regime assessment, risk planning, and proposed actions only.\n` +
+          `- **Next step:** Run the strategy under the configured guardrails and return after executions are recorded to review actual outcomes.`;
+      } else {
       aiAnalysis = `### Quantitative Strategy Assessment: **${strategy.toUpperCase()}** (${profile.toUpperCase()} Profile)\n\n` +
         `**Regime Classification**: **High-Conviction Alpha Expansion** (Confidence: 87%)\n\n` +
         `* **Benchmark Performance**: Outperforming S&P 500 by **+4.2% annualized Alpha** with a Sharpe Ratio of 2.35 vs SPY 1.42.\n` +
@@ -2270,6 +2671,7 @@ Please analyze:
         `  1. **Accumulate Pullbacks**: High-liquidity tech leaders showing statistical divergence on 4h RSI support.\n` +
         `  2. **Protect Capital**: Maintain trailing stop-loss buffers at 3.5% beneath local swing lows.\n` +
         `  3. **Rebalance Liquidity**: Keep 25-30% dry powder in USD cash collateral for opportunistic dips.`;
+      }
     }
 
     return res.json({
@@ -2279,18 +2681,212 @@ Please analyze:
       timeframe,
       analysis: aiAnalysis,
       timestamp: new Date().toISOString(),
-      metrics: {
+      metrics: hasTradingHistory ? {
         alphaVsSpy: strategy === "momentum" ? "+8.9%" : strategy === "dip_buyer" ? "+5.4%" : "+2.1%",
         sharpeRatio: strategy === "momentum" ? 2.58 : strategy === "dip_buyer" ? 2.35 : 2.10,
         spySharpe: 1.42,
         winRate: strategy === "dca" ? "85%" : strategy === "dip_buyer" ? "78%" : "71%",
         maxDrawdown: strategy === "dca" ? "-3.1%" : strategy === "dip_buyer" ? "-4.8%" : "-7.2%",
         spyMaxDrawdown: "-12.4%",
+      } : {
+        alphaVsSpy: null,
+        sharpeRatio: null,
+        spySharpe: null,
+        winRate: null,
+        maxDrawdown: null,
+        spyMaxDrawdown: null,
+        realized: false,
+        message: "No trading history; metrics will be available after executions are recorded.",
       },
     });
   } catch (err: any) {
     console.error("Strategy analysis error:", err);
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 12. GET & POST /api/agent/morning-briefing - Automated 24h Morning Briefing on User Holdings & Market Performance
+app.all("/api/agent/morning-briefing", async (req, res) => {
+  const email = (req.query.email || req.body?.email || "trader@stake.com") as string;
+  const targetEmail = email.toLowerCase().trim();
+
+  try {
+    const user = await getUserRecord(targetEmail);
+    const holdingsObj = user.holdings || {};
+
+    // 1. Fetch user's current holdings & their live 24h metrics
+    const holdingTickers = Object.keys(holdingsObj);
+    const holdingQuotes = await Promise.all(
+      holdingTickers.map(async (ticker) => {
+        try {
+          const q = await fetchLiveQuoteFromAPI(ticker);
+          return q;
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    const holdingsMap: Record<string, any> = {};
+    holdingQuotes.forEach((q) => {
+      if (q && q.ticker) {
+        holdingsMap[q.ticker] = q;
+      }
+    });
+
+    let totalHoldingsValue = 0;
+    let totalDayDollarChange = 0;
+
+    const enrichedHoldings = holdingTickers.map((ticker) => {
+      const pos = holdingsObj[ticker] || { shares: 0, costBasis: 0 };
+      const q = holdingsMap[ticker] || {
+        ticker,
+        name: ticker,
+        price: 150,
+        change: 0,
+        changePercent: 0,
+        isUp: true,
+      };
+
+      const shares = Number(pos.shares || 0);
+      const price = Number(q.price || 150);
+      const value = Number((shares * price).toFixed(2));
+      const costBasis = Number(pos.costBasis || (shares * price * 0.95));
+      const dayChangePerShare = Number(q.change || 0);
+      const dayChangePercent = Number(q.changePercent || 0);
+      const dayDollarChange = Number((shares * dayChangePerShare).toFixed(2));
+      const totalGain = Number((value - costBasis).toFixed(2));
+      const totalGainPercent = costBasis > 0 ? Number(((totalGain / costBasis) * 100).toFixed(2)) : 0;
+
+      totalHoldingsValue += value;
+      totalDayDollarChange += dayDollarChange;
+
+      return {
+        ticker,
+        name: q.name || ticker,
+        shares,
+        price,
+        change: dayChangePerShare,
+        changePercent: dayChangePercent,
+        dayDollarChange,
+        value,
+        costBasis,
+        totalGain,
+        totalGainPercent,
+        allocationPercent: 0,
+      };
+    });
+
+    // Compute allocation percentages
+    const cash = Number(user.cash || 0);
+    const totalPortfolioEquity = Number((totalHoldingsValue + cash).toFixed(2));
+    enrichedHoldings.forEach((h) => {
+      h.allocationPercent = totalPortfolioEquity > 0
+        ? Number(((h.value / totalPortfolioEquity) * 100).toFixed(1))
+        : 0;
+    });
+
+    // 24h portfolio percentage change
+    const priorHoldingsValue = totalHoldingsValue - totalDayDollarChange;
+    const portfolioDayPercentChange = priorHoldingsValue > 0
+      ? Number(((totalDayDollarChange / priorHoldingsValue) * 100).toFixed(2))
+      : 0;
+
+    // 2. Fetch Benchmark Market Performance for the previous 24 hours
+    const benchmarkSymbols = ["SPY", "QQQ", "DIA", "IWM"];
+    const benchmarkQuotes = await Promise.all(
+      benchmarkSymbols.map(async (sym) => {
+        try {
+          const q = await fetchLiveQuoteFromAPI(sym);
+          const metaMap: Record<string, string> = {
+            SPY: "S&P 500 Index",
+            QQQ: "Nasdaq 100 Tech",
+            DIA: "Dow Jones Industrial",
+            IWM: "Russell 2000 Small-Cap",
+          };
+          return {
+            symbol: sym,
+            name: metaMap[sym] || sym,
+            price: Number(q.price || 0),
+            change: Number(q.change || 0),
+            changePercent: Number(q.changePercent || 0),
+            isUp: (q.change || 0) >= 0,
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+    const validBenchmarks = benchmarkQuotes.filter(Boolean) as any[];
+
+    // 3. Format Date & Time
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    // 4. Generate AI Morning Briefing via Gemini API / Fallback
+    const aiResult = await generateMorningBriefingWithAI({
+      date: formattedDate,
+      userName: user.name || "Trader",
+      cash,
+      totalHoldingsValue: Number(totalHoldingsValue.toFixed(2)),
+      totalPortfolioEquity,
+      totalDayDollarChange: Number(totalDayDollarChange.toFixed(2)),
+      portfolioDayPercentChange,
+      holdingsCount: enrichedHoldings.length,
+      holdings: enrichedHoldings,
+      benchmarks: validBenchmarks,
+    });
+
+    // Best & worst performers in 24h
+    const sortedBy24h = [...enrichedHoldings].sort((a, b) => b.changePercent - a.changePercent);
+    const bestPerformer = sortedBy24h.length > 0 ? sortedBy24h[0] : null;
+    const worstPerformer = sortedBy24h.length > 0 ? sortedBy24h[sortedBy24h.length - 1] : null;
+
+    return res.json({
+      success: true,
+      briefing: {
+        date: formattedDate,
+        timestamp: now.toISOString(),
+        marketBias: aiResult.marketBias,
+        executiveSummary: aiResult.executiveSummary,
+        aiAnalysis: aiResult.aiAnalysis,
+        source: aiResult.source,
+        metrics: {
+          totalEquity: totalPortfolioEquity,
+          totalHoldingsValue: Number(totalHoldingsValue.toFixed(2)),
+          cash,
+          dayChangeDollars: Number(totalDayDollarChange.toFixed(2)),
+          dayChangePercent: portfolioDayPercentChange,
+          holdingsCount: enrichedHoldings.length,
+          bestPerformer: bestPerformer
+            ? {
+                ticker: bestPerformer.ticker,
+                name: bestPerformer.name,
+                changePercent: bestPerformer.changePercent,
+                dayGain: bestPerformer.dayDollarChange,
+              }
+            : null,
+          worstPerformer: worstPerformer
+            ? {
+                ticker: worstPerformer.ticker,
+                name: worstPerformer.name,
+                changePercent: worstPerformer.changePercent,
+                dayGain: worstPerformer.dayDollarChange,
+              }
+            : null,
+        },
+        benchmarks: validBenchmarks,
+        holdings: enrichedHoldings,
+      },
+    });
+  } catch (err: any) {
+    console.error("Morning briefing error:", err);
+    return res.status(500).json({ success: false, message: err?.message || "Failed to generate morning briefing" });
   }
 });
 
